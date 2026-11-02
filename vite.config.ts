@@ -21,7 +21,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['tests/sim/**/*.test.ts', 'tests/program/**/*.test.ts', 'tests/ui/**/*.test.tsx'],
+    include: ['tests/sim/**/*.test.ts', 'tests/program/**/*.test.ts', 'tests/ui/**/*.test.{ts,tsx}'],
     environment: 'node',
   },
 });

@@ -242,10 +242,10 @@ function aaBlocks(): BlocksState {
     ),
   });
   failure.x = 20;
-  failure.y = 640;
+  failure.y = 1000;
   const start = blk('event_start', {}, { DO: blk('drone_set_power', {}, { P: num(1), W: num(1), S: num(1.5) }) });
-  start.x = 520;
-  start.y = 640;
+  start.x = 620;
+  start.y = 1000;
   return { blocks: { languageVersion: 0, blocks: [update, failure, start] }, variables: [VAR_T, VAR_ORBIT] };
 }
 

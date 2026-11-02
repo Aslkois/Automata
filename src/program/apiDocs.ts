@@ -1,0 +1,63 @@
+// Reference for the drone API (autocomplete, in-app reference and docs/API.md).
+export interface ApiDoc {
+  name: string;
+  sig: string;
+  returns: string;
+  doc: string;
+  group: 'Self' | 'Sensors' | 'Movement' | 'Weapons' | 'Shields' | 'Power' | 'Hardware' | 'Timers' | 'Globals';
+}
+
+export const API_DOCS: ApiDoc[] = [
+  { group: 'Self', name: 'time', sig: 'drone.time()', returns: 'number', doc: 'Simulation time in seconds.' },
+  { group: 'Self', name: 'x', sig: 'drone.x()', returns: 'number', doc: 'Own centre-of-mass x.' },
+  { group: 'Self', name: 'y', sig: 'drone.y()', returns: 'number', doc: 'Own centre-of-mass y.' },
+  { group: 'Self', name: 'position', sig: 'drone.position()', returns: '{x, y}', doc: 'Own position.' },
+  { group: 'Self', name: 'heading', sig: 'drone.heading()', returns: 'degrees', doc: 'Hull heading. 0° = +x (east), 90° = +y (south).' },
+  { group: 'Self', name: 'speed', sig: 'drone.speed()', returns: 'number', doc: 'Signed forward speed (u/s).' },
+  { group: 'Self', name: 'velocity', sig: 'drone.velocity()', returns: '{x, y}', doc: 'Velocity vector.' },
+  { group: 'Self', name: 'angleTo', sig: 'drone.angleTo(x, y)', returns: 'degrees', doc: 'Bearing from self to a point.' },
+  { group: 'Self', name: 'distanceTo', sig: 'drone.distanceTo(x, y)', returns: 'number', doc: 'Distance from self to a point.' },
+  { group: 'Self', name: 'arena', sig: 'drone.arena()', returns: '{width, height}', doc: 'Arena dimensions (public map knowledge).' },
+  { group: 'Self', name: 'id', sig: 'drone.id()', returns: 'number', doc: 'Own id.' },
+  { group: 'Self', name: 'team', sig: 'drone.team()', returns: 'number', doc: 'Own team.' },
+  { group: 'Self', name: 'random', sig: 'drone.random()', returns: '0..1', doc: 'Seeded deterministic random number (Math.random is the same source).' },
+  { group: 'Self', name: 'log', sig: 'drone.log(...values)', returns: '', doc: 'Write to the decision trace.' },
+  { group: 'Sensors', name: 'contacts', sig: 'drone.contacts()', returns: 'Contact[]', doc: 'All contacts detected this tick by powered, working sensors with line of sight. Sorted by distance.' },
+  { group: 'Sensors', name: 'enemies', sig: 'drone.enemies()', returns: 'Contact[]', doc: 'Detected enemy contacts.' },
+  { group: 'Sensors', name: 'nearestEnemy', sig: 'drone.nearestEnemy()', returns: 'Contact | null', doc: 'Closest detected enemy not known to be disabled.' },
+  { group: 'Sensors', name: 'threats', sig: 'drone.threats()', returns: 'Threat[]', doc: 'Interceptable shells on a collision course (needs a radar).' },
+  { group: 'Sensors', name: 'sensors', sig: 'drone.sensors()', returns: 'Sensor[]', doc: 'Own sensors with status, arc, range and facing.' },
+  { group: 'Movement', name: 'drive', sig: 'drone.drive(throttle, steer)', returns: '', doc: 'Persistent propulsion command, both in [-1, 1]. Positive steer turns clockwise.' },
+  { group: 'Movement', name: 'turnToward', sig: 'drone.turnToward(x, y, throttle = 1)', returns: '', doc: 'Proportional steering toward a point (slows down for sharp turns).' },
+  { group: 'Movement', name: 'stop', sig: 'drone.stop()', returns: '', doc: 'Zero throttle and steering.' },
+  { group: 'Weapons', name: 'weapons', sig: 'drone.weapons()', returns: 'Weapon[]', doc: 'Own weapons: id, type, functional, ammo, reserve, reloading, ready, heat, aim, arcMin/arcMax, range, blocked.' },
+  { group: 'Weapons', name: 'weapon', sig: 'drone.weapon(id)', returns: 'Weapon', doc: 'One weapon by id ("F.H1"), index or object.' },
+  { group: 'Weapons', name: 'aim', sig: 'drone.aim(id, angle)', returns: '', doc: 'Command a turret to a world angle (degrees). Turrets are stabilised and traverse at their rate within their arc.' },
+  { group: 'Weapons', name: 'aimAt', sig: 'drone.aimAt(id, x, y)', returns: '', doc: 'Command a turret toward a point.' },
+  { group: 'Weapons', name: 'fire', sig: 'drone.fire(id, on = true)', returns: '', doc: 'Hold (or release) the trigger. The weapon fires whenever loaded, cool and unobstructed.' },
+  { group: 'Weapons', name: 'ceaseFire', sig: 'drone.ceaseFire(id?)', returns: '', doc: 'Release one or all triggers.' },
+  { group: 'Weapons', name: 'reload', sig: 'drone.reload(id)', returns: '', doc: 'Start a reload from ammunition storage.' },
+  { group: 'Weapons', name: 'canFire', sig: 'drone.canFire(id, x, y)', returns: 'boolean', doc: 'Point within traverse arc, not obstructed by own sections, weapon loaded, cool and functional.' },
+  { group: 'Weapons', name: 'inArc', sig: 'drone.inArc(id, x, y)', returns: 'boolean', doc: 'Point within traverse arc and not obstructed (ignores ammunition state).' },
+  { group: 'Weapons', name: 'aimError', sig: 'drone.aimError(id, x, y)', returns: 'degrees', doc: 'Angle between the current turret direction and a point.' },
+  { group: 'Weapons', name: 'lead', sig: 'drone.lead(id, contact)', returns: '{x, y, t} | null', doc: 'Intercept point for a contact using its observed velocity and the weapon muzzle velocity.' },
+  { group: 'Shields', name: 'shields', sig: 'drone.shields()', returns: 'Shield[]', doc: 'Own shields: charge, capacity, raised, powered, overloaded, facing, arc.' },
+  { group: 'Shields', name: 'raiseShield', sig: 'drone.raiseShield(id, on = true)', returns: '', doc: 'Raise or lower a shield (lowered shields still recharge).' },
+  { group: 'Shields', name: 'shieldFace', sig: 'drone.shieldFace(id, angle)', returns: '', doc: 'Rotate a directional shield to a world angle.' },
+  { group: 'Shields', name: 'shieldFaceToward', sig: 'drone.shieldFaceToward(id, x, y)', returns: '', doc: 'Rotate a directional shield toward a point.' },
+  { group: 'Power', name: 'power', sig: 'drone.power()', returns: 'Power', doc: 'generation, stored, capacity, demand/satisfaction per category, allocation.' },
+  { group: 'Power', name: 'setPower', sig: 'drone.setPower(propulsion, weapons, shields)', returns: '', doc: 'Priority weights for distributing power during shortages.' },
+  { group: 'Power', name: 'maxHeat', sig: 'drone.maxHeat()', returns: 'number', doc: 'Hottest working component temperature (100 = overheated).' },
+  { group: 'Hardware', name: 'components', sig: 'drone.components()', returns: 'Component[]', doc: 'Every component: health, destroyed, attached, functional, heat.' },
+  { group: 'Hardware', name: 'component', sig: 'drone.component(id)', returns: 'Component', doc: 'One component by id.' },
+  { group: 'Hardware', name: 'sections', sig: 'drone.sections()', returns: 'Section[]', doc: 'front/middle/rear: class, attached, destroyed, integrity, armor.' },
+  { group: 'Hardware', name: 'count', sig: 'drone.count(kind)', returns: 'number', doc: 'Working components of a kind (weapon, sensor, motor, shield, generator, controller, gear…).' },
+  { group: 'Hardware', name: 'status', sig: 'drone.status()', returns: 'Status', doc: 'Derived flags: degraded, immobilized, disarmed, disabled, label.' },
+  { group: 'Hardware', name: 'failures', sig: 'drone.failures()', returns: 'Failure[]', doc: 'Hardware failure events since the previous decision tick.' },
+  { group: 'Timers', name: 'resetTimer', sig: 'drone.resetTimer(name)', returns: '', doc: 'Reset a named timer to now.' },
+  { group: 'Timers', name: 'elapsed', sig: 'drone.elapsed(name)', returns: 'seconds', doc: 'Seconds since the timer was reset (starts on first use).' },
+  { group: 'Globals', name: 'angleDiff', sig: 'angleDiff(from, to)', returns: 'degrees', doc: 'Signed smallest angle from one heading to another (-180..180].' },
+  { group: 'Globals', name: 'clamp', sig: 'clamp(x, lo, hi)', returns: 'number', doc: 'Clamp a number.' },
+  { group: 'Globals', name: 'rad', sig: 'rad(deg)', returns: 'number', doc: 'Degrees to radians.' },
+  { group: 'Globals', name: 'deg', sig: 'deg(rad)', returns: 'number', doc: 'Radians to degrees.' },
+];
