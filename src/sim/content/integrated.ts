@@ -44,7 +44,7 @@ export function integratedParts(d: Pick<DroneDesign, 'chassis' | 'sections'>): I
       id: 'M.CPU',
       x: 1,
       y: -2.5,
-      def: { ...base, id: 'integrated_cpu', name: 'Autonomous CPU', kind: 'controller', mass: 0, hp: 140, armor: 12, description: 'Runs the drone’s brain. Fails only if its section is destroyed or the drone breaks apart.', controller: { opsBudget: CPU_BUDGET, power: 2 } },
+      def: { ...base, id: 'integrated_cpu', name: 'Autonomous CPU', kind: 'controller', mass: 0, hp: 340, armor: 24, description: 'Runs the drone’s brain. Fails only if its section is destroyed or the drone breaks apart.', controller: { opsBudget: CPU_BUDGET, power: 2 } },
     },
     {
       id: 'M.CORE',

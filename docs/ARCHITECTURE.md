@@ -15,19 +15,29 @@ src/
   program/        player programming
     interpreter.ts  AutoScript: sandboxed tree-walking interpreter (acorn parser)
     api.ts          the drone API exposed to programs
-    runtime.ts      per-drone controller: compile, budget, decision trace, error isolation
-    compile/        blocks -> AutoScript, nodes -> AutoScript, code validation
-    blockDefs.ts / nodeDefs.ts  block and node catalogues shared by editors and compilers
+    runtime.ts      per-drone controller: compile, budget, decision trace, variables, error isolation
+    brain/          one brain per drone design, three editors
+      ir.ts         canonical program: structured AutoScript tree with stable ids
+      parse.ts      AutoScript -> IR (unsupported constructs become exact code modules)
+      print.ts      IR -> AutoScript with a line map (what the runtime executes)
+      reconcile.ts  keeps ids of unchanged logic across code edits
+      blocks.ts     IR <-> Blockly workspace JSON (headless)
+      graph.ts      IR <-> node graph, automatic layout (headless)
+      model.ts      Brain record, per-view caches, drafts, edits
+      catalog.ts    API/helper metadata and the Insert catalogue shared by all views
+      stdlib.ts     helper functions (engageAll, aimAtContact…) appended when used
+    legacy/         schema-1 block/node compilers, kept only for migration
   render/         canvas renderer, event-driven VFX, procedural audio (observe only)
-  ui/             React app: Hangar, Programs (Blockly / XYFlow / CodeMirror), Battle
-  data/defaults.ts  example designs and programs
+  ui/             React app: rail shell, Construct, Program (Blockly / XYFlow / CodeMirror), Simulate
+    migrate.ts      versioned library migration (schema 1 -> 2), recovered programs
+  data/defaults.ts  example designs and brains
 ```
 
 ## Principles
 
 - **The simulation is authoritative and headless.** `Simulation.step()` advances exactly 1/60 s. Rendering, audio and UI read its state and drain its event queue. They never write to it. Battles run identically with or without a renderer (`npm run sim:headless`, tests).
-- **One runtime for three interfaces.** Blocks (Blockly JSON) and nodes (graph JSON) are compiled headlessly to AutoScript, a JavaScript subset. Code programs are AutoScript. All of them run in the same `Interpreter` with the same `drone` API. Compiled block and node programs contain `__at("<id>")` markers, so each trace entry points to its source block or node. Code programs report line numbers.
-- **Sandboxing.** Player source is never executed as host JavaScript. The interpreter enforces a syntax allow-list, a per-tick operation budget (set by the control unit), a call-depth limit, array and string size limits, null-prototype objects, no prototype access, read-only built-ins and seeded `Math.random`. A failing program records an error for that tick. The drone keeps its standing commands and the simulation continues.
+- **One brain, three views.** Each design owns exactly one brain. Its authoritative content is a structured AutoScript IR in which every statement and expression has a stable id. Blocks, Nodes and Code are projections of that IR. Each view caches the document it last showed together with the IR hash it was made from, and the cache is used only while that hash still matches. An edit that converts replaces the IR; one that doesn't is kept as that view's draft. Constructs a visual view can't express (switch, arrow functions, object literals, templates…) appear there as code modules: exact source that can be edited in place and runs unchanged. The runtime executes the printed IR, and trace line numbers map back to ids, so the debugger can open any view at the originating logic. Lossless round trips and identical simulated behaviour across views are covered by `tests/program/brain.test.ts`.
+- **Sandboxing.** Player source is never executed as host JavaScript. The interpreter enforces a syntax allow-list, a per-tick operation budget (the integrated CPU's runaway-loop guard), a call-depth limit, array and string size limits, null-prototype objects, no prototype access, read-only built-ins and seeded `Math.random`. A failing program records an error for that tick. The drone keeps its standing commands and the simulation continues.
 - **No omniscience.** The API reads only the drone's own hardware state and its `perception`, which is computed each decision tick from functioning, powered sensors with range, arc and line of sight.
 - **Data-driven content.** Sections, chassis and components are plain data. Systems switch only on component `kind`.
 - **Determinism.** The simulation uses a fixed timestep, seeded `Rng` (mulberry32), stable update ordering (drone id order) and per-drone program RNGs. `Simulation.fingerprint()` hashes the physical and combat state. Tests verify that identical seeds give identical fingerprints, and that single-stepping matches batch stepping, in Node. Bit-for-bit determinism across different JS engines or platforms has **not** been verified.

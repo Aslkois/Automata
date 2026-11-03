@@ -22,8 +22,24 @@ A drone is laid out along its forward axis as **rear | middle | front**. Section
 | --- | --- | --- | --- | --- | --- |
 | Wheeled | 0.035 | 0.75 / 0.62 | Ackermann: needs forward speed to turn | 60 kg | 45 |
 | Tracked | 0.085 | 0.95 / 1.10 | Skid steer: can pivot in place | 170 kg | 90 |
+| Walking | 0.06 | 1.05 / 1.30 | Turns on the spot; slow (low drive power) | 130 kg | 75 |
+| Flying | 0.012 | 0.90 / 0.34 | Vectored thrust; fast, drifts in turns; still blocked by walls (it skims low) | 45 kg | 32 |
 
-Every section carries a left and a right running-gear component. Grip on each side depends on how healthy that side's gear is.
+Every section carries a left and a right running-gear component (wheels, track, legs or thrusters). Grip, or thrust for the flyer, on each side depends on how healthy that side's gear is.
+
+## Integrated systems
+
+Every chassis builds these into the middle section automatically. The player never installs, wires or upgrades them.
+
+| System | Provides |
+| --- | --- |
+| Propulsion (wheel motors, track drive, leg actuators or lift thrusters) | Force and power scale with the three section classes and the chassis. Output falls with damage, power shortage and heat. Heavier drones accelerate less. |
+| Autonomous CPU | Runs the brain (20 000 operations per decision: a runaway-loop guard, not a constraint). |
+| Power core | 30 PU/s plus 10 / 15 / 22 per light / medium / heavy section, and a 500 PU·s buffer. |
+| Coolant loop | Baseline cooling of 6 heat/s. |
+| Proximity array | 360° detection out to 420 u, with classification. Cameras and radar see further. |
+
+They are real components: they take damage from penetrating hits, and losing the middle section loses them. A drone whose CPU is destroyed is disabled.
 
 ## Components
 
@@ -40,16 +56,18 @@ Every section carries a left and a right running-gear component. Grip on each si
 | Compact Generator | S internal | 180 | 45 PU/s |
 | Reactor | L internal | 650 | 130 PU/s, runs hot |
 | Battery / Capacitor | S internal | 120 / 50 | 700 PU·s @ 90/s, or 180 PU·s @ 300/s |
-| Drive Motor S/M/L | S/M/L internal | 140/300/560 | Force 120k/230k/400k, 22/45/75 PU/s at full throttle |
-| Control Unit / Advanced | S/M internal | 40/90 | 4000 / 12000 operations per decision tick |
 | Cooling Unit | S internal | 80 | 7 heat/s for its own section, half that for adjacent sections |
 | Small / Medium magazine | S internal | 110/140 | 1500 small or 400 medium rounds |
 | Shell Rack | M internal | 260 | 20 large shells. Cooks off when destroyed. |
 
 ## Validation
 
-**Errors** (block deployment): no control unit, no power source, a component in the wrong slot type or size, armor above the class maximum, equipment over the frame limit, or drive force too weak to overcome rolling resistance.
+**Errors** (block deployment): a component in the wrong slot type or size, armor above the class maximum, equipment over the frame limit, or a drone too heavy for its propulsion to move.
 
-**Warnings**: always-on demand above generation, peak demand above generation plus discharge, no propulsion, very low acceleration, firing arcs fully or partly obstructed, no ammunition storage for a weapon's calibre, no cooling.
+**Warnings**: always-on demand above generation, peak demand above what generation and the buffers can supply, very low acceleration, firing arcs fully or partly obstructed, no ammunition storage for a weapon's calibre.
+
+**Suggestions**: no weapons yet.
+
+Drive motors and control units used to be equipment. Designs saved before schema 2 are migrated by removing them, because every chassis now integrates both.
 
 Unusual designs are allowed as long as they physically work. The game has no fixed classes and assigns no labels to designs.

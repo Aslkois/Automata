@@ -785,7 +785,8 @@ input[type='range'] {
 .drone-chip .name {
   font: 600 15px/1.1 var(--display);
   text-align: center;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  hyphens: auto;
   max-width: 100%;
 }
 .drone-chip .sub {
@@ -3249,7 +3250,14 @@ select.nf {
 /* ------------------------------------------------------------------ responsive: tablet */
 @media (max-width: 1024px) {
   :root {
-    --rail: 76px;
+    --rail: 80px;
+  }
+  .act {
+    font-size: 10px;
+    letter-spacing: 0.05em;
+  }
+  .drone-chip .name {
+    font-size: 13px;
   }
   .title-input {
     font-size: 28px;
@@ -3285,11 +3293,156 @@ select.nf {
   }
 }
 
+/* ------------------------------------------------------------------ responsive: compact construct */
+@media (max-width: 1100px), (max-height: 560px) {
+  /* construct stacks: identity, sections, the stage, the tray */
+  .props {
+    top: auto;
+    bottom: calc(var(--tray-h, 52px) + 10px);
+    max-height: calc(100% - var(--tray-h, 52px) - 150px);
+  }
+  .construct {
+    display: flex;
+    flex-direction: column;
+  }
+  .c-head {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    order: 1;
+    padding: calc(8px + var(--safe-t)) 12px 6px;
+    gap: 8px;
+    align-items: center;
+    background: linear-gradient(180deg, var(--vellum), rgba(230, 220, 200, 0.8));
+  }
+  .identity {
+    min-width: 0;
+  }
+  .identity .seg {
+    overflow-x: auto;
+    max-width: 100%;
+    scrollbar-width: none;
+  }
+  .readout {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    align-self: center;
+  }
+  .cross {
+    margin-left: auto;
+  }
+
+  .cross .btn {
+    min-height: 38px;
+  }
+  .c-head .grow {
+    display: none;
+  }
+  .assembly {
+    position: relative;
+    order: 2;
+    top: auto;
+    left: auto;
+    transform: none;
+    margin: 0 12px;
+    width: auto;
+    min-width: 0;
+  }
+  .asm-seg {
+    padding: 7px 8px;
+  }
+
+  .stage {
+    position: relative;
+    order: 3;
+    flex: 1;
+    min-height: 0;
+  }
+  .stage-layer {
+    top: auto;
+    left: 12px;
+    bottom: calc(var(--tray-h, 52px) + 64px);
+    grid-auto-flow: column;
+    align-items: center;
+  }
+  .tray {
+    position: relative;
+    order: 4;
+  }
+  .stage-tools {
+    bottom: 10px;
+    left: auto;
+    right: 12px;
+  }
+  .hint {
+    bottom: calc(var(--tray-h, 52px) + 12px);
+  }
+  .stage-layer .switch-label {
+    font-size: 12.5px;
+  }
+  .stage-tools .scale {
+    display: none;
+  }
+  /* properties: a bottom sheet over the tray */
+  .props {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: auto;
+    max-height: 62%;
+    border-radius: 14px 14px 0 0;
+    animation: slide-up var(--slow) var(--ease);
+    z-index: 11;
+    padding-bottom: var(--safe-b);
+  }
+  .props::before {
+    content: '';
+    position: sticky;
+    display: block;
+    top: 6px;
+    left: 0;
+    margin: 6px auto 0;
+    width: 40px;
+    height: 4px;
+    border: 0;
+    border-radius: 2px;
+    background: var(--dune);
+    opacity: 1;
+  }
+  .props::after {
+    display: none;
+  }
+  .props-body {
+    padding: 8px 18px 22px;
+  }
+}
+
 /* ------------------------------------------------------------------ responsive: phone */
 @media (max-width: 720px) {
   :root {
     --nav-h: calc(60px + var(--safe-b));
   }
+  .identity {
+    flex: 1 1 100%;
+  }
+  .title-input {
+    font-size: 26px;
+    width: 100%;
+  }
+  .readout {
+    display: none;
+  }
+  .cross .btn:first-child {
+    display: none;
+  }
+  .asm-top .armor,
+  .asm-parts {
+    display: none;
+  }
+
   body {
     font-size: 15px;
   }
@@ -3359,134 +3512,6 @@ select.nf {
     animation: slide-up var(--slow) var(--ease);
   }
 
-  /* construct: one column — identity, sections, the stage, the tray */
-  .construct {
-    display: flex;
-    flex-direction: column;
-  }
-  .c-head {
-    position: relative;
-    top: auto;
-    left: auto;
-    right: auto;
-    order: 1;
-    padding: calc(8px + var(--safe-t)) 12px 6px;
-    gap: 8px;
-    align-items: center;
-    background: linear-gradient(180deg, var(--vellum), rgba(230, 220, 200, 0.8));
-  }
-  .identity {
-    flex: 1 1 100%;
-    min-width: 0;
-  }
-  .identity .seg {
-    overflow-x: auto;
-    max-width: 100%;
-    scrollbar-width: none;
-  }
-  .title-input {
-    font-size: 26px;
-    width: 100%;
-  }
-  .readout {
-    display: none;
-  }
-  .cross {
-    margin-left: auto;
-  }
-  .cross .btn:first-child {
-    display: none;
-  }
-  .cross .btn {
-    min-height: 38px;
-  }
-  .c-head .grow {
-    display: none;
-  }
-  .assembly {
-    position: relative;
-    order: 2;
-    top: auto;
-    left: auto;
-    transform: none;
-    margin: 0 12px;
-    width: auto;
-    min-width: 0;
-  }
-  .asm-seg {
-    padding: 7px 8px;
-  }
-  .asm-top .armor,
-  .asm-parts {
-    display: none;
-  }
-  .stage {
-    position: relative;
-    order: 3;
-    flex: 1;
-    min-height: 0;
-  }
-  .stage-layer {
-    top: auto;
-    left: 12px;
-    bottom: calc(var(--tray-h, 52px) + 64px);
-    grid-auto-flow: column;
-    align-items: center;
-  }
-  .tray {
-    position: relative;
-    order: 4;
-  }
-  .stage-tools {
-    bottom: 10px;
-    left: auto;
-    right: 12px;
-  }
-  .hint {
-    bottom: calc(var(--tray-h, 52px) + 12px);
-  }
-  .stage-layer .switch-label {
-    font-size: 12.5px;
-  }
-  .stage-tools {
-    left: 12px;
-  }
-  .stage-tools .scale {
-    display: none;
-  }
-  /* properties: a bottom sheet over the tray */
-  .props {
-    left: 0;
-    right: 0;
-    top: auto;
-    bottom: 0;
-    width: auto;
-    max-height: 62%;
-    border-radius: 14px 14px 0 0;
-    animation: slide-up var(--slow) var(--ease);
-    z-index: 11;
-    padding-bottom: var(--safe-b);
-  }
-  .props::before {
-    content: '';
-    position: sticky;
-    display: block;
-    top: 6px;
-    left: 0;
-    margin: 6px auto 0;
-    width: 40px;
-    height: 4px;
-    border: 0;
-    border-radius: 2px;
-    background: var(--dune);
-    opacity: 1;
-  }
-  .props::after {
-    display: none;
-  }
-  .props-body {
-    padding: 8px 18px 22px;
-  }
   .tray-bar {
     gap: 8px;
     padding: 0 10px;
@@ -3674,6 +3699,13 @@ select.nf {
   .sp-head {
     padding: 12px 8px 10px 16px;
   }
+  /* while spectating, the transport rides above the sheet */
+  .simulate.spectating .transport {
+    bottom: calc(52% + 10px);
+  }
+  .simulate.spectating .timeline {
+    display: none;
+  }
   .silhouette {
     height: 70px;
   }
@@ -3689,7 +3721,20 @@ select.nf {
 /* phones in landscape: keep the rail at the side so the workspace keeps its height */
 @media (max-height: 500px) and (orientation: landscape) and (max-width: 1000px) {
   :root {
-    --rail: 72px;
+    --rail: 76px;
+  }
+  .title-input {
+    font-size: 22px;
+    width: 220px;
+  }
+  .c-head {
+    flex-wrap: nowrap;
+  }
+  .cross .btn:first-child {
+    display: none;
+  }
+  .stage-layer .switch-label {
+    display: none;
   }
   .mark {
     display: none;
@@ -3701,20 +3746,26 @@ select.nf {
   .drone-chip .sub {
     display: none;
   }
-  .assembly {
-    top: 84px;
-  }
-  .readout {
+  .readout,
+  .asm-parts {
     display: none;
   }
-  .stage-layer {
-    top: 150px;
-  }
   .props {
-    top: 64px;
+    top: 8px;
+    bottom: 8px;
   }
   .tray-grid {
-    height: 150px;
+    height: 132px;
+  }
+  .construct .tray {
+    position: absolute;
+    order: 0;
+  }
+  .stage {
+    margin-bottom: 52px;
+  }
+  .part .pstat:last-of-type {
+    display: none;
   }
   .spectator {
     top: 56px;

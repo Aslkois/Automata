@@ -18,7 +18,7 @@ function onFailure(event) { // called once per hardware failure, before update()
 ```
 
 - Commands such as `drive`, `aim`, `fire` and `setPower` are **persistent**. They stay in effect until changed. The 60 Hz systems carry them out: turrets traverse at their rate, triggers fire whenever the weapon is able.
-- Each decision tick has an operation budget from the best working control unit (4000 or 12000 ops). Exceeding it ends that tick with an error. Standing commands remain.
+- Each decision tick has an operation budget of 20 000 operations from the integrated CPU, to stop runaway loops. Exceeding it ends that tick with an error. Standing commands remain.
 - Angles are in degrees. 0° points to +x (east) and 90° to +y (south, down the screen). Distances are world units (1 u = 0.1 m).
 
 ## Language (AutoScript)
@@ -117,7 +117,7 @@ Limits: call depth 64; arrays and strings up to 10 000 elements or characters.
 | `drone.components()` | `Component[]` | Every component: health, destroyed, attached, functional, heat. |
 | `drone.component(id)` | `Component` | One component by id. |
 | `drone.sections()` | `Section[]` | front/middle/rear: class, attached, destroyed, integrity, armor. |
-| `drone.count(kind)` | `number` | Working components of a kind (weapon, sensor, motor, shield, generator, controller, gear…). |
+| `drone.count(kind)` | `number` | Working components of a kind (weapon, sensor, motor, shield, generator, controller, gear…). The integrated drive, CPU, power core, coolant loop and proximity array count as motor, controller, generator, cooler and sensor. |
 | `drone.status()` | `Status` | Derived flags: degraded, immobilized, disarmed, disabled, label. |
 | `drone.failures()` | `Failure[]` | Hardware failure events since the previous decision tick. |
 
@@ -137,8 +137,18 @@ Limits: call depth 64; arrays and strings up to 10 000 elements or characters.
 | `rad(deg)` | `number` | Degrees to radians. |
 | `deg(rad)` | `number` | Radians to degrees. |
 
-## Blocks and nodes
+## Blocks, nodes and code
 
-The block categories (Events, Logic, Loops, Math, Text & Lists, Sensors, Movement, Weapons, Systems, Variables, Functions) and the node categories (Events, Flow, Sensors, Actions, Data, Memory) map directly onto the calls above. Convenience blocks and nodes such as *all weapons engage*, *aim weapon at contact* and *face shield toward* call small helper functions written in AutoScript. They are visible under **Show compiled AutoScript** and use only the public API.
+A drone's brain is one AutoScript program; Blocks and Nodes are other ways of showing and editing it.
 
-Node graphs use typed ports: `exec`, `number`, `boolean`, `contact`, `string` and `any`. The editor rejects mismatched connections. The compiler reports unconnected required inputs, data cycles and execution loops. *State Is* and *Set State* nodes implement a state machine through a persistent `__state` variable.
+- **Mapping.** *every decision tick* is `function update()`, *when hardware fails* is `function onFailure(event)`, and *when the brain starts* holds the top-level steps, which run once. Calls are shown with labelled arguments. Literal and variable arguments are typed directly on node ports.
+- **Code modules.** Anything a visual editor can't draw stays as a code module with its exact text: `switch`, `for…in`, arrow functions, object and template literals, optional chaining, labels, nested function declarations, and assignment inside expressions. You can edit modules in place. If edited text becomes expressible, it is shown natively next time.
+- **Comments** become notes (blocks and nodes) and survive round trips. Code keeps your formatting until the program is changed in another view.
+- **Helpers** are ordinary AutoScript built only from the public API. They are appended when used, and your own function with the same name wins:
+  - `engageAll(contact)`
+  - `aimAtContact(weapon, contact, lead = true)`
+  - `turnTowardContact(contact, throttle = 1)`
+  - `shieldFaceContact(shield, contact)`
+  - `canFireAt(weapon, contact)`
+  - `itemAt(list, position)` (1-based)
+- **Node graphs.** Execution flows through diamond ports, and each step follows exactly one step. A data node used by several inputs is evaluated at each use.

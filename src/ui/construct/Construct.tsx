@@ -24,6 +24,12 @@ export function Construct({ active }: { active: boolean }) {
   const [showArcs, setShowArcs] = useStoredState('arcs', true);
   const [issuesOpen, setIssuesOpen] = useState(false);
   const phone = useMedia(PHONE);
+  const stacked = useMedia('(max-width: 1100px), (max-height: 560px)');
+  const short = useMedia('(max-height: 560px)');
+  // on short (landscape phone) screens the tray starts collapsed so the drone keeps the space
+  useEffect(() => {
+    if (short) setTrayOpen(false);
+  }, [short, setTrayOpen]);
 
   useEffect(() => {
     setSel(null);
@@ -124,7 +130,7 @@ export function Construct({ active }: { active: boolean }) {
 
   return (
     <div className="construct" data-testid="construct" style={{ ['--tray-h' as string]: `${trayH}px` }}>
-      <Stage design={design} stats={stats} layer={layer} sel={sel} armed={armedDef} showArcs={showArcs} onSelect={onSelect} onDropPart={onDropPart} inset={phone ? { bottom: 60, right: 0, top: 8 } : { bottom: trayH, right: propsOpen ? 390 : 0, top: 230 }} />
+      <Stage design={design} stats={stats} layer={layer} sel={sel} armed={armedDef} showArcs={showArcs} onSelect={onSelect} onDropPart={onDropPart} inset={stacked ? { bottom: 60, right: propsOpen ? 380 : 0, top: 8 } : { bottom: trayH, right: propsOpen ? 390 : 0, top: 230 }} />
 
       <header className="c-head">
         <div className="identity">

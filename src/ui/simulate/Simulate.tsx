@@ -254,7 +254,7 @@ export function Simulate({ active }: { active: boolean }) {
   const nameOf = (id: number) => sim?.drones.find((d) => d.id === id)?.name ?? `#${id}`;
 
   return (
-    <div className="simulate" data-testid="battle">
+    <div className={`simulate ${selDrone ? 'spectating' : ''}`} data-testid="battle">
       <div className="field">
         <canvas ref={canvasRef} data-testid="battle-canvas" aria-label="Battlefield" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel} />
       </div>

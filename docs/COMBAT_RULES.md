@@ -23,14 +23,14 @@ For a hit on a section face at angle θ from the surface normal:
 ## Components & structure
 - Components have their own integrity. A destroyed component stops working: weapons stop firing, motors lose force, sensors lose contacts, generators stop supplying, shields drop. Below 50% integrity, turrets traverse at half speed, spread worsens and outputs fall.
 - A section at 0 structure is destroyed. All its components are destroyed and its joints fail.
-- When a joint fails, the drone splits into connected groups. The group with a working control unit stays the drone. Every other group becomes **debris**: a separate rigid body that keeps the same motion, mass and collision shape. Detached equipment loses power, control and ammunition feed. The drone's mass, centre of mass and inertia are recomputed.
+- When a joint fails, the drone splits into connected groups. The group with the working integrated CPU (normally the middle section) stays the drone. Every other group becomes **debris**: a separate rigid body that keeps the same motion, mass and collision shape. Detached equipment loses power, control and ammunition feed. The drone's mass, centre of mass and inertia are recomputed.
 - A destroyed ammunition module **cooks off**, damaging its section and the components inside it.
 
 ## Damage states (derived, never a health bar)
 - **Degraded**: any component destroyed or below 50%, or any section detached or below 50%.
 - **Immobilized**: no working motor, or no running gear left.
 - **Disarmed**: no working weapon with ammunition available.
-- **Disabled**: no working control unit or no power source. The program halts and all commands clear.
+- **Disabled**: the integrated CPU is destroyed or detached, or there is no power at all. The program halts and all commands clear.
 - **Destroyed**: no intact section remains.
 - A team is defeated when none of its drones remains combat-effective (combat-ineffective = disabled, destroyed or disarmed). If both sides are still effective when the time limit expires, the battle is a draw.
 
@@ -40,7 +40,7 @@ For a hit on a section face at angle θ from the surface normal:
 - Recharge consumes power. Upkeep is needed while the shield is raised. If less than 50% of shield power is supplied, the shield is unpowered and does not block.
 
 ## Power
-- Supply = generation + battery discharge. Systems (control units, sensors, coolers) are served first. The rest goes to propulsion, weapons and shields by the program's priority weights (`setPower`), water-filled so unused shares are redistributed. Surplus charges batteries.
+- Supply = generation + battery discharge. Systems (the CPU, sensors, coolers) are served first. The integrated power core contributes generation and a buffer. The rest goes to propulsion, weapons and shields by the program's priority weights (`setPower`), water-filled so unused shares are redistributed. Surplus charges batteries.
 - When a category is under-supplied: propulsion force drops, turret traverse and reloading slow, shields recharge more slowly or fail, and sensors go offline when systems power falls below 50%.
 
 ## Heat

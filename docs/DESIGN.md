@@ -1,119 +1,67 @@
-# AUTOMATA — THE MACHINE
+# AUTOMATA: interface design
 
-Design specification for the interface. **Design read:** a precision-machine desktop interface for players who build and program autonomous drones. ENERGY 2 · RHYTHM 3 · MOTION 1: calm surfaces, spatially varied compositions per workspace, almost no animation.
+**Design read:** an elegant, melancholic operating system built for autonomous machines. It is precise, quiet and slightly distant, ancient and futuristic at once. ENERGY 2 · RHYTHM 3 · MOTION 1: calm surfaces, compositions that differ by workspace, and slow, deliberate movement.
 
-## 1. Identity
+It should feel like a beautifully designed operating system for artificial life. Not an industrial dashboard, an electronics workbench, a conventional desktop app or a neon cyberpunk interface.
 
-AUTOMATA is an instrument for making autonomous machines and watching them work. The interface takes its cues from machined parts and instrument faces: brushed metal bezels, engraved scales, precise rectangular selections, and diagrams drawn with real dimensions. It is warm (ivory and stone, not white), quiet (one interaction accent), and exact (every number is real simulation data).
+## Material
 
-Do not use: paper labels, tape, receipts, cutting mats, colourful patch cables, glassmorphism, neon, gradients used for decoration, or another game's interface.
-
-## 2. Tokens
-
-| Token | Value | Use |
+| Token | Value | Role |
 | --- | --- | --- |
-| `--bone` | `#f3efe6` | primary work surface (stages, editors) |
-| `--linen` | `#e9e3d6` | secondary surface, trays |
-| `--stone` | `#d6cebe` | borders on light, idle controls |
-| `--steel` | `#9a978f` | metallic mid-tone, scales, disabled |
-| `--iron` | `#5d5c58` | secondary text on light |
-| `--graphite` | `#2c2c2a` | primary text, dark chrome |
-| `--carbon` | `#1d1d1c` | navigation rail, battlefield frame |
-| `--signal` | `#2f6f8f` | the one interaction accent: selection, focus, primary action |
-| `--signal-wash` | `#d9e6ec` | selected row/background |
-| `--ok` `#4c7a52` · `--warn` `#b07d22` · `--fault` `#a8402b` | states: working / caution / damage, failure, errors |
+| `--ivory` | `#efe8da` | primary surface |
+| `--vellum` / `--sepia` / `--dune` | `#e6dcc8` / `#d6c8ad` / `#bfae8e` | secondary surfaces, rules, tracks |
+| `--umber` | `#7d6548` | muted brown: kickers, section marks, calibration |
+| `--iron` / `--stone` | `#5b554b` / `#8e8576` | secondary and tertiary text |
+| `--graphite` / `--carbon` / `--pitch` | `#2a2723` / `#1e1c19` / `#141311` | text, inverted selection, rail, battlefield |
+| `--signal` | `#3d6e7d` | the one cool hue: focus, the stage selection bracket, trace highlight |
+| `--ok` `#5d7a4f` · `--warn` `#a8792a` · `--fault` `#9e3f2a` | states |
 
-* **Teams:** Cobalt `#4f7fb8`, Amber `#c98a2e`, Verdigris `#4a9a83`, Iris `#8c6bb3`. They're always shown with a name, never by colour alone.
-* **Programming categories:** Events (graphite), Logic (signal blue), Math (ochre), Values (stone), Sensors (verdigris), Movement (cobalt), Weapons (brick), Systems (olive), Functions (iris), Code (carbon).
-* **Equipment kinds:** each has its own glyph and a tint shared with the matching programming category (weapon = brick, sensor = verdigris, …).
-* **Geometry:** radius 3 px on controls and 6 px on floating surfaces. Borders 1 px. Elevation is one soft shadow for floating surfaces only.
-* **Spacing scale:** 4 · 8 · 12 · 16 · 24 · 32 · 48.
+* **Teams:** Cobalt, Amber, Verdigris, Iris, always named. **Programming categories** have muted, distinct hues shared by blocks, nodes, the Insert drawer and the reference.
+* **Equipment kinds** use a glyph plus the tint of their programming category.
+* **Analog texture:** light surfaces carry a faint fibre grain (an SVG noise tile) and a warm vignette. The battlefield and rail carry faint scan lines. Both are low enough never to compete with text.
+* **Electronic imperfection is an event, not a decoration:** a brief signal breakup on the spectator card when hardware is destroyed, and a flicker on failed rows. Nothing else distorts.
 
-## 3. Typography
+## Typography
 
-* **Instrument Sans** carries the interface. Body text is 14 px and never smaller than 12 px.
-  * Workspace title: 22/600
-  * Object name: 18/600
-  * Property label: 13/500 in iron
-  * Value: 14/500
-* **JetBrains Mono** is used only for code, telemetry numbers, component ids (`F.H1`) and coordinates. Numerals are tabular.
-* Uppercase appears only in the three activity names and two-letter section marks. Everything else is sentence case.
+* **Cormorant Garamond** (500–600) names things: drone names, workspace and card titles, the tray heading.
+* **Instrument Sans** carries the interface. Body text is 14–15 px; labels are sentence case at 12.5–13 px.
+* Uppercase is limited to the three activity names, the editor switch and small section kickers. These are tracked out (0.1–0.16 em).
+* **JetBrains Mono** (tabular numerals, no ligatures) is used only for code, measurements, telemetry and ids such as `F.H1`.
 
-## 4. Navigation
+## Ornament and geometry
 
-* A narrow **carbon rail** on the left holds the AUTOMATA mark, three activities (**Construct**, **Program**, **Simulate**, each with a glyph and a label), and at the bottom the **active drone** (its three-segment silhouette and name), which opens the drone switcher.
-* The active drone is global. Construct edits it, Program edits its brain, and Simulate deploys it.
-* Workspaces stay mounted, so editor state, camera, undo history and unsaved drafts survive switching.
-* Direct links:
-  * Construct → "Program this drone"
-  * Program → "Hardware"
-  * Simulate diagnostic → "Open brain at this decision" / "Open hardware"
+* Hairline rules (1 px at 16–32 % graphite), dotted leaders in property lists, and lozenge joints between assembly segments.
+* Calibration corners on cards, tick scales on the stage axis and arena edges, and the three-segment front/middle/rear mark, used only where it encodes real sections: the logo, drone chips and the integrity of each section.
+* Radius is 3 px on controls and 6 px on floating cards. Floating surfaces get a single soft shadow.
+* **Selection is a clean inversion** (graphite ground, ivory text), animated over 280 ms. Pressed controls dip by 1 px.
 
-## 5. Workspaces
+## Composition per workspace
 
-### Construct
+* **Navigation.** A carbon rail holds the mark, Construct, Program and Simulate, and the active drone, which opens the drone switcher. On phones the rail becomes a bottom bar. Workspaces stay mounted, so editors, camera and simulation keep their state.
+* **Construct.**
+  * A full-bleed calibrated stage shows the drone at true proportions, with pan, pinch and wheel zoom.
+  * The title, chassis and live figures float top-left. A status pill expands into plain-language problems.
+  * The assembly strip sits above the drone. The properties surface appears only for a selection, and the equipment tray is docked below.
+  * Tablets and short screens stack these as header, strip, stage and tray. On phones, properties become a bottom sheet.
+* **Program.**
+  * The brain bar shows the drone, **BLOCKS | NODES | CODE**, compile state, save state and Test.
+  * A slim tool rail opens Insert, Reference, Debug and Recovered drawers. On phones these become bottom sheets that leave the editor visible.
+  * The editor owns the rest.
+* **Simulate.**
+  * The field is the screen. Instruments float over it in translucent charcoal: the scenario chip, the drone list, the camera chips, a transport capsule and an event timeline.
+  * The spectator card is a dark instrument on the right edge, or a bottom sheet on phones.
+  * Labels on the field are drawn as in-world annotations, not panels.
 
-* A full-bleed **assembly stage**: a calibrated grid with pan (drag), zoom (wheel, buttons) and fit.
-* The drone is drawn at true proportions, with distinct front, middle and rear sections and equipment at its mounted position and facing.
-* **Selection:** a precise rectangular bracket. Unrelated parts dim slightly, and nothing covers the machine.
-* **Assembly strip:** a compact three-segment bar floating at the top of the stage. Each segment shows the section's class, armour and fill; click it to focus the section.
-* **Properties surface:** a floating card on the right that appears only for a selected slot or section (power, mass, durability, mounting and capability). With nothing selected the stage is unobstructed.
-* **Equipment tray:** docked at the bottom. It's collapsed to a strip of category tabs and expands to show a searchable equipment grid with comparison against the selected mount. Install by dragging onto the stage or by clicking with a slot selected.
-* **Design summary:** mass, speed, power and issues as a small readout in the top-left. Issues expand on click.
+## Motion
 
-### Program
+Drawers and cards slide 18 px and fade over 280 ms on `cubic-bezier(.2,.7,.1,1)`. Workspaces cross-fade. There's no idle animation. `prefers-reduced-motion` removes all motion.
 
-* The editor owns the screen.
-* **Top bar:** drone identity · `Blocks | Nodes | Code` · compile state · save state · Test.
-* Tools are summoned rather than permanent:
-  * the **Insert** drawer (searchable, by category), also opened with `/` or Ctrl+K;
-  * the **Reference** drawer (drone API);
-  * the **Debug** drawer, which shows the latest real decision trace with branch outcomes and variable values; clicking an entry highlights its source in the active view.
-* **Compatibility diagnostics** appear as a quiet badge ("2 code modules") with an explanation.
+## Touch and devices
 
-### Simulate
-
-* The battlefield is the screen.
-* Floating instruments:
-  * a transport capsule at the bottom centre (pause/play, step, speed, restart);
-  * a scenario button at the top left (opens the deployment sheet);
-  * a camera chip at the top right;
-  * an event timeline: a thin bar of real event ticks that expands into a drawer.
-* Selecting a drone opens a **spectator card** on the right edge. It summarises identity, condition, weapons, power/heat, sensors, the current action and the program state, with expandable sections for components, the full trace and source. Deselecting returns to freecam.
-
-## 6. One brain, three editors
-
-* Each drone design owns exactly one **brain**.
-* The brain's authoritative content is a structured AutoScript **IR**: statements and expressions with stable ids.
-* Each editor is a view of that IR:
-  * Blocks and Nodes are generated from it and converted back when edited.
-  * Code is printed from it, and parsed back on every valid edit.
-* Constructs a visual view can't express are shown there as **code modules**. A code module holds the exact source, can be edited in place, and runs unchanged.
-* What is cached per view:
-  * Code keeps the player's own text while its meaning is unchanged.
-  * Blocks and Nodes keep their positions.
-  * Unattached fragments stay in the view where they were left. They are not part of the brain and don't run.
-* Invalid code never replaces the last valid brain. The draft and its diagnostics are kept until fixed.
-
-## 7. Interaction states
-
-* Hover lifts a control's surface one step.
-* Focus is a 2 px signal ring offset by 2 px.
-* Selection is a signal bracket (on the stage) or a signal-wash row with a signal edge (in lists).
-* Pressed controls invert to graphite.
-* Disabled controls use steel text with no hover.
-* Errors use fault text plus an icon, never colour alone.
-
-## 8. Motion
-
-Motion is limited to 120–160 ms opacity and translate for drawers and cards. There's no idle animation. The only effect is a brief signal-loss stutter on the spectator card when hardware is actually destroyed. `prefers-reduced-motion` removes all of it.
-
-## 9. Responsive behaviour
-
-* The layout targets 1280×720 and up.
-* Floating cards cap their width at 360 px (420 px at ≥1600 px) and scroll internally.
-* At narrow widths:
-  * the tray shows fewer columns;
-  * the rail keeps its labels;
-  * the Program top bar wraps its secondary actions into a menu below 1360 px.
-* No horizontal page scroll at any supported size.
+* Touch targets are at least 44 px on coarse pointers.
+* Equipment is placed by tapping a part and then a slot; drag is optional.
+* Node ports have a 36 px invisible hit area, and tapping one port and then another connects them.
+* Code shows a symbol bar on touch devices.
+* Safe-area insets are respected.
+* Rendering stops and the battle pauses while the app is in the background. Panels refresh only while visible.
+* Tested at 375×812, 390×844, 430×932, 768×1024, 1024×768, 844×390, 1280×720, 1440×900 and 1920×1080.
