@@ -20,6 +20,8 @@ export interface DecisionRecord {
   error: string | null;
   contacts: number;
   threats: number;
+  /** values of the brain's top-level variables after this decision */
+  vars?: [string, string][];
 }
 
 export type ControllerState = 'ok' | 'compile-error' | 'runtime-error' | 'offline';
@@ -121,6 +123,7 @@ export class DroneController {
     rec.entries = it.trace;
     rec.dropped = it.traceDropped;
     rec.ops = it.ops;
+    rec.vars = it.globalVariables();
     this.push(rec);
   }
 

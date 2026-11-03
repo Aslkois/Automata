@@ -22,7 +22,7 @@ const cameraOnly = () =>
   design({
     sections: {
       front: { class: 'light', armor: 10, slots: { H1: m('camera') } },
-      middle: { class: 'medium', armor: 10, slots: { I1: m('controller'), I2: m('generator_s') } },
+      middle: { class: 'medium', armor: 10, slots: { I2: m('generator_s') } },
       rear: { class: 'light', armor: 10, slots: {} },
     },
   });
@@ -34,10 +34,10 @@ describe('information access', () => {
       drone.log('seen', e == null ? 'none' : e.x);
       drone.log('scope', typeof globalThis, typeof window, typeof process, typeof Function, typeof sim, typeof eval);
     }`);
-    // Enemy directly behind a forward-only camera.
+    // Enemy directly behind a forward-only camera, beyond the integrated proximity array.
     const sim = makeSim([
-      { design: cameraOnly(), program: watcher, team: 0, x: 600, y: 500, angle: 0 },
-      { design: cameraOnly(), program: idle, team: 1, x: 300, y: 500, angle: 0 },
+      { design: cameraOnly(), program: watcher, team: 0, x: 900, y: 500, angle: 0 },
+      { design: cameraOnly(), program: idle, team: 1, x: 250, y: 500, angle: 0 },
     ]);
     sim.run(0.5);
     expect(sim.drones[0].perception.contacts).toHaveLength(0);
@@ -73,7 +73,7 @@ describe('information access', () => {
     expect(c.team).toBe('enemy');
     expect(Math.abs(c.distance - 400)).toBeLessThan(15);
     expect(c.size).not.toBeNull(); // camera classifies
-    expect(logs(sim, sim.drones[0].id).some((l) => l.startsWith(`enemy ${Math.round(c.x)}`) && l.endsWith('F.H1'))).toBe(true);
+    expect(logs(sim, sim.drones[0].id).some((l) => l.startsWith(`enemy ${Math.round(c.x)}`) && l.includes('F.H1'))).toBe(true);
     expect(Math.abs(c.x - (enemy.body.pos.x + 0))).toBeLessThan(10);
   });
 });
@@ -99,8 +99,8 @@ describe('program execution', () => {
   it('13. one brain edited as code, blocks or nodes issues the same real commands', () => {
     const fixed = design({
       sections: {
-        front: { class: 'light', armor: 10, slots: { H1: m('mg'), I1: m('ammo_small'), I2: m('motor_s') } },
-        middle: { class: 'medium', armor: 10, slots: { I1: m('controller'), I2: m('generator_s'), I3: m('motor_m') } },
+        front: { class: 'light', armor: 10, slots: { H1: m('mg'), I1: m('ammo_small') } },
+        middle: { class: 'medium', armor: 10, slots: { I2: m('generator_s') } },
         rear: { class: 'light', armor: 10, slots: {} },
       },
     });
@@ -151,7 +151,7 @@ describe('structure', () => {
     const dz = design({
       sections: {
         front: { class: 'medium', armor: 10, slots: { I1: m('generator_s') } },
-        middle: { class: 'medium', armor: 10, slots: { I1: m('controller'), I2: m('generator_s') } },
+        middle: { class: 'medium', armor: 10, slots: { I2: m('generator_s') } },
         rear: { class: 'light', armor: 10, slots: {} },
       },
     });
@@ -160,7 +160,7 @@ describe('structure', () => {
     sim.step();
     const massBefore = d.body.mass;
     const genBefore = d.power.generation;
-    expect(genBefore).toBe(90);
+    expect(genBefore).toBe(160); // 2 × 45 PU/s generators + the integrated core (70)
     d.joints[0].hp = 0; // front-middle
     processJoints(sim, d);
     sim.step();
@@ -168,8 +168,8 @@ describe('structure', () => {
     expect(sim.debris).toHaveLength(1);
     expect(d.body.mass).toBeLessThan(massBefore);
     expect(sim.debris[0].body.mass + d.body.mass).toBeCloseTo(massBefore, 3);
-    expect(d.power.generation).toBe(45); // the front generator no longer supplies the drone
-    expect(d.status.disabled).toBe(false); // controller is in the middle
+    expect(d.power.generation).toBe(115); // the front generator no longer supplies the drone
+    expect(d.status.disabled).toBe(false); // the integrated CPU is in the middle
     // Collision: a round fired at the old front position now strikes the debris, not the drone.
     const fx = sim.debris[0].body.pos.x + 20;
     shoot(sim, 'mg', { x: fx, y: 300 }, { x: fx, y: 500 });
@@ -181,7 +181,7 @@ describe('structure', () => {
     d2.joints[0].hp = 0;
     d2.joints[1].hp = 0;
     processJoints(sim2, d2);
-    damageComponent(sim2, d2, comp(d2, 'M.I1'), 999);
+    damageComponent(sim2, d2, comp(d2, 'M.CPU'), 999);
     sim2.step();
     expect(d2.status.disabled).toBe(true);
   });

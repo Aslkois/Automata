@@ -1,7 +1,8 @@
 // Drone design schema (versioned), geometry layout, derived statistics and validation.
 // Designs are pure data; `buildDrone` (drone.ts) turns a design into runtime state.
-import { CHASSIS, GRAVITY, type ChassisType } from './content/chassis';
-import { COMPONENT_MAP, FOOTPRINT, type ComponentDef } from './content/components';
+import { CHASSIS, CHASSIS_TYPES, GRAVITY, type ChassisType } from './content/chassis';
+import { INTEGRATED_MASS, integratedParts } from './content/integrated';
+import { COMPONENT_MAP, FOOTPRINT, RETIRED_IDS, type ComponentDef } from './content/components';
 import {
   DEFAULT_MOUNT_FACING,
   SECTION_CLASSES,
@@ -14,7 +15,7 @@ import {
 } from './content/sections';
 import { DEG, segmentBox, type Vec2 } from './math';
 
-export const DESIGN_SCHEMA_VERSION = 1;
+export const DESIGN_SCHEMA_VERSION = 2;
 
 export interface MountDesign {
   component: string;
@@ -120,7 +121,8 @@ export function isLineObstructed(
 }
 
 export interface Issue {
-  severity: 'error' | 'warning';
+  /** error blocks deployment; warning is worth fixing; info is a gentle suggestion */
+  severity: 'error' | 'warning' | 'info';
   code: string;
   message: string;
   section?: SectionPos;
@@ -173,7 +175,7 @@ export function computeStats(d: DroneDesign): DesignStats {
   for (const pos of SECTION_POSITIONS) {
     const sd = d.sections[pos];
     const cls = SECTION_CLASSES[sd.class];
-    const sm = cls.structureMass + sd.armor * cls.armorMassPerMm + 2 * ch.gearMassPerSide;
+    const sm = cls.structureMass + sd.armor * cls.armorMassPerMm + 2 * ch.gearMassPerSide + (pos === 'middle' ? INTEGRATED_MASS : 0);
     sectionMass[pos] = sm;
     pts.push({ m: sm, x: lay[pos].cx, y: 0, l: cls.length, w: cls.width });
   }
@@ -203,7 +205,8 @@ export function computeStats(d: DroneDesign): DesignStats {
     cooling = 0,
     ops = 0;
   const ammo: Record<string, number> = { small: 0, medium: 0, large: 0 };
-  for (const mt of mounts) {
+  const integrated = integratedParts(d);
+  for (const mt of [...mounts, ...integrated]) {
     const c = mt.def;
     if (c.power?.generation) gen += c.power.generation;
     if (c.power?.storage) {
@@ -330,27 +333,22 @@ export function validateDesign(d: DroneDesign, stats = computeStats(d)): Issue[]
         section: pos,
       });
   }
-  if (!mounts.some((m) => m.def.kind === 'controller'))
-    issues.push({ severity: 'error', code: 'no-controller', message: 'No control unit: the drone cannot run a program.' });
-  if (stats.powerGeneration <= 0 && stats.storage <= 0)
-    issues.push({ severity: 'error', code: 'no-power', message: 'No generator or battery: nothing can be powered.' });
-  else if (stats.powerGeneration < stats.baseDemand)
+  if (stats.powerGeneration < stats.baseDemand)
     issues.push({
       severity: 'warning',
       code: 'insufficient-power',
-      message: `Generation ${stats.powerGeneration} PU/s is below always-on demand ${stats.baseDemand} PU/s; batteries will drain.`,
+      message: `Power: generation ${stats.powerGeneration} PU/s is below the always-on demand of ${stats.baseDemand} PU/s, so the buffer will drain. Add a generator.`,
     });
   if (stats.powerGeneration + stats.maxDischarge < stats.peakDemand)
     issues.push({
       severity: 'warning',
       code: 'peak-power',
-      message: `Peak demand ${stats.peakDemand} PU/s exceeds generation + discharge (${stats.powerGeneration + stats.maxDischarge}). Systems will be throttled under full load.`,
+      message: `Power: at full load the drone needs ${stats.peakDemand} PU/s but can supply ${stats.powerGeneration + stats.maxDischarge}. Everything still works, slower under heavy use. A generator or battery helps.`,
     });
-  if (stats.motorForce <= 0) issues.push({ severity: 'warning', code: 'no-propulsion', message: 'No drive motor: the drone is immobile.' });
-  else if (stats.maxAccel <= 0)
-    issues.push({ severity: 'error', code: 'excessive-weight', message: `Drive force cannot overcome rolling resistance at ${Math.round(stats.mass)} kg.` });
+  if (stats.maxAccel <= 0)
+    issues.push({ severity: 'error', code: 'excessive-weight', message: `Too heavy to move: ${Math.round(stats.mass)} kg is more than the ${CHASSIS[d.chassis].driveName.toLowerCase()} can push. Remove equipment or armour.` });
   else if (stats.maxAccel < 6)
-    issues.push({ severity: 'warning', code: 'underpowered', message: `Very low acceleration (${stats.maxAccel.toFixed(1)} u/s²) for ${Math.round(stats.mass)} kg.` });
+    issues.push({ severity: 'warning', code: 'underpowered', message: `Sluggish: ${Math.round(stats.mass)} kg accelerates at only ${stats.maxAccel.toFixed(1)} u/s². Lighter armour or a lighter frame helps.` });
   for (const w of stats.weapons) {
     if (w.usableFraction === 0)
       issues.push({ severity: 'warning', code: 'weapon-obstructed', message: `${w.mount} ${w.name}: entire firing arc is obstructed by taller sections.`, mount: w.mount });
@@ -362,12 +360,11 @@ export function validateDesign(d: DroneDesign, stats = computeStats(d)): Issue[]
       issues.push({
         severity: 'warning',
         code: 'no-ammo-storage',
-        message: `${mt.id} ${mt.def.name}: no ${mt.def.weapon.caliber}-calibre ammunition storage; only the loaded magazine is available.`,
+        message: `${mt.id} ${mt.def.name}: no ${mt.def.weapon.caliber}-calibre ammunition storage, so it can only fire its loaded magazine. Add a magazine in an internal bay.`,
         mount: mt.id,
       });
   }
-  if (stats.weapons.length > 0 && stats.coolingCapacity === 0)
-    issues.push({ severity: 'warning', code: 'no-cooling', message: 'No cooling units: weapons rely on passive cooling only.' });
+  if (stats.weapons.length === 0) issues.push({ severity: 'info', code: 'no-weapons', message: 'No weapons yet: the drone can move and see but not fight. Add one to a hardpoint.' });
   return issues;
 }
 
@@ -384,8 +381,14 @@ export function newDesign(id: string, name: string): DroneDesign {
     schema: DESIGN_SCHEMA_VERSION,
     id,
     name,
-    chassis: 'tracked',
-    sections: { front: emptySection('medium'), middle: emptySection('medium'), rear: emptySection('medium') },
+    chassis: 'wheeled',
+    // a working machine from the start: twin machine guns with a magazine; the chassis
+    // provides propulsion, CPU, power, cooling and proximity sensing
+    sections: {
+      front: { class: 'medium', armor: 20, slots: { H1: { component: 'mg', rotation: 0 }, H2: { component: 'mg', rotation: 0 }, I1: { component: 'ammo_small', rotation: 0 } } },
+      middle: { class: 'medium', armor: 15, slots: { H3: { component: 'camera', rotation: 0 } } },
+      rear: { class: 'light', armor: 8, slots: {} },
+    },
   };
 }
 
@@ -405,7 +408,7 @@ export function parseDesign(json: string | unknown): DroneDesign {
   const schema = typeof o.schema === 'number' ? o.schema : 0;
   if (schema > DESIGN_SCHEMA_VERSION) throw new Error(`Design schema ${schema} is newer than supported (${DESIGN_SCHEMA_VERSION})`);
   if (typeof o.name !== 'string') throw new Error('Design is missing a name');
-  if (o.chassis !== 'wheeled' && o.chassis !== 'tracked') throw new Error(`Unknown chassis '${String(o.chassis)}'`);
+  if (!CHASSIS_TYPES.includes(o.chassis as ChassisType)) throw new Error(`Unknown chassis '${String(o.chassis)}'`);
   const secs = o.sections as Record<string, unknown> | undefined;
   if (!secs) throw new Error('Design has no sections');
   const sections = {} as Record<SectionPos, SectionDesign>;
@@ -423,6 +426,8 @@ export function parseDesign(json: string | unknown): DroneDesign {
       }
       const mv = val as Record<string, unknown>;
       if (typeof mv.component !== 'string') throw new Error(`Slot ${pos}.${k} has no component`);
+      // schema 1 -> 2: motors and control units are integrated into every chassis now
+      if (RETIRED_IDS.has(mv.component)) continue;
       slots[k] = { component: mv.component, rotation: typeof mv.rotation === 'number' ? mv.rotation : DEFAULT_MOUNT_FACING[pos] };
     }
     sections[pos] = { class: cls, armor: typeof s.armor === 'number' ? s.armor : 0, slots };
@@ -431,7 +436,7 @@ export function parseDesign(json: string | unknown): DroneDesign {
     schema: DESIGN_SCHEMA_VERSION,
     id: typeof o.id === 'string' ? o.id : `design-${Math.random().toString(36).slice(2, 9)}`,
     name: o.name,
-    chassis: o.chassis,
+    chassis: o.chassis as ChassisType,
     sections,
   };
 }

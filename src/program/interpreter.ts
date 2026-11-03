@@ -271,6 +271,13 @@ export class Interpreter {
     this.globals.vars.set(name, { value, kind: 'builtin' });
   }
 
+  /** Player-declared top-level variables and their current values (for the debugger). */
+  globalVariables(): [string, string][] {
+    const out: [string, string][] = [];
+    for (const [k, b] of this.globals.vars) if ((b.kind === 'var' || b.kind === 'let' || b.kind === 'const') && !k.startsWith('__')) out.push([k, inspect(b.value)]);
+    return out;
+  }
+
   pushTrace(kind: TraceEntry['kind'], text: string): void {
     if (this.trace.length >= this.maxTrace) {
       this.traceDropped++;

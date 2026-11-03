@@ -1,5 +1,6 @@
 // Turns a DroneDesign into runtime simulation state, and maintains mass properties.
 import { CHASSIS } from './content/chassis';
+import { integratedParts } from './content/integrated';
 import { FOOTPRINT } from './content/components';
 import { SECTION_CLASSES, SECTION_LETTER, SECTION_POSITIONS, type SectionPos } from './content/sections';
 import { layoutSections, listMounts, type DroneDesign } from './design';
@@ -158,6 +159,33 @@ export function buildDrone(design: DroneDesign, id: number, team: number, x: num
     if (def.ammo) c.ammo = { rounds: def.ammo.rounds };
     components.push(c);
   }
+  // Integrated systems: propulsion, CPU, power core, coolant loop, proximity sensors.
+  for (const ip of integratedParts(design)) {
+    const def = ip.def;
+    const c: RComponent = {
+      uid: uidCounter++,
+      id: ip.id,
+      name: def.name,
+      kind: def.kind,
+      def,
+      section: 'middle',
+      x: sections.middle.cx + ip.x,
+      y: ip.y,
+      half: 2.2,
+      facing: 0,
+      external: false,
+      profile: 0,
+      armor: def.armor,
+      hp: def.hp,
+      maxHp: def.hp,
+      destroyed: false,
+      heat: 0,
+      damagedReported: false,
+      integrated: true,
+    };
+    if (def.power?.storage) c.battery = { charge: def.power.storage };
+    components.push(c);
+  }
   // Running gear: one left + one right per section.
   for (const pos of SECTION_POSITIONS) {
     const s = sections[pos];
@@ -165,7 +193,7 @@ export function buildDrone(design: DroneDesign, id: number, team: number, x: num
       components.push({
         uid: uidCounter++,
         id: `${SECTION_LETTER[pos]}.gear${side === 'left' ? 'L' : 'R'}`,
-        name: `${chassis.id === 'tracked' ? 'Track' : 'Wheels'} (${pos} ${side})`,
+        name: `${chassis.gearName} (${pos} ${side})`,
         kind: 'gear',
         def: null,
         section: pos,

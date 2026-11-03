@@ -577,3 +577,16 @@ export function blockModules(doc: BlocksDoc): number {
 }
 
 export { inp };
+
+/** Blocks for an AutoScript snippet (Insert drawer). Returns top-level block JSON. */
+export function fragmentBlocks(code: string, kind: 'stmt' | 'expr' | 'top'): BJ[] | null {
+  if (kind === 'expr') {
+    const r = parseExpression(code);
+    return r.expr ? [exprBlock(r.expr)] : null;
+  }
+  const r = parseStatements(code);
+  if (!r.stmts) return null;
+  if (kind === 'top') return r.stmts.filter((s) => s.k === 'func').map(rootBlock);
+  const c = chain(r.stmts);
+  return c ? [c] : null;
+}

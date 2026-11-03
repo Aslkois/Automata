@@ -14,8 +14,8 @@ export function design(over: Partial<DroneDesign> & { sections?: DroneDesign['se
     name: over.name ?? 'Test',
     chassis: over.chassis ?? 'tracked',
     sections: over.sections ?? {
-      front: { class: 'heavy', armor: 70, slots: { H1: m('heavy_cannon'), H2: m('mg'), H3: m('camera'), I1: m('ammo_small'), I2: m('shell_rack'), I3: m('motor_m') } },
-      middle: { class: 'medium', armor: 30, slots: { H1: m('shield_dir'), H2: m('mg', 90), H3: m('radar'), I1: m('controller'), I2: m('generator_s'), I3: m('motor_m') } },
+      front: { class: 'heavy', armor: 70, slots: { H1: m('heavy_cannon'), H2: m('mg'), H3: m('camera'), I1: m('ammo_small'), I2: m('shell_rack') } },
+      middle: { class: 'medium', armor: 30, slots: { H1: m('shield_dir'), H2: m('mg', 90), H3: m('radar'), I2: m('generator_s') } },
       rear: { class: 'light', armor: 10, slots: { H1: m('mg', 180), I1: m('battery'), I2: m('cooler') } },
     },
   };

@@ -11,8 +11,8 @@ const impacts = (ev: SimEvent[]) => ev.filter((e): e is Impact => e.type === 'im
 const target = () =>
   design({
     sections: {
-      front: { class: 'heavy', armor: 70, slots: { I1: m('cooler'), I3: m('motor_m') } },
-      middle: { class: 'medium', armor: 30, slots: { I1: m('controller'), I2: m('generator_s') } },
+      front: { class: 'heavy', armor: 70, slots: { I1: m('cooler') } },
+      middle: { class: 'medium', armor: 30, slots: { I2: m('generator_s') } },
       rear: { class: 'light', armor: 10, slots: { I1: m('battery'), I2: m('cooler') } },
     },
   });
@@ -68,7 +68,7 @@ describe('component damage', () => {
     const twin = design({
       sections: {
         front: { class: 'light', armor: 10, slots: { H1: m('mg'), H2: m('mg'), I1: m('ammo_small') } },
-        middle: { class: 'medium', armor: 10, slots: { I1: m('controller'), I2: m('generator_s') } },
+        middle: { class: 'medium', armor: 10, slots: { I2: m('generator_s') } },
         rear: { class: 'light', armor: 10, slots: {} },
       },
     });
@@ -96,7 +96,7 @@ describe('component damage', () => {
       return { dist: Math.hypot(d.body.pos.x - start.x, d.body.pos.y - start.y), heading: d.body.angle };
     };
     const healthy = run(() => {});
-    const lostMotor = run((sim) => damageComponent(sim, sim.drones[0], comp(sim.drones[0], 'F.I3'), 999));
+    const lostMotor = run((sim) => damageComponent(sim, sim.drones[0], comp(sim.drones[0], 'M.DRIVE'), 120));
     const lostLeftTracks = run((sim) => {
       const d = sim.drones[0];
       for (const id of ['F.gearL', 'M.gearL', 'R.gearL']) damageComponent(sim, d, comp(d, id), 999);
@@ -130,7 +130,7 @@ describe('component damage', () => {
       chassis: 'wheeled',
       sections: {
         front: { class: 'heavy', armor: 0, slots: { H1: m('heavy_cannon') } },
-        middle: { class: 'light', armor: 0, slots: { I1: m('controller'), I2: m('generator_s') } },
+        middle: { class: 'light', armor: 0, slots: { I2: m('generator_s') } },
         rear: { class: 'light', armor: 0, slots: {} },
       },
     });
@@ -138,7 +138,7 @@ describe('component damage', () => {
       chassis: 'wheeled',
       sections: {
         front: { class: 'heavy', armor: 70, slots: { H1: m('heavy_cannon') } },
-        middle: { class: 'heavy', armor: 70, slots: { I1: m('controller'), I2: m('generator_s') } },
+        middle: { class: 'heavy', armor: 70, slots: { I2: m('generator_s') } },
         rear: { class: 'heavy', armor: 70, slots: {} },
       },
     });
@@ -171,7 +171,7 @@ describe('shields', () => {
     design({
       sections: {
         front: { class: 'light', armor: 10, slots: {} },
-        middle: { class: 'medium', armor: 10, slots: { H3: m('shield_dir', 0), I1: m('controller'), I2: m('generator_s'), I3: m('battery') } },
+        middle: { class: 'medium', armor: 10, slots: { H3: m('shield_dir', 0), I2: m('generator_s'), I3: m('battery') } },
         rear: { class: 'light', armor: 10, slots: {} },
       },
     });
@@ -204,7 +204,7 @@ describe('shields', () => {
     shoot(sim, 'mg', { x: 900, y: 500 }, { x: 600, y: 500 });
     expect(impacts(runUntilProjectilesGone(sim))[0].result).not.toBe('shield');
     // Recovery requires power: with every power source destroyed the shield never recharges.
-    for (const id of ['M.I2', 'M.I3']) damageComponent(sim, d, comp(d, id), 999);
+    for (const id of ['M.I2', 'M.I3', 'M.CORE']) damageComponent(sim, d, comp(d, id), 999);
     sim.run(6);
     expect(sh.overloadLeft).toBe(0);
     expect(sh.charge).toBe(0);
@@ -214,7 +214,7 @@ describe('shields', () => {
   it('shield recharge is limited by power allocation under shortage', () => {
     const powered = () => {
       const d = shielded();
-      d.sections.front.slots = { I1: m('motor_s') };
+      d.sections.front.slots = {};
       return d;
     };
     const sim = makeSim([{ design: powered(), program: code('function update(){ drone.drive(1, 0); drone.setPower(1, 1, 0); }'), team: 0, x: 600, y: 500, angle: 0 }]);
@@ -222,8 +222,10 @@ describe('shields', () => {
     const sh = comp(d, 'M.H3').shield!;
     sim.step();
     sh.charge = 0;
-    // Drain the battery so only generation remains and allocation decides.
+    // Drain the batteries and lose the extra generator so only the core's generation remains.
     comp(d, 'M.I3').battery!.charge = 0;
+    comp(d, 'M.CORE').battery!.charge = 0;
+    damageComponent(sim, d, comp(d, 'M.I2'), 999);
     sim.run(2);
     const lowPriority = sh.charge;
     const sim2 = makeSim([{ design: powered(), program: code('function update(){ drone.drive(1, 0); drone.setPower(1, 1, 5); }'), team: 0, x: 600, y: 500, angle: 0 }]);
@@ -232,6 +234,8 @@ describe('shields', () => {
     sim2.step();
     sh2.charge = 0;
     comp(d2, 'M.I3').battery!.charge = 0;
+    comp(d2, 'M.CORE').battery!.charge = 0;
+    damageComponent(sim2, d2, comp(d2, 'M.I2'), 999);
     sim2.run(2);
     // Weights are priorities: shields get only the leftover in sim 1, propulsion is starved in sim 2.
     expect(d.power.satisfaction.shields).toBeLessThan(d2.power.satisfaction.shields);
