@@ -65,10 +65,27 @@ export function Simulate({ active }: { active: boolean }) {
     }
   }, [test, lib, scenario, session, runner]);
 
+  // Panels refresh at 8 Hz, and only while Simulate is visible.
   useEffect(() => {
+    if (!active) return;
     const id = setInterval(() => setTick((t) => t + 1), 125);
     return () => clearInterval(id);
-  }, []);
+  }, [active]);
+  // Backgrounding the app pauses the battle (and rendering); returning resumes it.
+  useEffect(() => {
+    let resume = false;
+    const onVis = () => {
+      if (document.hidden) {
+        resume = runner.playing;
+        if (resume) runner.pause();
+      } else if (resume) {
+        resume = false;
+        runner.play();
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [runner]);
   useEffect(() => {
     runner.vfx.quality = quality;
   }, [quality, runner]);
@@ -114,6 +131,10 @@ export function Simulate({ active }: { active: boolean }) {
       if (k.has('a') || k.has('arrowleft')) (c.x -= pan * dt), (manual = true);
       if (k.has('d') || k.has('arrowright')) (c.x += pan * dt), (manual = true);
       if (manual && view.current.follow) setFollow(false);
+      if (document.hidden) {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
       const stepped = runner.advance(dt);
       const sim = runner.sim;
       if (sim) {
@@ -166,11 +187,26 @@ export function Simulate({ active }: { active: boolean }) {
   }, [active, runner, sheet]);
 
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ d: number; zoom: number } | null>(null);
   const onPointerDown = (e: React.PointerEvent) => {
-    drag.current = { x: e.clientX, y: e.clientY, moved: false };
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    if (pointers.current.size === 2) {
+      const [a, b] = [...pointers.current.values()];
+      pinch.current = { d: Math.hypot(a.x - b.x, a.y - b.y), zoom: cam.current.zoom };
+      drag.current = null;
+      return;
+    }
+    drag.current = { x: e.clientX, y: e.clientY, moved: false };
   };
   const onPointerMove = (e: React.PointerEvent) => {
+    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch.current && pointers.current.size >= 2) {
+      const [a, b] = [...pointers.current.values()];
+      cam.current.zoom = Math.min(6, Math.max(0.2, (pinch.current.zoom * Math.hypot(a.x - b.x, a.y - b.y)) / Math.max(1, pinch.current.d)));
+      return;
+    }
     const dr = drag.current;
     if (!dr) return;
     const dx = e.clientX - dr.x;
@@ -184,6 +220,12 @@ export function Simulate({ active }: { active: boolean }) {
     if (follow) setFollow(false);
   };
   const onPointerUp = (e: React.PointerEvent) => {
+    pointers.current.delete(e.pointerId);
+    if (pinch.current) {
+      if (pointers.current.size < 2) pinch.current = null;
+      drag.current = null;
+      return;
+    }
     const dr = drag.current;
     drag.current = null;
     if (!dr || dr.moved || !runner.sim) return;
@@ -214,7 +256,7 @@ export function Simulate({ active }: { active: boolean }) {
   return (
     <div className="simulate" data-testid="battle">
       <div className="field">
-        <canvas ref={canvasRef} data-testid="battle-canvas" aria-label="Battlefield" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onWheel={onWheel} />
+        <canvas ref={canvasRef} data-testid="battle-canvas" aria-label="Battlefield" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel} />
       </div>
 
       <div className="float tl">
@@ -305,6 +347,9 @@ export function Simulate({ active }: { active: boolean }) {
             </button>
           ))}
         </div>
+        <button className="speed-cycle" onClick={() => runner.setSpeed(SPEEDS[(SPEEDS.indexOf(runner.speed) + 1) % SPEEDS.length])} aria-label={`Speed ${runner.speed}×, change`}>
+          {runner.speed}×
+        </button>
         <span className="clock num" data-testid="sim-clock">
           t = {sim ? sim.time.toFixed(2) : '0.00'} s<small data-testid="sim-tick">tick {sim?.tick ?? 0}</small>
         </span>

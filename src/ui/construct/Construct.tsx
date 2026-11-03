@@ -6,7 +6,7 @@ import { COMPONENT_MAP, type ComponentDef } from '../../sim/content/components';
 import { DEFAULT_MOUNT_FACING, SECTION_CLASSES, SECTION_LETTER, SECTION_POSITIONS, type SectionPos, type SlotDef, type SlotKind } from '../../sim/content/sections';
 import { cloneDesign, computeStats, hasErrors, validateDesign, type DroneDesign, type Issue } from '../../sim/design';
 import { useShell } from '../App';
-import { fmt, Icon, useStoredState } from '../common';
+import { fmt, Icon, PHONE, useMedia, useStoredState } from '../common';
 import { library, useLibrary } from '../store';
 import { AssemblyStrip } from './AssemblyStrip';
 import { Properties } from './Properties';
@@ -23,6 +23,7 @@ export function Construct({ active }: { active: boolean }) {
   const [trayOpen, setTrayOpen] = useStoredState('tray-open', true);
   const [showArcs, setShowArcs] = useStoredState('arcs', true);
   const [issuesOpen, setIssuesOpen] = useState(false);
+  const phone = useMedia(PHONE);
 
   useEffect(() => {
     setSel(null);
@@ -117,17 +118,18 @@ export function Construct({ active }: { active: boolean }) {
   };
 
   const errors = issues.filter((i) => i.severity === 'error');
-  const trayH = trayOpen ? 248 : 52;
-  const propsOpen = !!sel;
+  const cautions = issues.filter((i) => i.severity === 'warning');
+  const trayH = trayOpen ? (phone ? 238 : 248) : 52;
+  const propsOpen = !!sel && !phone;
 
   return (
-    <div className="construct" data-testid="construct">
-      <Stage design={design} stats={stats} layer={layer} sel={sel} armed={armedDef} showArcs={showArcs} onSelect={onSelect} onDropPart={onDropPart} inset={{ bottom: trayH, right: propsOpen ? 380 : 0, top: 96 }} />
+    <div className="construct" data-testid="construct" style={{ ['--tray-h' as string]: `${trayH}px` }}>
+      <Stage design={design} stats={stats} layer={layer} sel={sel} armed={armedDef} showArcs={showArcs} onSelect={onSelect} onDropPart={onDropPart} inset={phone ? { bottom: 60, right: 0, top: 8 } : { bottom: trayH, right: propsOpen ? 390 : 0, top: 230 }} />
 
       <header className="c-head">
         <div className="identity">
           <input className="title-input" aria-label="Drone name" value={design.name} onChange={(e) => update((d) => (d.name = e.target.value))} spellCheck={false} />
-          <div className="seg" role="radiogroup" aria-label="Chassis">
+          <div className="seg chassis" role="radiogroup" aria-label="Chassis">
             {(Object.keys(CHASSIS) as ChassisType[]).map((c) => (
               <button key={c} role="radio" aria-checked={design.chassis === c} className={design.chassis === c ? 'on' : ''} title={CHASSIS[c].description} onClick={() => update((d) => (d.chassis = c))}>
                 {CHASSIS[c].name}
@@ -155,18 +157,18 @@ export function Construct({ active }: { active: boolean }) {
             </dd>
           </div>
           <div>
-            <dt>Brain budget</dt>
-            <dd className={`num ${stats.controllerOps ? '' : 'fault'}`}>{stats.controllerOps ? `${stats.controllerOps} ops` : 'none'}</dd>
+            <dt>Weapons</dt>
+            <dd className="num">{stats.weapons.length}</dd>
           </div>
         </dl>
         <div className="issues-anchor">
-          <button className={`status-pill ${errors.length ? 'fault' : issues.length ? 'warn' : 'ok'}`} aria-expanded={issuesOpen} onClick={() => setIssuesOpen((o) => !o)} data-testid="issues-toggle">
-            <Icon name={errors.length || issues.length ? 'warn' : 'check'} size={16} />
-            {errors.length ? `${errors.length} ${errors.length === 1 ? 'fault' : 'faults'}` : issues.length ? `${issues.length} ${issues.length === 1 ? 'caution' : 'cautions'}` : 'Ready to deploy'}
+          <button className={`status-pill ${errors.length ? 'fault' : cautions.length ? 'warn' : 'ok'}`} aria-expanded={issuesOpen} onClick={() => setIssuesOpen((o) => !o)} data-testid="issues-toggle">
+            <Icon name={errors.length || cautions.length ? 'warn' : 'check'} size={16} />
+            {errors.length ? `${errors.length} ${errors.length === 1 ? 'fault' : 'faults'}` : cautions.length ? `${cautions.length} ${cautions.length === 1 ? 'caution' : 'cautions'}` : 'Ready to deploy'}
           </button>
           {issuesOpen && (
             <ul className="issues pop" data-testid="issues" aria-label="Construction problems">
-              {issues.length === 0 && <li className="muted">No problems found.</li>}
+              {issues.length === 0 && <li className="muted pad">No problems. Propulsion, CPU, power, cooling and proximity sensing are built into the chassis.</li>}
               {issues.map((i, k) => (
                 <li key={k}>
                   <button className={i.severity} onClick={() => onIssue(i)}>

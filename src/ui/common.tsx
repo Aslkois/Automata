@@ -112,3 +112,18 @@ export const fmt = {
   n1: (n: number) => (Math.abs(n) >= 100 ? n.toFixed(0) : n.toFixed(1)),
   pct: (n: number) => `${Math.round(n * 100)}%`,
 };
+
+/** True while a media query matches (layout decisions that CSS alone cannot make). */
+export function useMedia(query: string): boolean {
+  const [m, setM] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(query).matches : false));
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia(query);
+    const on = () => setM(mq.matches);
+    on();
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, [query]);
+  return m;
+}
+export const PHONE = '(max-width: 720px)';

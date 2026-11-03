@@ -532,8 +532,16 @@ const Inner = forwardRef<EditorHandle, Props>(function Inner({ doc, onChange, hi
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           isValidConnection={isValidConnection}
-          fitView
-          fitViewOptions={{ padding: 0.12, minZoom: 0.6, maxZoom: 1 }}
+          onInit={(inst) => {
+            // open on the main handler at a readable zoom rather than shrinking everything to fit
+            const g = graphRef.current;
+            const entries = g.nodes.filter((n) => n.t === 'entry');
+            const main = entries.find((n) => n.d.role === 'tick') ?? entries[0] ?? g.nodes[0];
+            if (!main) return;
+            const r = host.current?.getBoundingClientRect();
+            const zoom = r && r.width < 600 ? 0.75 : 0.92;
+            inst.setViewport({ x: 48 - main.x * zoom, y: 56 - main.y * zoom, zoom });
+          }}
           minZoom={0.2}
           maxZoom={1.6}
           colorMode="light"

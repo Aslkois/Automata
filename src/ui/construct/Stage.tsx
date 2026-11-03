@@ -35,6 +35,8 @@ export function Stage({ design, stats, layer, sel, armed, showArcs, onSelect, on
   const [size, setSize] = useState({ w: 1200, h: 700 });
   const [view, setView] = useState<View | null>(null);
   const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean } | null>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ d: number; k: number; cx: number; cy: number; vx: number; vy: number } | null>(null);
   const lay = layoutSections(design);
   const x0 = lay.rear.cx - lay.rear.length / 2;
   const x1 = lay.front.cx + lay.front.length / 2;
@@ -79,12 +81,36 @@ export function Stage({ design, stats, layer, sel, armed, showArcs, onSelect, on
     const r = ref.current!.getBoundingClientRect();
     zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
   };
+  const local = (e: { clientX: number; clientY: number }) => {
+    const r = ref.current!.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
   const onDown = (e: RPointerEvent) => {
+    pointers.current.set(e.pointerId, local(e));
+    if (pointers.current.size === 2) {
+      // two fingers: pinch to zoom around their midpoint
+      const [a, b] = [...pointers.current.values()];
+      pinch.current = { d: Math.hypot(a.x - b.x, a.y - b.y), k: v.k, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, vx: v.x, vy: v.y };
+      drag.current = null;
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+      return;
+    }
     if (e.button !== 0 || (e.target as Element).closest('[data-hit]')) return;
     drag.current = { x: e.clientX, y: e.clientY, vx: v.x, vy: v.y, moved: false };
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
   };
   const onMove = (e: RPointerEvent) => {
+    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, local(e));
+    const pz = pinch.current;
+    if (pz && pointers.current.size >= 2) {
+      const [a, b] = [...pointers.current.values()];
+      const k = Math.max(2, Math.min(40, (pz.k * Math.hypot(a.x - b.x, a.y - b.y)) / Math.max(1, pz.d)));
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      const f = k / pz.k;
+      setView({ k, x: mx - (pz.cx - pz.vx) * f, y: my - (pz.cy - pz.vy) * f });
+      return;
+    }
     const d = drag.current;
     if (!d) return;
     const dx = e.clientX - d.x;
@@ -92,7 +118,12 @@ export function Stage({ design, stats, layer, sel, armed, showArcs, onSelect, on
     if (Math.abs(dx) + Math.abs(dy) > 3) d.moved = true;
     if (d.moved) setView({ k: v.k, x: d.vx + dx, y: d.vy + dy });
   };
-  const onUp = () => {
+  const onUp = (e: RPointerEvent) => {
+    pointers.current.delete(e.pointerId);
+    if (pinch.current) {
+      if (pointers.current.size < 2) pinch.current = null;
+      return;
+    }
     const d = drag.current;
     drag.current = null;
     if (d && !d.moved) onSelect(null);
@@ -104,7 +135,7 @@ export function Stage({ design, stats, layer, sel, armed, showArcs, onSelect, on
 
   return (
     <div className="stage">
-      <svg ref={ref} className="stage-svg" onWheel={onWheel} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} aria-label={`Assembly stage: ${design.name}`} role="application">
+      <svg ref={ref} className="stage-svg" onWheel={onWheel} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} aria-label={`Assembly stage: ${design.name}`} role="application">
         <defs>
           <pattern id="grid-fine" width={gridStep * v.k} height={gridStep * v.k} patternUnits="userSpaceOnUse" x={v.x % (gridStep * v.k)} y={v.y % (gridStep * v.k)}>
             <path d={`M ${gridStep * v.k} 0 L 0 0 0 ${gridStep * v.k}`} fill="none" stroke="var(--grid)" strokeWidth={1} />
@@ -229,20 +260,44 @@ function Axis({ x0, x1, halfW, k }: { x0: number; x1: number; halfW: number; k: 
 }
 
 function Gear({ design, lay }: { design: DroneDesign; lay: ReturnType<typeof layoutSections> }) {
-  const tracked = design.chassis === 'tracked';
+  const kind = design.chassis;
   return (
     <g className="gear">
       {SECTION_POSITIONS.map((pos) => {
         const s = lay[pos];
         return [-1, 1].map((side) => {
           const y = side < 0 ? -s.width / 2 - 3.4 : s.width / 2 + 0.4;
-          if (tracked) {
+          if (kind === 'tracked') {
             const n = Math.floor((s.length - 1) / 1.6);
             return (
               <g key={`${pos}${side}`}>
                 <rect x={s.cx - s.length / 2 + 0.3} y={y} width={s.length - 0.6} height={3} rx={0.6} className="track" />
                 {Array.from({ length: n }, (_, i) => (
                   <line key={i} x1={s.cx - s.length / 2 + 1 + i * 1.6} x2={s.cx - s.length / 2 + 1 + i * 1.6} y1={y + 0.25} y2={y + 2.75} className="tread" />
+                ))}
+              </g>
+            );
+          }
+          if (kind === 'walking') {
+            return (
+              <g key={`${pos}${side}`}>
+                {[-0.25, 0.25].map((f) => (
+                  <g key={f}>
+                    <line x1={s.cx + f * s.length} y1={side < 0 ? -s.width / 2 : s.width / 2} x2={s.cx + f * s.length + 1} y2={y + 1.6} className="tread" style={{ strokeWidth: 0.6 }} />
+                    <rect x={s.cx + f * s.length - 1.6} y={y + 0.2} width={4.4} height={2.6} rx={0.5} className="leg" />
+                  </g>
+                ))}
+              </g>
+            );
+          }
+          if (kind === 'flying') {
+            return (
+              <g key={`${pos}${side}`}>
+                {[-0.28, 0.28].map((f) => (
+                  <g key={f}>
+                    <circle cx={s.cx + f * s.length} cy={y + 1.5} r={3.6} className="wash" />
+                    <circle cx={s.cx + f * s.length} cy={y + 1.5} r={1.9} className="thruster" />
+                  </g>
                 ))}
               </g>
             );

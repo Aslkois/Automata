@@ -123,7 +123,7 @@ export const CodeEditor = forwardRef<CodeHandle, Props>(function CodeEditor({ va
       const sel = v.state.selection.main;
       const line = v.state.doc.lineAt(sel.head);
       // statements go on their own line, indented like the current one
-      const multi = text.includes('\n') || text.endsWith(';') || text.endsWith('}');
+      const multi = text.includes('\n') || (text.length > 2 && (text.endsWith(';') || text.endsWith('}')));
       if (multi && line.text.trim() !== '') {
         const indent = /^\s*/.exec(line.text)![0];
         const ins = '\n' + text.split('\n').map((l) => indent + l).join('\n');

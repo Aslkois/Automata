@@ -63,15 +63,19 @@ const listeners = new Set<() => void>();
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let lastSaved = Date.now();
 let pending = false;
+const saveListeners = new Set<() => void>();
 
 function persist() {
-  pending = true;
+  if (!pending) {
+    pending = true;
+    for (const l of saveListeners) l();
+  }
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     persistNow(state);
     pending = false;
     lastSaved = Date.now();
-    for (const l of listeners) l();
+    for (const l of saveListeners) l();
   }, 300);
 }
 
@@ -206,6 +210,18 @@ export function programFor(designId: string, lib = state): { program: ProgramSou
   const d = lib.designs.find((x) => x.id === designId);
   const c = compileBrain(b.ir, b.id, `${d?.name ?? 'drone'} brain`);
   return { program: c.program, errors: c.errors };
+}
+
+/** Whether a save is pending (for the "Saving… / Saved" indicator). */
+export function useSaving(): boolean {
+  return useSyncExternalStore(
+    (l) => {
+      saveListeners.add(l);
+      return () => saveListeners.delete(l);
+    },
+    () => pending,
+    () => pending,
+  );
 }
 
 export function useLibrary(): Library {

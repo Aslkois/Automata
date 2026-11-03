@@ -366,3 +366,11 @@ describe('one brain, three editors', () => {
     expect(openView(brain, 'code').opened.doc.text).toBe(mine);
   });
 });
+
+describe('fragments', () => {
+  it('code modules and snippets may use return, break and continue', async () => {
+    const { parseStatements } = await import('../../src/program/brain/parse');
+    for (const c of ['break;', 'continue;', 'return;', 'if (x) { return 1; }']) expect(parseStatements(c).stmts, c).not.toBeNull();
+    expect(parseStatements('function (').stmts).toBeNull();
+  });
+});

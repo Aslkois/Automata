@@ -292,10 +292,17 @@ export function parseBrain(src: string): ParseResult {
   return { ir: { body }, diagnostics: [], idLine: c.idLine, rawLine: c.rawLine };
 }
 
-/** Parse a fragment of statements (code modules, inserted snippets). */
+/**
+ * Parse a fragment of statements (code modules, inserted snippets). A fragment may belong
+ * inside a function or loop (`return`, `break`), so it is also tried in that context.
+ */
 export function parseStatements(src: string): { stmts: Stmt[] | null; diagnostics: Diagnostic[] } {
   const r = parseBrain(src);
-  return { stmts: r.ir?.body ?? null, diagnostics: r.diagnostics };
+  if (r.ir) return { stmts: r.ir.body, diagnostics: [] };
+  const wrapped = parseBrain(`function __fragment__() {\nwhile (__fragment__) {\n${src}\n}\n}`);
+  const fn = wrapped.ir?.body[0];
+  if (fn && fn.k === 'func' && fn.body[0]?.k === 'while') return { stmts: fn.body[0].body, diagnostics: [] };
+  return { stmts: null, diagnostics: r.diagnostics };
 }
 
 /** Parse a single expression (inline values, expression modules). */

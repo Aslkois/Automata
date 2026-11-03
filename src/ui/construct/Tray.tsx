@@ -15,8 +15,6 @@ const CATS: { key: string; label: string; kinds: string[] }[] = [
   { key: 'sensor', label: 'Sensors', kinds: ['sensor'] },
   { key: 'shield', label: 'Shields', kinds: ['shield'] },
   { key: 'power', label: 'Power', kinds: ['generator', 'battery'] },
-  { key: 'motor', label: 'Motors', kinds: ['motor'] },
-  { key: 'controller', label: 'Control', kinds: ['controller'] },
   { key: 'cooler', label: 'Cooling', kinds: ['cooler'] },
   { key: 'ammo', label: 'Ammunition', kinds: ['ammo'] },
 ];

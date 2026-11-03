@@ -1,32 +1,34 @@
-// AUTOMATA — THE MACHINE. Design tokens shared by the UI, the editors and the renderer.
-// Warm ivory and stone surfaces, graphite and carbon chrome, one steel-blue accent for
-// interaction; stronger colours only for meaningful states, teams and categories.
+// AUTOMATA — an operating system for artificial life. Design tokens shared by the UI, the
+// editors and the renderer: ivory and sepia surfaces, graphite and charcoal for contrast,
+// muted brown for quiet emphasis, one cool signal hue for focus; stronger colours only for
+// meaningful states, teams and programming categories.
 
 export const T = {
-  bone: '#f3efe6',
-  linen: '#e9e3d6',
-  sand: '#ddd5c5',
-  stone: '#cfc6b4',
-  steel: '#9a978f',
-  iron: '#5d5c58',
-  graphite: '#2c2c2a',
-  carbon: '#1d1d1c',
-  pitch: '#161615',
-  signal: '#2f6f8f',
-  signalDeep: '#24566f',
-  signalWash: '#dce7ec',
-  signalLight: '#8fc0d6',
-  ok: '#4c7a52',
-  warn: '#b07d22',
-  fault: '#a8402b',
-  faultLight: '#d9775f',
+  ivory: '#efe8da',
+  vellum: '#e6dcc8',
+  sepia: '#d6c8ad',
+  dune: '#bfae8e',
+  umber: '#7d6548',
+  stone: '#8e8576',
+  iron: '#5b554b',
+  graphite: '#2a2723',
+  carbon: '#1e1c19',
+  pitch: '#141311',
+  signal: '#3d6e7d',
+  signalDeep: '#2c5562',
+  signalWash: '#dbe3dd',
+  signalLight: '#9cc3c9',
+  ok: '#5d7a4f',
+  warn: '#a8792a',
+  fault: '#9e3f2a',
+  faultLight: '#d47b63',
 } as const;
 
 export const TEAMS = [
-  { name: 'Cobalt', color: '#3f6fa8', light: '#8db3e0' },
-  { name: 'Amber', color: '#b97a1f', light: '#e3b062' },
-  { name: 'Verdigris', color: '#3c8a74', light: '#7cc6af' },
-  { name: 'Iris', color: '#7d5ea6', light: '#b9a0dc' },
+  { name: 'Cobalt', color: '#4a6f9c', light: '#9dbbdc' },
+  { name: 'Amber', color: '#b07a2c', light: '#e2b46e' },
+  { name: 'Verdigris', color: '#447f6c', light: '#8cc4b1' },
+  { name: 'Iris', color: '#7a6296', light: '#bba7d6' },
 ];
 export const TEAM_COLOR = TEAMS.map((t) => t.color);
 export const TEAM_LIGHT = TEAMS.map((t) => t.light);
@@ -34,17 +36,17 @@ export const TEAM_NAME = TEAMS.map((t) => t.name);
 
 /** Programming categories, shared by blocks, nodes, the insert drawer and the reference. */
 export const CAT: Record<string, { color: string; label: string }> = {
-  event: { color: '#3b3a37', label: 'Events' },
-  logic: { color: '#2f6f8f', label: 'Logic' },
-  loop: { color: '#3e6380', label: 'Loops' },
-  math: { color: '#9a7128', label: 'Math' },
-  value: { color: '#76705f', label: 'Values' },
-  sensor: { color: '#37806c', label: 'Sensors' },
-  move: { color: '#3f62a0', label: 'Movement' },
-  weapon: { color: '#a1452f', label: 'Weapons' },
-  system: { color: '#6e6c3a', label: 'Systems' },
-  function: { color: '#73588f', label: 'Functions' },
-  code: { color: '#2c2c2a', label: 'Code' },
+  event: { color: '#3a352e', label: 'Events' },
+  logic: { color: '#3d6e7d', label: 'Logic' },
+  loop: { color: '#4f6577', label: 'Loops' },
+  math: { color: '#9c763a', label: 'Math' },
+  value: { color: '#7b6f5f', label: 'Values' },
+  sensor: { color: '#4c7a68', label: 'Sensors' },
+  move: { color: '#4d6390', label: 'Movement' },
+  weapon: { color: '#9a4a32', label: 'Weapons' },
+  system: { color: '#6e6a3e', label: 'Systems' },
+  function: { color: '#6e5a84', label: 'Functions' },
+  code: { color: '#2a2723', label: 'Code' },
 };
 
 /** Equipment kinds: a glyph, a label and the tint of the related programming category. */

@@ -102,7 +102,8 @@ export function openView<K extends ViewKind>(brain: Brain, kind: K): { opened: O
   if (cache?.draft && cache.draft.baseHash === hash) return { opened: { doc: cache.draft.doc, isDraft: true, errors: cache.draft.errors }, cache };
   const stale = cache?.draft && cache.draft.baseHash !== hash ? cache.draft : cache?.setAside;
   if (cache && cache.hash === hash) {
-    const c: ViewCache<ViewDocs[K]> = { ...cache, draft: undefined, setAside: stale };
+    const unchanged = !cache.draft && cache.setAside === stale;
+    const c: ViewCache<ViewDocs[K]> = unchanged ? cache : { ...cache, draft: undefined, setAside: stale };
     return { opened: { doc: cache.doc, isDraft: false, errors: [], setAside: stale }, cache: c };
   }
   const doc = generate(brain.ir, kind, cache?.doc);
@@ -146,12 +147,12 @@ export function applyEdit<K extends ViewKind>(brain: Brain, kind: K, doc: ViewDo
   const prevCache = brain.views[kind] as ViewCache<ViewDocs[K]> | undefined;
   if (!next) {
     const cache: ViewCache<ViewDocs[K]> = { ...(prevCache ?? { doc, hash: base }), draft: { doc, baseHash: base, errors } };
-    return { brain: { ...brain, view: kind, views: { ...brain.views, [kind]: cache } }, ok: false, errors, changed: false };
+    return { brain: { ...brain, views: { ...brain.views, [kind]: cache } }, ok: false, errors, changed: false };
   }
   const hash = irHash(next);
   const changed = hash !== base;
   const cache: ViewCache<ViewDocs[K]> = { doc: storedDoc, hash, viewport: prevCache?.viewport };
-  return { brain: { ...brain, ir: changed ? next : brain.ir, view: kind, views: { ...brain.views, [kind]: cache }, updatedAt: changed ? Date.now() : brain.updatedAt }, ok: true, errors: [], changed };
+  return { brain: { ...brain, ir: changed ? next : brain.ir, views: { ...brain.views, [kind]: cache }, updatedAt: changed ? Date.now() : brain.updatedAt }, ok: true, errors: [], changed };
 }
 
 /** Throw away a draft (the view then shows the brain again). */
