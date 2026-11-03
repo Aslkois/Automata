@@ -4,6 +4,7 @@ import { activeSensors } from '../sim/sensors';
 import type { Simulation } from '../sim/world';
 import type { Debris, Drone, RComponent, RSection } from '../sim/types';
 import type { Vfx } from './vfx';
+import { TEAM_COLOR } from '../ui/theme';
 
 export interface Camera {
   x: number;
@@ -19,8 +20,9 @@ export interface ViewOptions {
   labels: boolean;
 }
 
-export const TEAM_COLORS = ['#6c9fd8', '#d98c5f', '#8fbf6a', '#c27ba0'];
-const TEAM_FILL = ['#121a24', '#241811', '#141f12', '#21141d'];
+export const TEAM_COLORS = TEAM_COLOR;
+// Dark hull plates tinted toward each team colour, outlined in the team colour.
+const TEAM_FILL = ['#1b2a45', '#3a2414', '#123a31', '#3d1a27'];
 
 export function worldToScreen(cam: Camera, w: number, h: number, x: number, y: number) {
   return { x: (x - cam.x) * cam.zoom + w / 2, y: (y - cam.y) * cam.zoom + h / 2 };
@@ -53,7 +55,7 @@ export class Renderer {
   draw(sim: Simulation, cam: Camera, vfx: Vfx, opts: ViewOptions, w: number, h: number, dpr: number) {
     const ctx = this.ctx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = '#1a2d21';
     ctx.fillRect(0, 0, w * dpr, h * dpr);
     ctx.setTransform(dpr * cam.zoom, 0, 0, dpr * cam.zoom, dpr * (w / 2 - cam.x * cam.zoom), dpr * (h / 2 - cam.y * cam.zoom));
     const z = cam.zoom;
@@ -61,28 +63,42 @@ export class Renderer {
 
     // ground grid
     const A = sim.arena;
-    ctx.fillStyle = '#050506';
+    // the cutting mat: minor grid every 50 u, major every 200 u
+    ctx.fillStyle = '#2c4636';
     ctx.fillRect(0, 0, A.width, A.height);
-    ctx.strokeStyle = '#0e0f11';
-    ctx.lineWidth = px;
-    ctx.beginPath();
-    for (let x = 0; x <= A.width; x += 100) {
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, A.height);
+    for (const [step, color, width] of [
+      [50, '#36553f', 1],
+      [200, '#436a51', 2],
+    ] as const) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width * px;
+      ctx.beginPath();
+      for (let x = 0; x <= A.width; x += step) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, A.height);
+      }
+      for (let y = 0; y <= A.height; y += step) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(A.width, y);
+      }
+      ctx.stroke();
     }
-    for (let y = 0; y <= A.height; y += 100) {
-      ctx.moveTo(0, y);
-      ctx.lineTo(A.width, y);
-    }
-    ctx.stroke();
     vfx.drawDecals(ctx);
     // obstacles
     for (const o of A.obstacles) {
-      ctx.fillStyle = '#16171a';
-      ctx.strokeStyle = '#2a2c31';
+      ctx.fillStyle = '#15161c';
+      ctx.strokeStyle = '#000';
       ctx.lineWidth = 1.2 * px;
       ctx.fillRect(o.x - o.hw, o.y - o.hh, o.hw * 2, o.hh * 2);
+      ctx.lineWidth = 2 * px;
       ctx.strokeRect(o.x - o.hw, o.y - o.hh, o.hw * 2, o.hh * 2);
+      // a lit top edge so cover reads as a raised block
+      ctx.strokeStyle = '#454a5a';
+      ctx.lineWidth = 2 * px;
+      ctx.beginPath();
+      ctx.moveTo(o.x - o.hw + 2 * px, o.y - o.hh + 2 * px);
+      ctx.lineTo(o.x + o.hw - 2 * px, o.y - o.hh + 2 * px);
+      ctx.stroke();
     }
 
     const sel = opts.selected !== null ? sim.drones.find((d) => d.id === opts.selected) ?? null : null;
@@ -112,7 +128,7 @@ export class Renderer {
     // contacts of the selected drone (what its program can see)
     if (sel) {
       for (const c of sel.perception.contacts) {
-        ctx.strokeStyle = c.team === 'enemy' ? '#d0605a' : '#7fb069';
+        ctx.strokeStyle = c.team === 'enemy' ? '#ff5c8a' : '#18c29c';
         ctx.lineWidth = 1.2 * px;
         const r = 30;
         ctx.beginPath();
@@ -130,7 +146,7 @@ export class Renderer {
         }
       }
       for (const t of sel.perception.threats) {
-        ctx.strokeStyle = '#d4a446';
+        ctx.strokeStyle = '#ffd23f';
         ctx.lineWidth = px;
         ctx.beginPath();
         ctx.arc(t.x, t.y, 6, 0, Math.PI * 2);
@@ -173,13 +189,13 @@ export class Renderer {
     // labels in screen space
     if (opts.labels) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.font = '11px system-ui, sans-serif';
+      ctx.font = "700 12px 'Bricolage Grotesque', system-ui, sans-serif";
       ctx.textAlign = 'center';
       for (const d of sim.drones) {
         if (!visible.has(d.id)) continue;
         const c = comWorld(d.body);
         const s = worldToScreen(cam, w, h, c.x, c.y - d.radius - 6);
-        ctx.fillStyle = d.status.disabled || d.status.destroyed ? '#5c5f66' : TEAM_COLORS[d.team % TEAM_COLORS.length];
+        ctx.fillStyle = d.status.disabled || d.status.destroyed ? '#a3a8b8' : TEAM_COLORS[d.team % TEAM_COLORS.length];
         ctx.fillText(`${d.name}${d.status.label !== 'Operational' ? ` · ${d.status.label}` : ''}`, s.x, s.y);
       }
     }
@@ -198,10 +214,10 @@ export class Renderer {
       const g = d.components.find((c) => c.kind === 'gear' && c.section === s.pos && c.gearSide === side);
       const y = side === 'left' ? -s.width / 2 - 3 : s.width / 2;
       const broken = !g || g.destroyed;
-      ctx.fillStyle = broken ? '#1a1212' : tracked ? '#24262a' : '#1d1e21';
+      ctx.fillStyle = broken ? '#3a1820' : '#15161c';
       ctx.fillRect(s.cx - s.length / 2 + 0.5, y, s.length - 1, 3);
       if (!broken) {
-        ctx.strokeStyle = '#3a3c42';
+        ctx.strokeStyle = '#9aa3c7';
         ctx.lineWidth = 0.5;
         ctx.beginPath();
         const ph = phase ? (side === 'left' ? phase.left : phase.right) : 0;
@@ -356,7 +372,7 @@ export class Renderer {
     }
     for (const c of d.components) if (d.sections[c.section].attached) this.drawComponent(c, dead ? '#5c5f66' : '#cfd3da', px, c.weapon ? c.weapon.aim : null);
     if (selected) {
-      ctx.strokeStyle = '#5fa8a8';
+      ctx.strokeStyle = '#ffd23f';
       ctx.lineWidth = 1.2 * px;
       ctx.setLineDash([4 * px, 3 * px]);
       ctx.beginPath();
@@ -390,7 +406,7 @@ export class Renderer {
     ctx.translate(b.body.pos.x, b.body.pos.y);
     ctx.rotate(b.body.angle);
     for (const s of b.sections) this.drawGear(b, s, px, null);
-    this.drawHull(b.sections, '#121212', '#3c3530', px);
+    this.drawHull(b.sections, '#1b1c22', '#4a4f5e', px);
     for (const c of b.components) this.drawComponent({ ...c, destroyed: true }, '#4a4744', px, null);
     ctx.restore();
   }

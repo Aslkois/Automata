@@ -29,13 +29,27 @@ npm run dev          # http://localhost:5173
 3. **build**: `npm run build`, then uploads `dist/` as the Pages artifact
 4. **deploy**: only on the default branch. Publishes the artifact with `actions/deploy-pages`.
 
-**One-time setup:** in the repository go to *Settings → Pages → Build and deployment → Source* and choose **GitHub Actions**. The build uses relative asset paths (`base: './'`), so it works at `https://<owner>.github.io/<repo>/` with no per-repository configuration.
+**One-time setup:** in the repository go to *Settings → Pages → Build and deployment → Source* and choose **GitHub Actions**. The build uses relative asset paths (`base: './'`), so it works at `https://<owner>.github.io/<Repo>/ (the live site is https://aslkois.github.io/Automata/ — the path is case-sensitive)` with no per-repository configuration.
 
 ## Using the game
 
-- **Hangar**: pick a chassis and a class for each section, set armor, click slots to mount equipment and rotate hardpoints. Firing arcs are drawn with self-obstructed parts in red. Mass, speed, power, cooling, ammunition and validation update live. Designs can be saved, imported and exported as JSON.
-- **Programs**: create Block, Node or Code programs. The Build panel shows compile errors (click one to jump to it) and the API reference. Block and node programs can show their compiled AutoScript or be converted to a code program.
-- **Battle**: choose Duel or Sandbox, assign a design and a program to each combatant, then Deploy. Play, Pause, Step tick, Step decision, Restart and Speed control the simulation. The default camera is a freecam. Click a drone to spectate it: you get follow, sensor cones, weapon arcs, and a *sensor view* that shows only what that drone perceives. The Inspector shows live structure, power, weapons, shields, components, contacts and the **decision trace**. Click a trace entry to see the exact code line, block or node, then choose *Show in editor*.
+The interface is a workbench in the spirit of SPLICE: ink panels around a cutting-mat work surface, warm-white controls, and colour that always means something.
+
+| Colour | Hardware (Hangar) | Programming (blocks, nodes, API) |
+| --- | --- | --- |
+| Pink | Weapons | Weapons |
+| Teal | Sensors | Sensors |
+| Violet | Shields | Logic & flow |
+| Yellow | Power | Math & data constants; selected/active state |
+| Cobalt | Propulsion | Movement |
+| Sky | Thermal | Systems |
+| Orange | Ammunition | Events |
+
+Node wires are coloured by type: white = execution, yellow = number, teal = boolean, sky = contact, orange = string.
+
+- **Hangar**: the left panel holds your designs and a categorised, searchable equipment library. Click a part to arm it (compatible slots light up), then click a slot, or drag the part onto a slot. The large central schematic shows sections, slots, turret facings, armor and firing arcs (red = blocked by a taller own section). Click a section, use the section rail, or click a slot to edit it in the inspector on the right. The inspector has three tabs: Selection, Performance and Checks. Construction problems also float over the canvas; click one to jump to the cause.
+- **Programs**: the left panel holds the program library plus a palette for the current mode. Node programs get the node parts, code programs get API calls you can click to insert, and block programs get the colour key; the block toolbox itself sits inside the editor. The large centre editor shows blocks, a node graph or code. Block and node programs can switch to a read-only AutoScript view or be converted to code. The resizable inspector on the right shows build status (click an error to jump to it) and the API reference.
+- **Battle**: a compact toolbar holds Play, Step tick, Step decision, Restart, the speed control, the clock, effects, sound and panel toggles. The battlefield takes the rest of the screen. Roster/Scenario (left), Debugger (right, resizable) and the event Timeline (bottom) are all collapsible. Click a drone to spectate it: the overlay offers Follow, Sensor view, Sensor cones, Weapon arcs, Freecam and Fit arena. The debugger shows live state, components, sensor contacts and the **decision trace**; click a trace entry to see the exact code line, block or node, then choose *Show in editor*.
 
 Examples included: **Assault Platform** (tracked; heavy front with two heavy cannons, medium middle with MGs and radar, light rear with point defense), run by the code program *Assault Doctrine*. **AA Destroyer** (wheeled; light front and rear with AA autocannons, heavy middle with a directional shield, radar and reactor), run by the block program *AA Orbit*. **Skirmisher**, run by the node program *Brawler*.
 
