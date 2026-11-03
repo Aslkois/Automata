@@ -207,6 +207,8 @@ export interface InterpreterOptions {
   source: string;
   random: () => number;
   maxTrace?: number;
+  /** lines from here on are library helpers: traces inside them keep the caller's line */
+  libraryFrom?: number;
 }
 
 export class Interpreter {
@@ -353,7 +355,7 @@ export class Interpreter {
   }
 
   private setLine(n: N): void {
-    if (this.opts.locMode === 'line' && n.loc) this.loc = { kind: 'line', line: n.loc.start.line };
+    if (this.opts.locMode === 'line' && n.loc && !(this.opts.libraryFrom && n.loc.start.line >= this.opts.libraryFrom)) this.loc = { kind: 'line', line: n.loc.start.line };
   }
 
   private src(n: N): string {

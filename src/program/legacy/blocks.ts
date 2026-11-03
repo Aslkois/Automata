@@ -1,12 +1,13 @@
 // Headless compiler: Blockly JSON workspace state -> AutoScript.
 // Each statement is prefixed with __at("<blockId>") so the decision inspector can point at
 // the block that was executing when a trace entry was recorded.
-import { BLOCK_DEFS, STANDARD_BLOCKS } from '../blockDefs';
-import type { BlockJson, BlocksState, CompileResult } from '../types';
+import { BLOCK_DEFS, STANDARD_BLOCKS } from './blockDefs';
+import type { BlockJson, BlocksState, CompileResult } from './types';
 import { PRELUDE } from './prelude';
 
 const KNOWN = new Set<string>([...STANDARD_BLOCKS, ...BLOCK_DEFS.map((b) => b.type as string)]);
 const q = (s: unknown) => JSON.stringify(String(s));
+const RESERVED_NAMES = new Set('drone Math update onFailure event undefined NaN Infinity angleDiff clamp rad deg break case const continue default delete do else for function if in let new null return switch this true false typeof var void while'.split(' '));
 
 class BlockCompiler {
   errors: CompileResult['errors'] = [];
@@ -17,7 +18,8 @@ class BlockCompiler {
   constructor(private state: BlocksState) {
     const used = new Set<string>();
     for (const v of state.variables ?? []) {
-      let base = 'v_' + v.name.replace(/[^A-Za-z0-9_]/g, '_');
+      const clean = v.name.trim().replace(/\s+(\w)/g, (_, c: string) => c.toUpperCase()).replace(/[^A-Za-z0-9_]/g, '_');
+      let base = /^[A-Za-z_]/.test(clean) && !RESERVED_NAMES.has(clean) ? clean : 'v_' + clean;
       while (used.has(base)) base += '_';
       used.add(base);
       this.varNames.set(v.id, base);
@@ -255,8 +257,10 @@ class BlockCompiler {
         return 'drone.threats().length';
       case 'drone_contact_exists':
         return `${i('CONTACT', 'null')} != null`;
-      case 'drone_contact_prop':
-        return `(${i('CONTACT', 'null')})?.${/^[a-z]+$/.test(f('PROP')) ? f('PROP') : 'x'} ?? 0`;
+      case 'drone_contact_prop': {
+        const c = i('CONTACT', 'null');
+        return `${c} == null ? 0 : ${c}.${/^[a-z]+$/.test(f('PROP')) ? f('PROP') : 'x'}`;
+      }
       case 'drone_self': {
         const p = f('PROP');
         return `drone.${['x', 'y', 'heading', 'speed', 'time'].includes(p) ? p : 'x'}()`;
@@ -306,11 +310,8 @@ class BlockCompiler {
         case 'procedures_defreturn': {
           const name = this.procName(this.field(b, 'NAME'));
           const params = ((b.extraState?.params as { name: string; id: string }[] | undefined) ?? []).map((p) => this.varNames.get(p.id) ?? 'v_' + p.name.replace(/[^A-Za-z0-9_]/g, '_'));
-          // Blockly procedure parameters are workspace variables; bind them as globals for the call.
-          const saved = params.map((p, k) => `var __s${k} = ${p}; ${p} = arguments_${k};`).join(' ');
-          const restore = params.map((p, k) => `${p} = __s${k};`).join(' ');
-          const ret = b.type === 'procedures_defreturn' ? this.expr(this.input(b, 'RETURN'), 'null') : 'undefined';
-          procs += `function ${name}(${params.map((_, k) => 'arguments_' + k).join(', ')}) {\n  ${saved}\n  var __r = (function () {\n${this.stmts(this.input(b, 'STACK'), '    ')}    return ${ret};\n  })();\n  ${restore}\n  return __r;\n}\n`;
+          const ret = b.type === 'procedures_defreturn' ? `  return ${this.expr(this.input(b, 'RETURN'), 'null')};\n` : '';
+          procs += `function ${name}(${params.join(', ')}) {\n${this.stmts(this.input(b, 'STACK'), '  ')}${ret}}\n`;
           break;
         }
         case 'event_start':

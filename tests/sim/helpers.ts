@@ -21,7 +21,7 @@ export function design(over: Partial<DroneDesign> & { sections?: DroneDesign['se
   };
 }
 
-export const code = (src: string): ProgramSource => ({ schema: PROGRAM_SCHEMA_VERSION, id: 'p', name: 'p', kind: 'code', code: src });
+export const code = (src: string): ProgramSource => ({ schema: PROGRAM_SCHEMA_VERSION, id: 'p', name: 'p', code: src });
 export const idle = code('function update() {}');
 
 /** An open arena (boundary walls only) for controlled experiments. */
