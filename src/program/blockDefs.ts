@@ -2,7 +2,7 @@
 // these, and the headless block compiler (compile/blocks.ts) understands the same fields.
 
 // Block styles are defined by the editor theme (see BlockEditor.tsx); the palette matches
-// the rest of AUTOMATA: events orange, sensors teal, movement cobalt, weapons pink, systems sky.
+// the archive palette: muted, ivory-labelled plates distinguished by category.
 const C_EVENT = 'event_blocks';
 const C_SENSE = 'sensor_blocks';
 const C_MOVE = 'move_blocks';
@@ -12,14 +12,15 @@ const C_DATA = 'data_blocks';
 
 /** Toolbox category colours (hex). */
 export const CATEGORY_HEX = {
-  event: '#ff8a1f',
-  logic: '#b45cff',
-  math: '#ffd23f',
-  data: '#9aa3c7',
-  sensor: '#18c29c',
-  move: '#2f6bff',
-  weapon: '#ff5c8a',
-  system: '#6fa8ff',
+  event: '#3a3834',
+  logic: '#5e5348',
+  math: '#8a7245',
+  data: '#76705f',
+  sensor: '#4f6a5c',
+  move: '#4a5d74',
+  weapon: '#874333',
+  system: '#615d4d',
+  memory: '#6b5868',
 };
 
 const CONTACT_PROPS = [
@@ -143,6 +144,6 @@ export const TOOLBOX_CATEGORIES: { name: string; colour: string; blocks: string[
   { name: 'Movement', colour: CATEGORY_HEX.move, blocks: ['drone_drive', 'drone_turn_toward_contact', 'drone_turn_toward', 'drone_stop'] },
   { name: 'Weapons', colour: CATEGORY_HEX.weapon, blocks: ['drone_engage_all', 'drone_aim_at_contact', 'drone_aim_angle', 'drone_fire', 'drone_fire_if', 'drone_reload', 'drone_can_fire', 'drone_weapon_prop'] },
   { name: 'Systems', colour: CATEGORY_HEX.system, blocks: ['drone_shield_face_contact', 'drone_shield_raise', 'drone_set_power', 'drone_shield_charge', 'drone_power_prop', 'drone_status_flag', 'drone_count_kind', 'drone_component_ok', 'drone_reset_timer', 'drone_elapsed', 'drone_log'] },
-  { name: 'Variables', colour: CATEGORY_HEX.data, blocks: [], custom: 'VARIABLE' },
-  { name: 'Functions', colour: CATEGORY_HEX.data, blocks: [], custom: 'PROCEDURE' },
+  { name: 'Variables', colour: CATEGORY_HEX.memory, blocks: [], custom: 'VARIABLE' },
+  { name: 'Functions', colour: CATEGORY_HEX.memory, blocks: [], custom: 'PROCEDURE' },
 ];

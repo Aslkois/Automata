@@ -23,18 +23,18 @@ import {
 import '@xyflow/react/dist/style.css';
 import { NODE_MAP, portCompatible } from '../../program/nodeDefs';
 import type { GraphNode, NodeGraph, PortType } from '../../program/types';
-import { C, PORT_COLOR } from '../theme';
+import { A, PORT_COLOR, PROG } from '../theme';
 
 /** Node families: colour = what the node does (matches blocks and the hangar). */
-export const NODE_FAMILIES: { key: string; label: string; color: string; ink: string; types: string[] }[] = [
-  { key: 'event', label: 'Events', color: C.orange, ink: C.ink, types: ['OnTick', 'OnStart', 'OnFailure'] },
-  { key: 'flow', label: 'Flow & logic', color: C.violet, ink: C.ink, types: ['Branch', 'Sequence', 'Compare', 'Logic'] },
-  { key: 'sensor', label: 'Sensors', color: C.teal, ink: C.ink, types: ['NearestEnemy', 'ContactInfo', 'Self', 'WeaponStatus', 'CanFire', 'ThreatCount', 'ComponentOK', 'Status', 'Power', 'ShieldCharge'] },
-  { key: 'move', label: 'Movement', color: C.cobalt, ink: C.paper, types: ['Drive', 'TurnToward', 'Stop'] },
-  { key: 'weapon', label: 'Weapons', color: C.pink, ink: C.ink, types: ['EngageAll', 'AimAt', 'Fire', 'Reload'] },
-  { key: 'system', label: 'Systems', color: C.sky, ink: C.ink, types: ['ShieldFace', 'RaiseShield', 'SetPower', 'Log'] },
-  { key: 'data', label: 'Data', color: C.yellow, ink: C.ink, types: ['Number', 'Bool', 'Math', 'AngleDiff', 'Random'] },
-  { key: 'memory', label: 'Memory & state', color: '#ff9ec0', ink: C.ink, types: ['GetVar', 'SetVar', 'StateIs', 'SetState', 'Timer', 'ResetTimer'] },
+export const NODE_FAMILIES: { key: string; label: string; color: string; types: string[] }[] = [
+  { key: 'event', label: 'Events', color: PROG.event.fill, types: ['OnTick', 'OnStart', 'OnFailure'] },
+  { key: 'flow', label: 'Flow & logic', color: PROG.logic.fill, types: ['Branch', 'Sequence', 'Compare', 'Logic'] },
+  { key: 'sensor', label: 'Sensors', color: PROG.sensor.fill, types: ['NearestEnemy', 'ContactInfo', 'Self', 'WeaponStatus', 'CanFire', 'ThreatCount', 'ComponentOK', 'Status', 'Power', 'ShieldCharge'] },
+  { key: 'move', label: 'Movement', color: PROG.move.fill, types: ['Drive', 'TurnToward', 'Stop'] },
+  { key: 'weapon', label: 'Weapons', color: PROG.weapon.fill, types: ['EngageAll', 'AimAt', 'Fire', 'Reload'] },
+  { key: 'system', label: 'Systems', color: PROG.system.fill, types: ['ShieldFace', 'RaiseShield', 'SetPower', 'Log'] },
+  { key: 'data', label: 'Data', color: PROG.math.fill, types: ['Number', 'Bool', 'Math', 'AngleDiff', 'Random'] },
+  { key: 'memory', label: 'Memory & state', color: PROG.memory.fill, types: ['GetVar', 'SetVar', 'StateIs', 'SetState', 'Timer', 'ResetTimer'] },
 ];
 const FAMILY_OF: Record<string, (typeof NODE_FAMILIES)[number]> = Object.fromEntries(NODE_FAMILIES.flatMap((f) => f.types.map((t) => [t, f])));
 export const familyOf = (type: string) => FAMILY_OF[type] ?? NODE_FAMILIES[6];
@@ -58,47 +58,39 @@ function CableEdge({ id, sourceX, sourceY, targetX, targetY, data, selected }: E
   const d = cablePath(sourceX, sourceY, targetX, targetY);
   return (
     <g>
-      <path d={d} fill="none" stroke="#000" strokeWidth={exec ? 9 : 7} strokeLinecap="round" />
-      <BaseEdge id={id} path={d} className="cable-core" style={{ stroke: PORT_COLOR[type], strokeWidth: exec ? 5 : 4, strokeLinecap: 'round' }} interactionWidth={18} />
-      {exec && <path d={d} fill="none" stroke="#000" strokeOpacity={0.35} strokeWidth={1.5} strokeDasharray="2 7" />}
-      {selected && <path d={d} fill="none" stroke={C.yellow} strokeWidth={2} strokeDasharray="6 6" />}
+      <path d={d} fill="none" stroke={A.ivory} strokeWidth={exec ? 6 : 5} strokeLinecap="square" />
+      <BaseEdge id={id} path={d} className="cable-core" style={{ stroke: PORT_COLOR[type], strokeWidth: exec ? 2.2 : 1.6 }} interactionWidth={16} />
+      {exec && <path d={d} fill="none" stroke={A.ivory} strokeWidth={1} strokeDasharray="1 9" />}
+      {selected && <path d={d} fill="none" stroke={A.ink} strokeWidth={4} strokeOpacity={0.25} />}
     </g>
   );
 }
 
 function CableConnectionLine({ fromX, fromY, toX, toY, fromHandle, connectionStatus }: ConnectionLineComponentProps) {
-  const color = connectionStatus === 'invalid' ? C.red : C.yellow;
+  const color = connectionStatus === 'invalid' ? A.rust : A.ink;
   const d = fromHandle?.type === 'target' ? cablePath(toX, toY, fromX, fromY) : cablePath(fromX, fromY, toX, toY);
   return (
     <g>
-      <path d={d} fill="none" stroke="#000" strokeWidth={8} strokeLinecap="round" />
-      <path d={d} fill="none" stroke={color} strokeWidth={4.5} strokeLinecap="round" />
-      <circle cx={toX} cy={toY} r={7} fill="#000" />
-      <circle cx={toX} cy={toY} r={4} fill={color} />
+      <path d={d} fill="none" stroke={color} strokeWidth={1.6} strokeDasharray="4 3" />
+      <rect x={toX - 4} y={toY - 4} width={8} height={8} fill={A.ivory} stroke={color} strokeWidth={1.5} />
     </g>
   );
 }
 
 function GraphNodeView({ data, selected }: NodeProps<FlowNode>) {
   const def = NODE_MAP[data.gnode.type];
-  if (!def) return <div className="mod gnode errored">Unknown node {data.gnode.type}</div>;
+  if (!def) return <div className="card-node errored">Unknown node {data.gnode.type}</div>;
   const fam = familyOf(def.type);
   const rows = Math.max(def.inputs.length, def.outputs.length);
   return (
-    <div
-      className={`mod gnode ${selected ? 'sel' : ''} ${data.traced ? 'traced' : ''} ${data.errored ? 'errored' : ''}`}
-      style={{ ['--plate' as string]: fam.color, ['--plate-ink' as string]: fam.ink }}
-      data-testid={`gnode-${data.gnode.id}`}
-      title={def.description}
-    >
-      <span className="screw tl" />
-      <span className="screw tr" />
-      <div className="mod-head">
-        <span className="mod-title">{def.title}</span>
-        <span className="mod-cat">{fam.label}</span>
+    <div className={`card-node gnode ${selected ? 'sel' : ''} ${data.traced ? 'traced' : ''} ${data.errored ? 'errored' : ''}`} style={{ ['--c' as string]: fam.color }} data-testid={`gnode-${data.gnode.id}`} title={def.description}>
+      <div className="card-head">
+        <span className="notch" />
+        <b>{def.title}</b>
+        <span>{fam.label}</span>
       </div>
       {(rows > 0 || def.params.length > 0) && (
-        <div className="mod-body">
+        <div className="card-body">
           {Array.from({ length: rows }).map((_, i) => {
             const inp = def.inputs[i];
             const out = def.outputs[i];
@@ -107,16 +99,16 @@ function GraphNodeView({ data, selected }: NodeProps<FlowNode>) {
                 <span className="pin">
                   {inp && (
                     <>
-                      <Handle type="target" position={Position.Left} id={inp.id} className={`jack t-${inp.type}`} />
+                      <Handle type="target" position={Position.Left} id={inp.id} className={`port t-${inp.type}`} />
                       {inp.label || (inp.type === 'exec' ? 'run' : inp.id)}
                     </>
                   )}
                 </span>
-                <span className="pin pout">
+                <span className="pin out">
                   {out && (
                     <>
                       {out.label || (out.type === 'exec' ? 'then' : out.id)}
-                      <Handle type="source" position={Position.Right} id={out.id} className={`jack t-${out.type}`} />
+                      <Handle type="source" position={Position.Right} id={out.id} className={`port t-${out.type}`} />
                     </>
                   )}
                 </span>
@@ -275,7 +267,7 @@ const Inner = forwardRef<NodeEditorHandle, Props>(function Inner({ graph, onChan
   }, [highlight, flow]);
 
   return (
-    <div ref={host} style={{ position: 'absolute', inset: 0 }} className="mat">
+    <div ref={host} style={{ position: 'absolute', inset: 0 }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -287,14 +279,14 @@ const Inner = forwardRef<NodeEditorHandle, Props>(function Inner({ graph, onChan
         isValidConnection={isValidConnection}
         connectionLineComponent={CableConnectionLine}
         fitView
-        fitViewOptions={{ padding: 0.15 }}
-        colorMode="dark"
+        fitViewOptions={{ padding: 0.08, minZoom: 0.85, maxZoom: 1.1 }}
+        colorMode="light"
         deleteKeyCode={['Backspace', 'Delete']}
         proOptions={{ hideAttribution: true }}
         style={{ background: 'transparent' }}
       >
-        <Background variant={BackgroundVariant.Lines} color={C.matLine} gap={24} />
-        <Background id="major" variant={BackgroundVariant.Lines} color={C.matMajor} gap={120} lineWidth={2} />
+        <Background variant={BackgroundVariant.Dots} color={A.rule} gap={20} size={1.2} />
+        <Background id="major" variant={BackgroundVariant.Lines} color="rgba(43,41,37,0.06)" gap={100} lineWidth={1} />
         <Controls showInteractive={false} />
       </ReactFlow>
     </div>
