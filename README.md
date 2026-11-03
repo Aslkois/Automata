@@ -33,23 +33,23 @@ npm run dev          # http://localhost:5173
 
 ## Using the game
 
-The interface is a workbench in the spirit of SPLICE: ink panels around a cutting-mat work surface, warm-white controls, and colour that always means something.
+The interface is presented as **the Machine Archive**: an operating system left behind by the makers of autonomous machines. It is almost monochrome, built from parchment and ivory records, graphite instruments, and one muted rust reserved for faults and damage. See [docs/DESIGN.md](docs/DESIGN.md) for the design system.
 
-| Colour | Hardware (Hangar) | Programming (blocks, nodes, API) |
-| --- | --- | --- |
-| Pink | Weapons | Weapons |
-| Teal | Sensors | Sensors |
-| Violet | Shields | Logic & flow |
-| Yellow | Power | Math & data constants; selected/active state |
-| Cobalt | Propulsion | Movement |
-| Sky | Thermal | Systems |
-| Orange | Ammunition | Events |
-
-Node wires are coloured by type: white = execution, yellow = number, teal = boolean, sky = contact, orange = string.
-
-- **Hangar**: the left panel holds your designs and a categorised, searchable equipment library. Click a part to arm it (compatible slots light up), then click a slot, or drag the part onto a slot. The large central schematic shows sections, slots, turret facings, armor and firing arcs (red = blocked by a taller own section). Click a section, use the section rail, or click a slot to edit it in the inspector on the right. The inspector has three tabs: Selection, Performance and Checks. Construction problems also float over the canvas; click one to jump to the cause.
-- **Programs**: the left panel holds the program library plus a palette for the current mode. Node programs get the node parts, code programs get API calls you can click to insert, and block programs get the colour key; the block toolbox itself sits inside the editor. The large centre editor shows blocks, a node graph or code. Block and node programs can switch to a read-only AutoScript view or be converted to code. The resizable inspector on the right shows build status (click an error to jump to it) and the API reference.
-- **Battle**: a compact toolbar holds Play, Step tick, Step decision, Restart, the speed control, the clock, effects, sound and panel toggles. The battlefield takes the rest of the screen. Roster/Scenario (left), Debugger (right, resizable) and the event Timeline (bottom) are all collapsible. Click a drone to spectate it: the overlay offers Follow, Sensor view, Sensor cones, Weapon arcs, Freecam and Fit arena. The debugger shows live state, components, sensor contacts and the **decision trace**; click a trace entry to see the exact code line, block or node, then choose *Show in editor*.
+- **I · Hangar (specimen archive)**:
+  - The left index lists catalogued specimens (*No. 001…*, each with a READY / CAUTION / FAULT mark) and the equipment catalogue. Equipment is told apart by schematic glyph and catalogue code rather than by colour.
+  - To install equipment, click a part to arm it (compatible slots are marked), then click a slot, or drag the part onto a slot.
+  - The drawing sheet shows the specimen as a technical record: hatched armor bands, a centreline, chain dimensions per section, numbered callouts with leader lines, firing arcs (rust hatching where an arc is blocked by the drone's own hull), and a title block of real figures.
+  - The three-segment selector under the sheet chooses rear, middle or front.
+  - The specification sheet on the right has four tabs: Selection, Performance, Register (numbered to match the callouts) and Checks.
+- **II · Programs (intelligence laboratory)**:
+  - The left index holds intelligence records (*IR-001…*) and an instrument palette that changes with the record type: node parts for node records, drone API calls for code records (click one to insert it), and the category key for block records.
+  - The record is edited in the centre. A dark compiler transcript sits under the editor; click a listed problem to jump to it.
+  - The reference volume on the right can be resized. Block and node records can switch to their compiled AutoScript or be converted to code.
+- **III · Battle (observation)**:
+  - The field is a graphite scope with calibrated edges and stays dominant.
+  - The thin strip above it holds transport controls (Play, Step tick, Step decision, Restart, the speed scale and the clock), plus the Scenario drawer, the Specimens tags overlay and the event Ledger.
+  - Freecam leaves the field unobstructed. Selecting a machine (on the field or from its tag) opens a **diagnostic report**: a live silhouette of its actual structure and failed components, plus Diagnostics, Components, Sensors and Program tabs with the full decision trace and *Show in editor*.
+  - The report briefly loses signal only when real hardware is destroyed.
 
 Examples included: **Assault Platform** (tracked; heavy front with two heavy cannons, medium middle with MGs and radar, light rear with point defense), run by the code program *Assault Doctrine*. **AA Destroyer** (wheeled; light front and rear with AA autocannons, heavy middle with a directional shield, radar and reactor), run by the block program *AA Orbit*. **Skirmisher**, run by the node program *Brawler*.
 

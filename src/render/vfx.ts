@@ -61,7 +61,7 @@ export class Vfx {
     return Math.max(1, Math.round(base * MUL[this.quality]));
   }
 
-  private sparks(x: number, y: number, dirx: number, diry: number, spread: number, count: number, speed: number, color = '#ffd27a') {
+  private sparks(x: number, y: number, dirx: number, diry: number, spread: number, count: number, speed: number, color = '#efdcae') {
     const a0 = Math.atan2(diry, dirx);
     for (let i = 0; i < this.n(count); i++) {
       const a = a0 + rnd(-spread, spread);
@@ -70,7 +70,7 @@ export class Vfx {
     }
   }
 
-  private frags(x: number, y: number, dirx: number, diry: number, spread: number, count: number, speed: number, size: number, color = '#8d9096') {
+  private frags(x: number, y: number, dirx: number, diry: number, spread: number, count: number, speed: number, size: number, color = '#8a8478') {
     const a0 = Math.atan2(diry, dirx);
     for (let i = 0; i < this.n(count); i++) {
       const a = a0 + rnd(-spread, spread);
@@ -89,7 +89,7 @@ export class Vfx {
   }
 
   private arcs(x: number, y: number, count: number, len: number) {
-    for (let i = 0; i < this.n(count); i++) this.add({ kind: 'arc', x, y, vx: 0, vy: 0, life: rnd(0.05, 0.14), max: 0.14, size: len * rnd(0.6, 1.2), color: '#bfe6ff', rot: rnd(0, Math.PI * 2) });
+    for (let i = 0; i < this.n(count); i++) this.add({ kind: 'arc', x, y, vx: 0, vy: 0, life: rnd(0.05, 0.14), max: 0.14, size: len * rnd(0.6, 1.2), color: '#e2e4e2', rot: rnd(0, Math.PI * 2) });
   }
 
   private emitter(sim: Simulation, droneId: number, wx: number, wy: number, kind: Emitter['kind'], rate: number, life: number) {
@@ -129,8 +129,8 @@ export class Vfx {
         const k = big(e.caliber);
         const dx = Math.cos(e.dir);
         const dy = Math.sin(e.dir);
-        this.flash(e.x + dx * 1.5, e.y + dy * 1.5, 2 + k * 5, 0.045 + k * 0.04, '#ffe9b8');
-        this.sparks(e.x, e.y, dx, dy, 0.25, 2 + k * 6, 160 + k * 120, '#ffcf80');
+        this.flash(e.x + dx * 1.5, e.y + dy * 1.5, 2 + k * 5, 0.045 + k * 0.04, '#f2e6cc');
+        this.sparks(e.x, e.y, dx, dy, 0.25, 2 + k * 6, 160 + k * 120, '#eed7a6');
         if (k === 1) this.smoke(e.x + dx * 4, e.y + dy * 4, 4, 6);
         break;
       }
@@ -155,7 +155,7 @@ export class Vfx {
           case 'penetration':
             this.flash(e.x, e.y, 2 + k * 5, 0.08);
             this.frags(e.x, e.y, e.dirx, e.diry, 0.5, 3 + k * 10, 70 + k * 80, 1 + k * 1.5);
-            this.sparks(e.x, e.y, e.dirx, e.diry, 0.5, 4 + k * 10, 150 + k * 100, '#ffb35a');
+            this.sparks(e.x, e.y, e.dirx, e.diry, 0.5, 4 + k * 10, 150 + k * 100, '#e2b48a');
             this.smoke(e.x, e.y, 1 + k * 3, 4 + k * 4);
             break;
           case 'component-hit':
@@ -164,12 +164,12 @@ export class Vfx {
             this.frags(e.x, e.y, rx, ry, 1.2, 2 + k * 4, 60, 0.9);
             break;
           case 'shield':
-            this.add({ kind: 'ring', x: e.x, y: e.y, vx: e.nx, vy: e.ny, life: 0.18, max: 0.18, size: 4 + k * 8, color: '#a99be0' });
+            this.add({ kind: 'ring', x: e.x, y: e.y, vx: e.nx, vy: e.ny, life: 0.18, max: 0.18, size: 4 + k * 8, color: '#ece6d8' });
             this.arcs(e.x, e.y, 1 + Math.round(k * 3), 5 + k * 6);
             break;
           case 'wall':
           case 'debris':
-            this.sparks(e.x, e.y, rx, ry, 1.1, 2 + k * 6, 90, '#d9c3a0');
+            this.sparks(e.x, e.y, rx, ry, 1.1, 2 + k * 6, 90, '#bdb3a0');
             this.add({ kind: 'dust', x: e.x, y: e.y, vx: e.nx * 8, vy: e.ny * 8, life: 0.7, max: 0.7, size: 3 + k * 6, color: '#2d2b28' });
             break;
         }
@@ -189,9 +189,9 @@ export class Vfx {
         break;
       }
       case 'section-destroyed':
-        this.flash(e.x, e.y, 10, 0.12, '#ffe0b0');
-        this.frags(e.x, e.y, 1, 0, Math.PI, 18, 110, 2.5, '#6f7278');
-        this.sparks(e.x, e.y, 1, 0, Math.PI, 20, 200, '#ffb35a');
+        this.flash(e.x, e.y, 10, 0.12, '#f0e2c6');
+        this.frags(e.x, e.y, 1, 0, Math.PI, 18, 110, 2.5, '#6b665c');
+        this.sparks(e.x, e.y, 1, 0, Math.PI, 20, 200, '#e2b48a');
         this.smoke(e.x, e.y, 10, 10, true);
         this.emitter(sim, e.drone, e.x, e.y, 'fire', 12, 18);
         this.emitter(sim, e.drone, e.x, e.y, 'smoke', 3, Infinity);
@@ -204,7 +204,7 @@ export class Vfx {
         break;
       case 'shield-overload':
         this.arcs(e.x, e.y, 8, 14);
-        this.add({ kind: 'ring', x: e.x, y: e.y, vx: 0, vy: 0, life: 0.3, max: 0.3, size: 30, color: '#8f7cc4' });
+        this.add({ kind: 'ring', x: e.x, y: e.y, vx: 0, vy: 0, life: 0.3, max: 0.3, size: 30, color: '#d8cfb8' });
         break;
       case 'intercept':
         this.flash(e.x, e.y, 4, 0.08);
@@ -212,14 +212,14 @@ export class Vfx {
         this.smoke(e.x, e.y, 3, 5);
         break;
       case 'cookoff':
-        this.flash(e.x, e.y, 6 + Math.min(14, e.energy / 10), 0.14, '#ffd9a0');
+        this.flash(e.x, e.y, 6 + Math.min(14, e.energy / 10), 0.14, '#eedcbc');
         this.frags(e.x, e.y, 1, 0, Math.PI, 12, 120, 1.6);
-        this.sparks(e.x, e.y, 1, 0, Math.PI, 26, 220, '#ffb35a');
+        this.sparks(e.x, e.y, 1, 0, Math.PI, 26, 220, '#e2b48a');
         this.emitter(sim, e.drone, e.x, e.y, 'fire', 14, 14);
         this.decal(e.x, e.y, 10);
         break;
       case 'collision':
-        this.sparks(e.x, e.y, 1, 0, Math.PI, Math.min(10, 2 + e.impulse / 3000), 100, '#d9c3a0');
+        this.sparks(e.x, e.y, 1, 0, Math.PI, Math.min(10, 2 + e.impulse / 3000), 100, '#bdb3a0');
         break;
     }
   }
@@ -242,7 +242,7 @@ export class Vfx {
       while (em.acc >= 1) {
         em.acc -= 1;
         if (em.kind === 'smoke') this.smoke(w.x, w.y, 1, 5, true);
-        else if (em.kind === 'fire') this.add({ kind: 'fire', x: w.x + rnd(-2, 2), y: w.y + rnd(-2, 2), vx: rnd(-4, 4), vy: rnd(-10, -2), life: rnd(0.25, 0.6), max: 0.6, size: rnd(1.5, 3.5), color: '#ff8a3c' });
+        else if (em.kind === 'fire') this.add({ kind: 'fire', x: w.x + rnd(-2, 2), y: w.y + rnd(-2, 2), vx: rnd(-4, 4), vy: rnd(-10, -2), life: rnd(0.25, 0.6), max: 0.6, size: rnd(1.5, 3.5), color: '#c98a5a' });
         else this.arcs(w.x, w.y, 1, 6);
       }
     }
@@ -315,7 +315,7 @@ export class Vfx {
         }
         case 'fire': {
           ctx.globalAlpha = 0.85 * t;
-          ctx.fillStyle = t > 0.5 ? '#ffcf6a' : p.color;
+          ctx.fillStyle = t > 0.5 ? '#e3c492' : p.color;
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size * (0.5 + t * 0.5), 0, Math.PI * 2);
           ctx.fill();

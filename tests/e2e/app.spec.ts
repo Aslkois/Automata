@@ -81,9 +81,9 @@ test('programming interfaces: code, block and node editors compile real programs
   await page.getByRole('region', { name: 'Insert API call' }).getByRole('button', { name: 'nearestEnemy', exact: true }).click();
   await expect(page.locator('.cm-content')).toContainText('drone.nearestEnemy()');
   // The inspector resizes from the keyboard.
-  const insp = page.getByRole('complementary', { name: 'Program inspector' });
+  const insp = page.getByRole('complementary', { name: 'Program reference' });
   const w0 = (await insp.boundingBox())!.width;
-  await page.getByRole('button', { name: 'Resize program inspector' }).focus();
+  await page.getByRole('button', { name: 'Resize program reference' }).focus();
   await page.keyboard.press('ArrowLeft');
   await expect.poll(async () => (await insp.boundingBox())!.width).toBeGreaterThan(w0 + 10);
   // Blocks
@@ -144,31 +144,31 @@ test('battle controls: play, pause, step, restart, speed and spectating', async 
   await page.getByRole('button', { name: 'Show in editor' }).click();
   await expect(page.getByTestId('programs')).toBeVisible();
   await expect(page.locator('.cm-trace-line')).toHaveCount(1);
-  // Back to freecam
+  // Back to the scope: the diagnostic report occupies space only while tracking.
   await tab(page, 'Battle').click();
-  await expect(page.getByText('Spectating Assault Platform')).toBeVisible();
-  await page.getByRole('button', { name: 'Freecam' }).click();
-  await expect(page.getByTestId('inspector')).toContainText('Click a drone');
-  // Panels collapse to give the battlefield the space.
+  await expect(page.getByText('Tracking')).toBeVisible();
   const canvas = page.getByTestId('battle-canvas');
-  const cw0 = (await canvas.boundingBox())!.width;
-  await controls.getByRole('button', { name: 'Roster' }).click();
-  await controls.getByRole('button', { name: 'Debugger' }).click();
-  await expect(page.getByTestId('drone-list')).toBeHidden();
+  const tracked = (await canvas.boundingBox())!.width;
+  await page.getByRole('button', { name: 'Freecam' }).click();
   await expect(page.getByTestId('inspector')).toHaveCount(0);
-  await expect.poll(async () => (await canvas.boundingBox())!.width).toBeGreaterThan(cw0 + 400);
-  // The event timeline is collapsible.
-  await controls.getByRole('button', { name: 'Timeline' }).click();
-  await expect(page.locator('.timeline-body')).toBeVisible();
-  await controls.getByRole('button', { name: 'Timeline' }).click();
-  await expect(page.locator('.timeline-body')).toHaveCount(0);
+  await expect.poll(async () => (await canvas.boundingBox())!.width).toBeGreaterThan(tracked + 300);
+  // Overlays collapse to leave the field unobstructed.
+  await controls.getByRole('button', { name: 'Specimens' }).click();
+  await expect(page.getByTestId('drone-list')).toHaveCount(0);
+  await controls.getByRole('button', { name: 'Specimens' }).click();
+  await expect(page.getByTestId('drone-list')).toBeVisible();
+  // The event ledger is collapsible.
+  await controls.getByRole('button', { name: 'Ledger' }).click();
+  await expect(page.locator('.ledger-body')).toBeVisible();
+  await controls.getByRole('button', { name: 'Ledger' }).click();
+  await expect(page.locator('.ledger-body')).toHaveCount(0);
 });
 
 test('deployment is blocked for invalid designs', async ({ page }) => {
   await tab(page, 'Hangar').click();
   await page.getByTestId('hangar').getByRole('button', { name: 'New', exact: true }).click();
   await tab(page, 'Battle').click();
-  await page.getByRole('tab', { name: 'Scenario' }).click();
+  await page.getByTestId('sim-controls').getByRole('button', { name: 'Scenario' }).click();
   await page.getByLabel('Design 1').selectOption({ label: 'New Drone' });
   await expect(page.getByTestId('roster-0')).toContainText('construction errors');
   await expect(page.getByRole('button', { name: 'Deploy' })).toBeDisabled();

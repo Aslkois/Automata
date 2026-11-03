@@ -4,6 +4,7 @@ import 'blockly/blocks';
 import * as En from 'blockly/msg/en';
 import { BLOCK_DEFS, TOOLBOX_CATEGORIES } from '../../program/blockDefs';
 import type { BlocksState } from '../../program/types';
+import { PROG } from '../theme';
 
 let registered = false;
 function register() {
@@ -54,44 +55,44 @@ function toolbox() {
 
 const style = (primary: string, secondary: string, tertiary: string) => ({ colourPrimary: primary, colourSecondary: secondary, colourTertiary: tertiary });
 const BLOCK_STYLES = {
-  event_blocks: style('#ff8a1f', '#ffb066', '#b85e0e'),
-  sensor_blocks: style('#18c29c', '#5fd9bb', '#0f8a6f'),
-  move_blocks: style('#2f6bff', '#6d97ff', '#1b45b8'),
-  weapon_blocks: style('#ff5c8a', '#ff8fae', '#c43c63'),
-  system_blocks: style('#6fa8ff', '#9cc3ff', '#3f78cf'),
-  data_blocks: style('#9aa3c7', '#bcc2dc', '#66709a'),
-  logic_blocks: style('#b45cff', '#cd8fff', '#7d36bd'),
-  loop_blocks: style('#b45cff', '#cd8fff', '#7d36bd'),
-  math_blocks: style('#ffd23f', '#ffe27f', '#c79b12'),
-  text_blocks: style('#9aa3c7', '#bcc2dc', '#66709a'),
-  list_blocks: style('#9aa3c7', '#bcc2dc', '#66709a'),
-  variable_blocks: style('#ff9ec0', '#ffc2d7', '#c4607f'),
-  variable_dynamic_blocks: style('#ff9ec0', '#ffc2d7', '#c4607f'),
-  procedure_blocks: style('#c4a7ff', '#dccaff', '#8a6ad1'),
-  colour_blocks: style('#9aa3c7', '#bcc2dc', '#66709a'),
-  hat_blocks: style('#ff8a1f', '#ffb066', '#b85e0e'),
+  event_blocks: style(PROG.event.fill, '#55524c', PROG.event.dark),
+  sensor_blocks: style(PROG.sensor.fill, '#6f887a', PROG.sensor.dark),
+  move_blocks: style(PROG.move.fill, '#6b7c92', PROG.move.dark),
+  weapon_blocks: style(PROG.weapon.fill, '#a5604f', PROG.weapon.dark),
+  system_blocks: style(PROG.system.fill, '#7f7a69', PROG.system.dark),
+  data_blocks: style(PROG.data.fill, '#938c7a', PROG.data.dark),
+  logic_blocks: style(PROG.logic.fill, '#7b6f62', PROG.logic.dark),
+  loop_blocks: style(PROG.logic.fill, '#7b6f62', PROG.logic.dark),
+  math_blocks: style(PROG.math.fill, '#a68e60', PROG.math.dark),
+  text_blocks: style(PROG.data.fill, '#938c7a', PROG.data.dark),
+  list_blocks: style(PROG.data.fill, '#938c7a', PROG.data.dark),
+  variable_blocks: style(PROG.memory.fill, '#887485', PROG.memory.dark),
+  variable_dynamic_blocks: style(PROG.memory.fill, '#887485', PROG.memory.dark),
+  procedure_blocks: style(PROG.memory.fill, '#887485', PROG.memory.dark),
+  colour_blocks: style(PROG.data.fill, '#938c7a', PROG.data.dark),
+  hat_blocks: style(PROG.event.fill, '#55524c', PROG.event.dark),
 };
 
 const theme = () =>
-  Blockly.Theme.defineTheme('automata-bench', {
-    name: 'automata-bench',
+  Blockly.Theme.defineTheme('automata-archive', {
+    name: 'automata-archive',
     base: Blockly.Themes.Classic,
     blockStyles: BLOCK_STYLES,
     componentStyles: {
-      workspaceBackgroundColour: '#1b2030',
-      toolboxBackgroundColour: '#23262f',
-      toolboxForegroundColour: '#f7f7f2',
-      flyoutBackgroundColour: '#15161c',
-      flyoutForegroundColour: '#f7f7f2',
-      flyoutOpacity: 0.97,
-      scrollbarColour: '#454a5a',
+      workspaceBackgroundColour: '#f4f0e6',
+      toolboxBackgroundColour: '#e8e2d4',
+      toolboxForegroundColour: '#2b2925',
+      flyoutBackgroundColour: '#ddd5c3',
+      flyoutForegroundColour: '#2b2925',
+      flyoutOpacity: 0.98,
+      scrollbarColour: '#b7ad98',
       scrollbarOpacity: 0.9,
-      insertionMarkerColour: '#ffd23f',
-      insertionMarkerOpacity: 0.5,
-      cursorColour: '#ffd23f',
-      selectedGlowColour: '#ffd23f',
+      insertionMarkerColour: '#2b2925',
+      insertionMarkerOpacity: 0.25,
+      cursorColour: '#2b2925',
+      selectedGlowColour: '#2b2925',
     },
-    fontStyle: { family: 'Bricolage Grotesque, system-ui, sans-serif', weight: '650', size: 12 },
+    fontStyle: { family: 'IBM Plex Sans, system-ui, sans-serif', weight: '500', size: 11 },
     startHats: true,
   });
 
@@ -110,7 +111,7 @@ export function BlockEditor({ state, onChange, highlight, visible }: { state: Bl
       renderer: 'thrasos',
       trashcan: true,
       sounds: false,
-      grid: { spacing: 24, length: 2.5, colour: '#2b3247', snap: true },
+      grid: { spacing: 24, length: 1, colour: '#c8bea9', snap: true },
       zoom: { controls: true, wheel: true, startScale: 0.85, maxScale: 2, minScale: 0.3 },
       move: { scrollbars: true, drag: true, wheel: false },
     });

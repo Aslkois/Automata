@@ -4,11 +4,11 @@ import { pickDrone, Renderer, screenToWorld, type Camera } from '../../render/re
 import type { Quality } from '../../render/vfx';
 import { hasErrors, validateDesign } from '../../sim/design';
 import { comWorld } from '../../sim/drone';
-import type { SimEvent } from '../../sim/types';
+import type { Drone, SimEvent } from '../../sim/types';
 import { defaultArena, type ScenarioConfig } from '../../sim/world';
-import { useResizableWidth } from '../common';
+import { Tri, useResizableWidth } from '../common';
 import { useLibrary, type Library } from '../store';
-import { C, TEAM_COLOR, TEAM_NAME } from '../theme';
+import { TEAM_COLOR, TEAM_LIGHT, TEAM_NAME } from '../theme';
 import { Inspector } from './Inspector';
 import { SimRunner, SPEEDS } from './runner';
 
@@ -49,40 +49,39 @@ export function describeEvent(e: SimEvent, name: (id: number) => string): string
     case 'program-error':
       return `${name(e.drone)} program error: ${e.message}`;
     case 'battle-end':
-      return `Battle ended: ${e.winner === null ? 'no winner' : `${TEAM_NAME[e.winner]} team wins`} — ${e.reason}`;
+      return `Engagement concluded: ${e.winner === null ? 'no victor' : `${TEAM_NAME[e.winner]} prevails`} — ${e.reason}`;
     default:
       return e.type;
   }
 }
 
-/** Timeline marker colour by what happened. */
-function eventColor(e: SimEvent): string {
+/** Ledger symbol and severity for an event. */
+function eventMark(e: SimEvent): { k: string; bad?: boolean; end?: boolean } {
   switch (e.type) {
     case 'impact':
-      return e.result === 'penetration' || e.result === 'component-hit' ? C.pink : e.result === 'shield' ? C.violet : C.slate;
+      return { k: e.result === 'penetration' || e.result === 'component-hit' ? '◆' : e.result === 'shield' ? '◇' : '·' };
     case 'component-destroyed':
     case 'section-destroyed':
     case 'cookoff':
     case 'detached':
-      return C.red;
+      return { k: '✕', bad: true };
     case 'shield-overload':
-      return C.violet;
+      return { k: '◇', bad: true };
     case 'intercept':
-      return C.teal;
+      return { k: '○' };
     case 'status':
-      return C.yellow;
+      return { k: '▸' };
     case 'program-error':
-      return C.orange;
+      return { k: '!', bad: true };
     case 'battle-end':
-      return C.paper;
+      return { k: '■', end: true };
     default:
-      return C.slate;
+      return { k: '·' };
   }
 }
 
 const eventDrone = (e: SimEvent): number | null => ('drone' in e && typeof e.drone === 'number' ? e.drone : e.type === 'intercept' ? e.by : null);
-
-const stateTone = (label: string, disabled: boolean) => (disabled ? 'err' : label === 'Operational' ? 'ok' : 'warn');
+const integrity = (d: Drone) => (['rear', 'middle', 'front'] as const).map((p) => (d.sections[p].attached ? d.sections[p].hp / d.sections[p].maxHp : 0));
 
 export function Battle({ active }: { active: boolean }) {
   const lib = useLibrary();
@@ -104,12 +103,11 @@ export function Battle({ active }: { active: boolean }) {
   const [quality, setQuality] = useState<Quality>('medium');
   const [sound, setSound] = useState(false);
   const [logFilter, setLogFilter] = useState(false);
-  const [rosterOpen, setRosterOpen] = useState(true);
-  const [rosterTab, setRosterTab] = useState<'drones' | 'scenario'>('drones');
-  const [debugOpen, setDebugOpen] = useState(true);
-  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [ledgerOpen, setLedgerOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
-  const insp = useResizableWidth('battle', 380, 320, 640);
+  const panel = useResizableWidth('battle', 400, 340, 640);
   const [, setTick] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cam = useRef<Camera>({ x: 900, y: 550, zoom: 0.6 });
@@ -151,22 +149,21 @@ export function Battle({ active }: { active: boolean }) {
     runner.pause();
     runner.load(JSON.parse(JSON.stringify(cfg)) as ScenarioConfig);
     setSelected(null);
-    setRosterTab('drones');
+    setDrawerOpen(false);
     fitRequest.current = true;
   };
 
-  // Deploy the example duel on first load so the battlefield is never empty.
+  // Deploy the example duel on first load so the field is never empty.
   useEffect(() => {
     if (!runner.sim && canDeploy) deploy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Panels refresh at ~8 Hz; the canvas renders every frame.
+  // Panels refresh at ~8 Hz; the scope renders every frame.
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 125);
     return () => clearInterval(id);
   }, []);
-
   useEffect(() => {
     runner.vfx.quality = quality;
   }, [quality, runner]);
@@ -195,7 +192,7 @@ export function Battle({ active }: { active: boolean }) {
       if (fitRequest.current && rect.width > 0 && runner.sim) {
         fitRequest.current = false;
         const A = runner.sim.arena;
-        c.zoom = Math.min(rect.width / A.width, rect.height / A.height) * 0.95;
+        c.zoom = Math.min(rect.width / (A.width + 120), rect.height / (A.height + 120));
         c.x = A.width / 2;
         c.y = A.height / 2;
       }
@@ -242,7 +239,10 @@ export function Battle({ active }: { active: boolean }) {
         e.preventDefault();
       } else if (key === '.') runner.stepTick();
       else if (key === ',') runner.stepDecision();
-      else if (key === 'escape') setSelected(null);
+      else if (key === 'escape') {
+        setSelected(null);
+        setDrawerOpen(false);
+      }
     };
     const up = (e: KeyboardEvent) => keys.current.delete(e.key.toLowerCase());
     window.addEventListener('keydown', down);
@@ -292,10 +292,7 @@ export function Battle({ active }: { active: boolean }) {
   };
   const select = (id: number | null) => {
     setSelected(id);
-    if (id !== null) {
-      setFollow(true);
-      setDebugOpen(true);
-    }
+    if (id !== null) setFollow(true);
   };
 
   const sim = runner.sim;
@@ -309,38 +306,46 @@ export function Battle({ active }: { active: boolean }) {
     if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 40) el.scrollTop = el.scrollHeight;
   });
   const selDrone = sim && selected !== null ? sim.drones.find((d) => d.id === selected) : undefined;
-
   const setEntry = (i: number, patch: Partial<Entry>) => setEntries((es) => es.map((x, k) => (k === i ? { ...x, ...patch } : x)));
+  const cfg = runner.config;
 
   return (
-    <div className="battle" data-testid="battle" style={insp.style}>
-      <div className="sim-bar" data-testid="sim-controls" role="toolbar" aria-label="Simulation controls">
-        <button className="btn small quiet" aria-pressed={rosterOpen} onClick={() => setRosterOpen((o) => !o)} title="Show or hide the roster and scenario panel">
-          Roster
+    <div className="obs" data-testid="battle" style={panel.style}>
+      <div className="strip" data-testid="sim-controls" role="toolbar" aria-label="Simulation controls">
+        <button className="btn sm" aria-pressed={drawerOpen} onClick={() => setDrawerOpen((o) => !o)} title="Choose combatants and deploy">
+          Scenario
         </button>
-        <span className="divider" />
-        <button className="btn go" style={{ minWidth: 82 }} onClick={() => runner.toggle()} disabled={!sim} aria-label={runner.playing ? 'Pause' : 'Play'}>
+        <span className="scenario hide-sm">
+          {cfg ? (
+            <>
+              {cfg.mode === 'duel' ? 'Duel' : 'Sandbox'} <em>· seed {cfg.seed} · {cfg.drones.length} specimens</em>
+            </>
+          ) : (
+            <em>Nothing deployed</em>
+          )}
+        </span>
+        <span className="vr" />
+        <button className="btn primary" style={{ minWidth: 76 }} onClick={() => runner.toggle()} disabled={!sim} aria-label={runner.playing ? 'Pause' : 'Play'}>
           {runner.playing ? 'Pause' : 'Play'}
         </button>
-        <button className="btn small quiet" onClick={() => runner.stepTick()} disabled={!sim} title="Advance one 1/60 s physics tick (.)">
+        <button className="btn sm" onClick={() => runner.stepTick()} disabled={!sim} title="Advance one 1/60 s physics tick (.)">
           Step tick
         </button>
-        <button className="btn small quiet" onClick={() => runner.stepDecision()} disabled={!sim} title="Advance to the next decision update (,)">
+        <button className="btn sm" onClick={() => runner.stepDecision()} disabled={!sim} title="Advance to the next decision update (,)">
           Step decision
         </button>
-        <button className="btn small quiet" onClick={() => runner.restart()} disabled={!sim} title="Restart from the deployed configuration">
+        <button className="btn sm" onClick={() => runner.restart()} disabled={!sim} title="Restart from the deployed configuration">
           Restart
         </button>
-        <div className="seg dense" role="radiogroup" aria-label="Speed">
+        <div className="speed" role="radiogroup" aria-label="Speed">
           {SPEEDS.map((s) => (
             <button key={s} role="radio" aria-checked={runner.speed === s} className={runner.speed === s ? 'on' : ''} onClick={() => runner.setSpeed(s)}>
               {s}×
             </button>
           ))}
         </div>
-        <span className="clock" data-testid="sim-clock">
-          t = {sim ? sim.time.toFixed(2) : '0.00'} s
-          <small data-testid="sim-tick">tick {sim?.tick ?? 0}</small>
+        <span className="chrono" data-testid="sim-clock">
+          t = {sim ? sim.time.toFixed(2) : '0.00'} s<small data-testid="sim-tick">tick {sim?.tick ?? 0}</small>
         </span>
         <span className="grow" />
         <label className="toggle hide-sm" title="Particle effects quality">
@@ -354,93 +359,159 @@ export function Battle({ active }: { active: boolean }) {
         <label className="toggle">
           <input type="checkbox" className="switch" checked={sound} onChange={(e) => setSound(e.target.checked)} /> Sound
         </label>
-        <span className="divider" />
-        <button className="btn small quiet" aria-pressed={timelineOpen} onClick={() => setTimelineOpen((o) => !o)}>
-          Timeline
+        <span className="vr" />
+        <button className="btn sm" aria-pressed={tagsOpen} onClick={() => setTagsOpen((o) => !o)}>
+          Specimens
         </button>
-        <button className="btn small quiet" aria-pressed={debugOpen} onClick={() => setDebugOpen((o) => !o)} title="Show or hide the drone inspector and debugger">
-          Debugger
+        <button className="btn sm" aria-pressed={ledgerOpen} onClick={() => setLedgerOpen((o) => !o)}>
+          Ledger
         </button>
       </div>
 
-      <div className="battle-body">
-        <aside className="dock left" hidden={!rosterOpen} aria-label="Roster">
-          <div className="insp-tabs" role="tablist">
-            <button role="tab" aria-selected={rosterTab === 'drones'} className={rosterTab === 'drones' ? 'on' : ''} onClick={() => setRosterTab('drones')}>
-              Drones {sim && <span className="muted">({sim.drones.length})</span>}
-            </button>
-            <button role="tab" aria-selected={rosterTab === 'scenario'} className={rosterTab === 'scenario' ? 'on' : ''} onClick={() => setRosterTab('scenario')}>
-              Scenario
-            </button>
-          </div>
-          <div className="insp-body">
-            {rosterTab === 'drones' && (
-              <>
-                {sim ? (
-                  <div className="items" data-testid="drone-list" style={{ gap: 6 }}>
-                    {sim.drones.map((d) => {
-                      const ctrl = sim.controllers.get(d.id)!;
-                      return (
-                        <button key={d.id} className={`drone-item ${selected === d.id ? 'sel' : ''}`} style={{ ['--c' as string]: TEAM_COLOR[d.team % 4] }} onClick={() => select(d.id)} aria-pressed={selected === d.id}>
-                          <span className="tdot" />
-                          <b>{d.name}</b>
-                          <span className="mini">
-                            <span className={`state-tag ${stateTone(d.status.label, d.status.disabled || d.status.destroyed)}`}>{d.status.label}</span>
-                            <span className="muted">{TEAM_NAME[d.team]}</span>
-                            {ctrl.state !== 'ok' && <span className="state-tag err">{ctrl.state}</span>}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="insp-note">Nothing deployed yet.</p>
-                )}
-                <button className="btn small quiet wide" onClick={() => setRosterTab('scenario')}>
-                  Change scenario…
-                </button>
-                <p className="insp-note">Selecting a drone spectates it. It never takes control — drones act only on their own programs.</p>
-              </>
+      <div className="obs-body">
+        <section className="field">
+          <div className="scope">
+            <canvas ref={canvasRef} data-testid="battle-canvas" aria-label="Battlefield" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onWheel={onWheel} />
+
+            {tagsOpen && sim && (
+              <div className="tags dark" data-testid="drone-list" aria-label="Specimens on the field">
+                <div className="tags-head">
+                  <span className="grow">Specimens</span>
+                  <span>{sim.drones.filter((d) => !d.status.disabled && !d.status.destroyed).length} active</span>
+                </div>
+                {sim.drones.map((d) => {
+                  const ctrl = sim.controllers.get(d.id)!;
+                  const dead = d.status.disabled || d.status.destroyed;
+                  return (
+                    <button key={d.id} className={`tag ${selected === d.id ? 'sel' : ''}`} style={{ ['--c' as string]: TEAM_LIGHT[d.team % 4] }} onClick={() => select(d.id)} aria-pressed={selected === d.id}>
+                      <span className="bar" />
+                      <b>{d.name}</b>
+                      <span className={`st ${dead ? 'bad' : ''}`}>{d.status.label === 'Operational' ? 'nominal' : d.status.label}</span>
+                      <span className="sub">
+                        <Tri values={integrity(d)} size={26} dark={selected !== d.id} />
+                        {TEAM_NAME[d.team]}
+                        {ctrl.state !== 'ok' && <span className="bad">program {ctrl.state}</span>}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             )}
-            {rosterTab === 'scenario' && (
-              <>
-                <div className="seg" role="group" aria-label="Mode">
-                  <button
-                    className={mode === 'duel' ? 'on' : ''}
-                    onClick={() => {
-                      setMode('duel');
-                      setEntries((es) => (es.length >= 2 ? [es[0], { ...es[1], team: es[0].team === 1 ? 0 : 1 }] : defaultEntries(lib)));
-                    }}
-                  >
-                    Duel
+
+            <div className="hud tr dark">
+              {selDrone ? (
+                <span className="cam">
+                  <span className="rec" />
+                  Tracking <b>{selDrone.name}</b>
+                  <button className="btn sm" onClick={() => setSelected(null)} title="Return to freecam (Esc)">
+                    Freecam
                   </button>
-                  <button className={mode === 'sandbox' ? 'on' : ''} onClick={() => setMode('sandbox')}>
-                    Sandbox
+                </span>
+              ) : (
+                <span className="cam" style={{ paddingRight: 10 }}>
+                  <span className="rec" />
+                  Freecam
+                </span>
+              )}
+              {selDrone && (
+                <>
+                  <button className="btn sm" aria-pressed={follow} onClick={() => setFollow((f) => !f)}>
+                    Follow
+                  </button>
+                  <button className="btn sm" aria-pressed={sensorView} onClick={() => setSensorView((s) => !s)} title="Show only what the selected machine's sensors perceive">
+                    Sensor view
+                  </button>
+                  <button className="btn sm" aria-pressed={showSensors} onClick={() => setShowSensors((s) => !s)}>
+                    Sensor cones
+                  </button>
+                  <button className="btn sm" aria-pressed={showArcs} onClick={() => setShowArcs((s) => !s)}>
+                    Weapon arcs
+                  </button>
+                </>
+              )}
+              <button className="btn sm" onClick={() => ((fitRequest.current = true), setFollow(false))} title="Fit the whole arena in view">
+                Fit arena
+              </button>
+            </div>
+
+            {sim?.result && (
+              <div className="result-banner" data-testid="result-banner" role="status">
+                <span className="eyebrow">Operational report · t = {sim.result.time.toFixed(1)} s</span>
+                <b>{sim.result.winner === null ? 'No victor' : `${TEAM_NAME[sim.result.winner]} prevails`}</b>
+                <div>{sim.result.reason}</div>
+              </div>
+            )}
+
+            <div className="hud bl dark">
+              <button className="btn sm" aria-expanded={keysOpen} onClick={() => setKeysOpen((o) => !o)}>
+                Controls
+              </button>
+              {keysOpen && (
+                <span className="readout">
+                  <b>drag</b>/<b>WASD</b> pan · <b>wheel</b> zoom · <span className="kbd">Space</span> play · <span className="kbd">.</span> tick · <span className="kbd">,</span> decision · <span className="kbd">Esc</span> freecam
+                </span>
+              )}
+            </div>
+            {sim && (
+              <div className="hud br dark">
+                {[...new Set(sim.drones.map((d) => d.team))].map((t) => {
+                  const alive = sim.drones.filter((d) => d.team === t && !d.status.disabled && !d.status.destroyed).length;
+                  const all = sim.drones.filter((d) => d.team === t).length;
+                  return (
+                    <span key={t} className="readout" style={{ ['--c' as string]: TEAM_LIGHT[t % 4] }}>
+                      <span className="sw" />
+                      <b>{TEAM_NAME[t]}</b> {alive}/{all} active
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            {drawerOpen && (
+              <aside className="drawer" aria-label="Scenario">
+                <div className="drawer-head">
+                  <h2>Scenario</h2>
+                  <button className="btn sm" onClick={() => setDrawerOpen(false)}>
+                    Close
                   </button>
                 </div>
-                <div className="field-row">
-                  <label className="field">
-                    Seed
-                    <input type="number" aria-label="Seed" value={seed} onChange={(e) => setSeed(Math.floor(Number(e.target.value) || 0))} />
-                  </label>
-                  <label className="field">
-                    Limit (s)
-                    <input type="number" aria-label="Time limit" value={timeLimit} min={0} onChange={(e) => setTimeLimit(Math.max(0, Number(e.target.value) || 0))} />
-                  </label>
-                  <label className="field">
-                    Decisions
-                    <select aria-label="Decision rate" value={decisionHz} onChange={(e) => setDecisionHz(Number(e.target.value))}>
-                      {[5, 10, 20, 30].map((h) => (
-                        <option key={h} value={h}>
-                          {h} Hz
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <div style={{ display: 'grid', gap: 8 }}>
+                <div className="drawer-body">
+                  <div className="seg" role="group" aria-label="Mode" style={{ justifySelf: 'start' }}>
+                    <button
+                      className={mode === 'duel' ? 'on' : ''}
+                      onClick={() => {
+                        setMode('duel');
+                        setEntries((es) => (es.length >= 2 ? [es[0], { ...es[1], team: es[0].team === 1 ? 0 : 1 }] : defaultEntries(lib)));
+                      }}
+                    >
+                      Duel
+                    </button>
+                    <button className={mode === 'sandbox' ? 'on' : ''} onClick={() => setMode('sandbox')}>
+                      Sandbox
+                    </button>
+                  </div>
+                  <div className="field-grid">
+                    <label className="fld">
+                      Seed
+                      <input type="number" aria-label="Seed" value={seed} onChange={(e) => setSeed(Math.floor(Number(e.target.value) || 0))} />
+                    </label>
+                    <label className="fld">
+                      Limit (s)
+                      <input type="number" aria-label="Time limit" value={timeLimit} min={0} onChange={(e) => setTimeLimit(Math.max(0, Number(e.target.value) || 0))} />
+                    </label>
+                    <label className="fld">
+                      Decisions
+                      <select aria-label="Decision rate" value={decisionHz} onChange={(e) => setDecisionHz(Number(e.target.value))}>
+                        {[5, 10, 20, 30].map((h) => (
+                          <option key={h} value={h}>
+                            {h} Hz
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
                   {entries.map((en, i) => (
-                    <div key={en.key} className="roster-card" data-testid={`roster-${i}`} style={{ ['--c' as string]: TEAM_COLOR[en.team % 4] }}>
+                    <div key={en.key} className="combatant" data-testid={`roster-${i}`} style={{ ['--c' as string]: TEAM_COLOR[en.team % 4] }}>
                       <div className="row">
                         Team
                         <select aria-label={`Team ${i + 1}`} value={en.team} onChange={(e) => setEntry(i, { team: Number(e.target.value) })}>
@@ -452,7 +523,7 @@ export function Battle({ active }: { active: boolean }) {
                         </select>
                       </div>
                       <div className="row">
-                        Design
+                        Specimen
                         <select aria-label={`Design ${i + 1}`} value={en.designId} onChange={(e) => setEntry(i, { designId: e.target.value })}>
                           {lib.designs.map((d) => (
                             <option key={d.id} value={d.id}>
@@ -462,7 +533,7 @@ export function Battle({ active }: { active: boolean }) {
                         </select>
                       </div>
                       <div className="row">
-                        Program
+                        Record
                         <select aria-label={`Program ${i + 1}`} value={en.programId} onChange={(e) => setEntry(i, { programId: e.target.value })}>
                           {lib.programs.map((p) => (
                             <option key={p.id} value={p.id}>
@@ -472,130 +543,62 @@ export function Battle({ active }: { active: boolean }) {
                         </select>
                       </div>
                       {problems[i]?.map((p) => (
-                        <div key={p} className="issue error">
+                        <div key={p} className="notice error">
                           {p}
                         </div>
                       ))}
                       {mode === 'sandbox' && (
-                        <button className="btn small danger" onClick={() => setEntries((es) => es.filter((_, k) => k !== i))}>
+                        <button className="btn sm danger" style={{ justifySelf: 'start' }} onClick={() => setEntries((es) => es.filter((_, k) => k !== i))}>
                           Remove
                         </button>
                       )}
                     </div>
                   ))}
-                </div>
-                {mode === 'sandbox' && entries.length < 6 && (
-                  <button className="btn small quiet" onClick={() => setEntries((es) => [...es, { key: Date.now(), team: es.length % 2, designId: lib.designs[0]?.id ?? '', programId: lib.programs[0]?.id ?? '' }])}>
-                    + Add drone
-                  </button>
-                )}
-                {!duelTeamsOk && <div className="issue error">A duel needs two different teams.</div>}
-                <button className="btn go wide" disabled={!canDeploy} onClick={deploy}>
-                  Deploy
-                </button>
-                <div className="unavailable">Team Battle, Fleet Battle, Challenges, Tournament and Replay Laboratory are not available yet (later phases).</div>
-              </>
-            )}
-          </div>
-        </aside>
-
-        <section className="field-wrap">
-          <div className="canvas-wrap">
-            <canvas ref={canvasRef} data-testid="battle-canvas" aria-label="Battlefield" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onWheel={onWheel} />
-            <div className="hud tl">
-              {selDrone ? (
-                <>
-                  <span className="spectate-chip" style={{ ['--c' as string]: TEAM_COLOR[selDrone.team % 4] }}>
-                    <span className="tdot" />
-                    Spectating {selDrone.name}
-                    <button className="btn small quiet" onClick={() => setSelected(null)} title="Return to freecam (Esc)">
-                      Freecam
+                  {mode === 'sandbox' && entries.length < 6 && (
+                    <button className="btn sm" style={{ justifySelf: 'start' }} onClick={() => setEntries((es) => [...es, { key: Date.now(), team: es.length % 2, designId: lib.designs[0]?.id ?? '', programId: lib.programs[0]?.id ?? '' }])}>
+                      + Add specimen
                     </button>
-                  </span>
-                  <button className="btn small" aria-pressed={follow} onClick={() => setFollow((f) => !f)}>
-                    Follow
+                  )}
+                  {!duelTeamsOk && <div className="notice error">A duel needs two different teams.</div>}
+                  <button className="btn primary wide" disabled={!canDeploy} onClick={deploy}>
+                    Deploy
                   </button>
-                  <button className="btn small" aria-pressed={sensorView} onClick={() => setSensorView((s) => !s)} title="Show only what the selected drone's sensors perceive">
-                    Sensor view
-                  </button>
-                  <button className="btn small" aria-pressed={showSensors} onClick={() => setShowSensors((s) => !s)}>
-                    Sensor cones
-                  </button>
-                  <button className="btn small" aria-pressed={showArcs} onClick={() => setShowArcs((s) => !s)}>
-                    Weapon arcs
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button className="btn small on" aria-pressed="true">
-                    Freecam
-                  </button>
-                  <span className="hud-chip">Click a drone to spectate it</span>
-                </>
-              )}
-              <span style={{ flex: 1 }} />
-              <button className="btn small quiet" onClick={() => ((fitRequest.current = true), setFollow(false))} title="Fit the whole arena in view">
-                Fit arena
-              </button>
-            </div>
-            {sim?.result && (
-              <div className="result-banner" data-testid="result-banner" role="status">
-                <b>{sim.result.winner === null ? 'No winner' : `${TEAM_NAME[sim.result.winner]} team wins`}</b> at {sim.result.time.toFixed(1)} s<div>{sim.result.reason}</div>
-              </div>
-            )}
-            <div className="hud bl">
-              <button className="btn small quiet" aria-expanded={keysOpen} onClick={() => setKeysOpen((o) => !o)}>
-                Controls ?
-              </button>
-              {keysOpen && (
-                <span className="hud-chip">
-                  <b>Drag</b>/<b>WASD</b> pan · <b>wheel</b> zoom · <span className="kbd">Space</span> play · <span className="kbd">.</span> tick · <span className="kbd">,</span> decision · <span className="kbd">Esc</span> freecam
-                </span>
-              )}
-            </div>
-            {sim && (
-              <div className="hud br">
-                {[...new Set(sim.drones.map((d) => d.team))].map((t) => {
-                  const alive = sim.drones.filter((d) => d.team === t && !d.status.disabled && !d.status.destroyed).length;
-                  const all = sim.drones.filter((d) => d.team === t).length;
-                  return (
-                    <span key={t} className="hud-chip" style={{ borderLeft: `6px solid ${TEAM_COLOR[t % 4]}` }}>
-                      <b>{TEAM_NAME[t]}</b> {alive}/{all} active
-                    </span>
-                  );
-                })}
-              </div>
+                  <div className="unavailable">Team Battle, Fleet Battle, Challenges, Tournament and Replay Laboratory are not available yet (later phases).</div>
+                </div>
+              </aside>
             )}
           </div>
-          <div className="timeline" data-testid="event-log">
-            <div className="timeline-head">
-              <button className="btn small quiet" aria-expanded={timelineOpen} onClick={() => setTimelineOpen((o) => !o)}>
-                {timelineOpen ? '▾' : '▸'} Events <span className="muted">({fullLog.length})</span>
+
+          <div className="ledger-strip dark" data-testid="event-log">
+            <div className="ledger-head">
+              <button className="btn sm" aria-expanded={ledgerOpen} onClick={() => setLedgerOpen((o) => !o)}>
+                {ledgerOpen ? '▾' : '▸'} Ledger <span className="faint">{fullLog.length}</span>
               </button>
               <span className="latest" aria-live="polite">
                 {latest ? (
                   <>
-                    <span style={{ color: C.slate }}>{latest.t.toFixed(2)}s</span> {describeEvent(latest, nameOf)}
+                    <span className="faint">{latest.t.toFixed(2)} s</span> {describeEvent(latest, nameOf)}
                   </>
                 ) : (
-                  'Combat events appear here.'
+                  'Events will be entered in the ledger as they occur.'
                 )}
               </span>
-              {timelineOpen && (
+              {ledgerOpen && (
                 <label className="toggle">
-                  <input type="checkbox" className="switch" checked={logFilter} onChange={(e) => setLogFilter(e.target.checked)} /> selected drone only
+                  <input type="checkbox" className="switch" checked={logFilter} onChange={(e) => setLogFilter(e.target.checked)} /> tracked machine only
                 </label>
               )}
             </div>
-            {timelineOpen && (
-              <div className="timeline-body" ref={logRef}>
-                {log.length === 0 && <div className="muted">No events yet.</div>}
+            {ledgerOpen && (
+              <div className="ledger-body timeline-body" ref={logRef}>
+                {log.length === 0 && <div className="faint">No entries yet.</div>}
                 {log.map((e, i) => {
                   const id = eventDrone(e);
+                  const m = eventMark(e);
                   return (
-                    <div key={i} className="ev" style={{ ['--c' as string]: eventColor(e) }} onClick={() => id !== null && select(id)}>
+                    <div key={i} className={`ev ${m.bad ? 'bad' : ''} ${m.end ? 'end' : ''}`} onClick={() => id !== null && select(id)}>
                       <span className="t">{e.t.toFixed(2)}</span>
-                      <span className="k" />
+                      <span className="k">{m.k}</span>
                       <span className="txt">{describeEvent(e, nameOf)}</span>
                     </div>
                   );
@@ -605,7 +608,7 @@ export function Battle({ active }: { active: boolean }) {
           </div>
         </section>
 
-        {debugOpen && <Inspector sim={sim} runner={runner} selected={selected} onSelect={select} width={insp.width} onResize={insp.setWidth} />}
+        {selDrone && sim && <Inspector sim={sim} drone={selDrone} onClose={() => setSelected(null)} width={panel.width} onResize={panel.setWidth} />}
       </div>
     </div>
   );
