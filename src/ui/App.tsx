@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useState } from 'react';
 import type { TraceLoc } from '../program/interpreter';
 import { Battle } from './battle/Battle';
+import { Logo } from './common';
 import { Hangar } from './hangar/Hangar';
 import { Programs } from './program/Programs';
 
@@ -21,37 +22,42 @@ interface Nav {
 const NavContext = createContext<Nav>({ target: { tab: 'hangar' }, navigate: () => {} });
 export const useNav = () => useContext(NavContext);
 
+const TABS: { id: Tab; label: string; color: string; hint: string }[] = [
+  { id: 'hangar', label: 'Hangar', color: 'var(--orange)', hint: 'Design the machine' },
+  { id: 'programs', label: 'Programs', color: 'var(--teal)', hint: 'Program its intelligence' },
+  { id: 'battle', label: 'Battle', color: 'var(--pink)', hint: 'Watch it fight on its own' },
+];
+
 export function App() {
   const [target, setTarget] = useState<NavTarget>({ tab: 'battle' });
   const navigate = useCallback((t: NavTarget) => setTarget(t), []);
-  const tabs: [Tab, string][] = [
-    ['hangar', 'Hangar'],
-    ['programs', 'Programs'],
-    ['battle', 'Battle'],
-  ];
   return (
     <NavContext.Provider value={{ target, navigate }}>
       <div className="app">
         <header className="topbar">
-          <span className="wordmark">AUTOMATA</span>
-          <nav className="tabs" role="tablist">
-            {tabs.map(([id, label]) => (
-              <button key={id} role="tab" aria-selected={target.tab === id} className={`tab ${target.tab === id ? 'active' : ''}`} onClick={() => navigate({ tab: id })}>
-                {label}
+          <span className="wordmark">
+            <Logo />
+            AUTOMATA
+          </span>
+          <nav className="topnav" role="tablist" aria-label="Workspace">
+            {TABS.map((t) => (
+              <button key={t.id} role="tab" aria-selected={target.tab === t.id} title={t.hint} className={target.tab === t.id ? 'on' : ''} onClick={() => navigate({ tab: t.id })}>
+                <span className="dot" style={{ background: t.color }} />
+                {t.label}
               </button>
             ))}
           </nav>
           <span className="spacer" />
-          <span className="hint">Design the machine · program its intelligence · it fights on its own</span>
+          <span className="tagline">Design the machine · program its intelligence · it fights on its own</span>
         </header>
         {/* Views stay mounted so editors and the running battle keep their state across tabs. */}
-        <div style={{ display: target.tab === 'hangar' ? 'contents' : 'none' }}>
+        <div className="view" style={{ display: target.tab === 'hangar' ? 'block' : 'none' }}>
           <Hangar />
         </div>
-        <div style={{ display: target.tab === 'programs' ? 'contents' : 'none' }}>
+        <div className="view" style={{ display: target.tab === 'programs' ? 'block' : 'none' }}>
           <Programs />
         </div>
-        <div style={{ display: target.tab === 'battle' ? 'contents' : 'none' }}>
+        <div className="view" style={{ display: target.tab === 'battle' ? 'block' : 'none' }}>
           <Battle active={target.tab === 'battle'} />
         </div>
       </div>
