@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent, type PointerEvent as RPointerEvent, type WheelEvent } from 'react';
 import { COMPONENT_MAP, FOOTPRINT, type ComponentDef } from '../../sim/content/components';
 import { SECTION_CLASSES, SECTION_LETTER, SECTION_POSITIONS, SLOT_SIZE_RANK, type SectionPos, type SlotDef, type SlotKind } from '../../sim/content/sections';
-import { layoutSections, listMounts, type DesignStats, type DroneDesign } from '../../sim/design';
+import { layoutSections, listMounts, slotOf, slotsOf, type DesignStats, type DroneDesign } from '../../sim/design';
 import { Icon } from '../common';
 import { GLYPH, KIND, T } from '../theme';
 
@@ -207,7 +207,7 @@ export function Stage({ design, stats, layer, sel, armed, showArcs, onSelect, on
             </g>
           ))}
           {SECTION_POSITIONS.map((pos) =>
-            SECTION_CLASSES[design.sections[pos].class].slots.map((slot) => (
+            slotsOf(design.sections[pos]).map((slot) => (
               <SlotMark key={`${pos}${slot.id}`} pos={pos} slot={slot} design={design} cx={lay[pos].cx} visible={slot.kind === layer} selected={sel?.type === 'slot' && sel.pos === pos && sel.id === slot.id} dimmed={!!sel && sel.pos !== pos} armed={armed} onSelect={onSelect} onDropPart={onDropPart} />
             )),
           )}
@@ -324,7 +324,7 @@ function Bracket({ design, lay, sel }: { design: DroneDesign; lay: ReturnType<ty
     w = s.length + 3.2;
     h = s.width + 10;
   } else {
-    const slot = SECTION_CLASSES[design.sections[sel.pos].class].slots.find((s) => s.id === sel.id);
+    const slot = slotOf(design.sections[sel.pos], sel.id);
     if (!slot) return null;
     const m = design.sections[sel.pos].slots[sel.id];
     const half = m ? FOOTPRINT[COMPONENT_MAP[m.component].size] : FOOTPRINT[slot.size];
