@@ -17,7 +17,7 @@ export const ASSAULT_PLATFORM: DroneDesign = {
   sections: {
     front: {
       class: 'heavy',
-      layout: 'medium',
+      layout: 'max',
       armor: 70,
       slots: { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('camera'), I1: m('cooler'), I2: m('shell_rack'), I3: m('battery'), I4: m('reactor') },
     },
@@ -173,7 +173,7 @@ export const BASTION: DroneDesign = {
   name: 'Bastion',
   chassis: 'tracked',
   sections: {
-    front: { class: 'heavy', layout: 'medium', armor: 70, slots: { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('camera'), I1: m('cooler'), I2: m('autoloader'), I3: m('spall_liner'), I4: m('shell_rack') } },
+    front: { class: 'heavy', layout: 'max', armor: 70, slots: { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('camera'), I1: m('cooler'), I2: m('autoloader'), I3: m('spall_liner'), I4: m('shell_rack') } },
     middle: { class: 'medium', layout: 'medium', armor: 35, slots: { H1: m('radar'), H2: m('point_defense'), H3: m('mg', 180), I1: m('ammo_small'), I2: m('generator_s'), I3: { component: 'coupling', rotation: 0, joint: 'front' } } },
     rear: { class: 'light', layout: 'medium', armor: 12, slots: { H1: m('point_defense', 180), I1: m('fire_suppression'), I2: m('battery') } },
   },

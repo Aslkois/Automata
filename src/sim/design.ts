@@ -1,5 +1,7 @@
 // Drone design schema (versioned), geometry layout, derived statistics and validation.
 // Designs are pure data; `buildDrone` (drone.ts) turns a design into runtime state.
+import { LEGACY_LAYOUT, SCHEMA3_LAYOUT } from './content/sections';
+import { loadState, ratedEquipment as ratedEquipment_, type LoadState } from './load';
 import { CHASSIS, CHASSIS_TYPES, GRAVITY, type ChassisType } from './content/chassis';
 import { INTEGRATED_MASS, integratedParts } from './content/integrated';
 import { AMMO_TYPES, COMPONENT_MAP, FOOTPRINT, RENAMED_COMPONENTS, RETIRED_IDS, type AmmoType, type ComponentDef } from './content/components';
@@ -24,7 +26,7 @@ import { DEG, segmentBox, type Vec2 } from './math';
  * 1: original. 2: drive motors and control units integrated (removed from slots).
  * 3: hardpoint layouts per section, mount configuration, AA autocannon -> Autocannon.
  */
-export const DESIGN_SCHEMA_VERSION = 3;
+export const DESIGN_SCHEMA_VERSION = 4;
 
 export interface MountDesign {
   component: string;
@@ -215,6 +217,22 @@ export interface DesignStats {
   /** stored reserve rounds by ammunition family (excluding weapons' loaded magazines) */
   ammo: Record<AmmoType, number>;
   length: number;
+  /** rated equipment load of each section on this chassis (class rating × chassis load rating), kg */
+  ratedEquipment: Record<SectionPos, number>;
+  /** installed equipment / rated equipment load per section */
+  loadUtilization: Record<SectionPos, number>;
+  /** load response of the whole drone (undamaged, fully powered) */
+  load: LoadState;
+  /** centre of mass relative to the geometric centre of the hull (u) */
+  comOffset: Vec2;
+  /** skid-steer: angular acceleration available from standstill, deg/s² (0 if it cannot pivot) */
+  pivotAccel: number;
+  /** wheeled: yaw rate at 50 u/s with full steering, deg/s */
+  yawRateAt50: number;
+  /** recoil effect of each weapon's firing event on the hull */
+  recoil: { mount: string; impulse: number; rating: number; dv: number; dw: number }[];
+  /** seconds of continuous fire per ammunition family from magazines plus stores (all weapons of that family firing) */
+  ammoEndurance: Partial<Record<AmmoType, number>>;
 }
 
 const ADJ: Record<SectionPos, SectionPos[]> = { front: ['middle'], middle: ['front', 'rear'], rear: ['middle'] };
@@ -304,9 +322,22 @@ export function computeStats(d: DroneDesign): DesignStats {
     }
     if (c.ammo) for (const [k, n] of Object.entries(moduleStock(c, mt.mount))) ammo[k as AmmoType] += n ?? 0;
   }
-  const tractionLimit = ch.muLong * mass * GRAVITY;
+  // load: what each section is rated to carry on this chassis, and how the drone responds
+  const ratedEquipment = { front: 0, middle: 0, rear: 0 } as Record<SectionPos, number>;
+  const loadUtilization = { front: 0, middle: 0, rear: 0 } as Record<SectionPos, number>;
+  let ratedTotal = 0;
+  let equipTotal = 0;
+  for (const pos of SECTION_POSITIONS) {
+    ratedEquipment[pos] = ratedEquipment_(d.sections[pos].class, ch);
+    loadUtilization[pos] = equipmentMass[pos] / ratedEquipment[pos];
+    ratedTotal += ratedEquipment[pos];
+    equipTotal += equipmentMass[pos];
+  }
+  const load = loadState(ch, mass, mass - equipTotal + ratedTotal);
+  const mg = mass * GRAVITY;
+  const tractionLimit = ch.muLong * load.traction * mg;
   const effForce = Math.min(motorForce, tractionLimit);
-  const roll = ch.rollingResistance * mass * GRAVITY;
+  const roll = (ch.rollingResistance * load.rolling + load.groundDrag) * mg;
   const maxAccel = Math.max(0, (effForce - roll) / mass);
   // top speed where power-limited force equals rolling resistance + aero drag (k v^2 * mass-independent)
   let topSpeed = 0;
@@ -319,6 +350,46 @@ export function computeStats(d: DroneDesign): DesignStats {
       }
       topSpeed = vv;
     }
+  }
+
+  // handling: what the drive can do against the drone's inertia
+  const hullX0 = lay.rear.cx - lay.rear.length / 2;
+  const hullX1 = lay.front.cx + lay.front.length / 2;
+  const comOffset = { x: com.x - (hullX0 + hullX1) / 2, y: com.y };
+  const width = Math.max(lay.front.width, lay.middle.width, lay.rear.width);
+  const len = hullX1 - hullX0;
+  let pivotAccel = 0;
+  let yawRateAt50 = 0;
+  if (ch.steering === 'skid') {
+    const side = Math.min(motorForce / 2, (ch.muLong * load.traction * mg) / 2);
+    const torque = side * 2 * (width / 2) - (ch.skidResistance * load.rolling + load.groundDrag) * mg * (len / 4);
+    pivotAccel = Math.max(0, torque / inertia) / DEG;
+  } else {
+    const wheelbase = Math.max(10, len * 0.7);
+    yawRateAt50 = ((50 * Math.tan(ch.maxSteerDeg * DEG)) / wheelbase) / DEG;
+  }
+  const recoil: DesignStats['recoil'] = [];
+  for (const mt of mounts) {
+    if (!mt.def.weapon) continue;
+    const J = mountRecoil(mt.def, mt.mount);
+    // impulse along the barrel at its rest facing: lateral arm about the centre of mass
+    const fx = Math.cos(mt.facing);
+    const fy = Math.sin(mt.facing);
+    const rx = mt.x - com.x;
+    const ry = mt.y - com.y;
+    recoil.push({ mount: mt.id, impulse: J, rating: mountRating(d.sections[mt.section]), dv: J / mass, dw: Math.abs(rx * fy - ry * fx) * J / inertia / DEG });
+  }
+  const ammoEndurance: DesignStats['ammoEndurance'] = {};
+  for (const t of Object.keys(AMMO_TYPES) as AmmoType[]) {
+    let use = 0;
+    let loaded = 0;
+    for (const mt of mounts) {
+      const w = mt.def.weapon;
+      if (!w || w.ammo[0] !== t) continue;
+      use += 1 / Math.max(w.cycleTime, w.magazine <= 1 ? w.reloadTime : 0);
+      loaded += w.magazine;
+    }
+    if (use > 0) ammoEndurance[t] = (loaded + ammo[t]) / use;
   }
 
   const sectionList = SECTION_POSITIONS.map((p) => lay[p]);
@@ -363,6 +434,14 @@ export function computeStats(d: DroneDesign): DesignStats {
     weapons,
     ammo,
     length: lay.front.cx + lay.front.length / 2 - (lay.rear.cx - lay.rear.length / 2),
+    ratedEquipment,
+    loadUtilization,
+    load,
+    comOffset,
+    pivotAccel,
+    yawRateAt50,
+    recoil,
+    ammoEndurance,
   };
 }
 
@@ -449,11 +528,11 @@ export function validateDesign(d: DroneDesign, stats = computeStats(d)): Issue[]
           });
       }
     }
-    if (stats.equipmentMass[pos] > cls.maxEquipmentMass)
+    if (stats.loadUtilization[pos] > 1)
       issues.push({
-        severity: 'error',
-        code: 'structural-load',
-        message: `${pos}: ${Math.round(stats.equipmentMass[pos])} kg of equipment exceeds the ${cls.name} frame limit (${cls.maxEquipmentMass} kg)`,
+        severity: 'warning',
+        code: 'section-overload',
+        message: `${pos[0].toUpperCase() + pos.slice(1)} section is operating above its rated equipment load (${Math.round(stats.equipmentMass[pos])} of ${Math.round(stats.ratedEquipment[pos])} kg on a ${CHASSIS[d.chassis].name.toLowerCase()} chassis). The running gear loses grip and wears faster while overloaded, and heavy recoil stresses the mounts.`,
         section: pos,
       });
     // overheating risk: each weapon heats itself; the section's cooling works on each part
@@ -490,10 +569,36 @@ export function validateDesign(d: DroneDesign, stats = computeStats(d)): Issue[]
         message: `Coilgun charging needs ${stats.chargeDemand} PU/s, but only ~${Math.max(0, Math.round(spare))} PU/s is spare and the buffers discharge at most ${stats.maxDischarge} PU/s. Charges will take longer than 5 s. Add a Capacitor Bank or generator.`,
       });
   }
+  const chName = CHASSIS[d.chassis].driveName.toLowerCase();
+  if (stats.load.lift < 1)
+    issues.push({
+      severity: 'warning',
+      code: 'lift-insufficient',
+      message: `Available thruster force can lift only ${Math.round(stats.load.liftCapacity)} of ${Math.round(stats.mass)} kg: about ${Math.round((1 - stats.load.lift) * 100)}% of the weight will drag on the ground, so the drone will be slow and hard to turn. It can still deploy.`,
+    });
   if (stats.maxAccel <= 0)
-    issues.push({ severity: 'error', code: 'excessive-weight', message: `Too heavy to move: ${Math.round(stats.mass)} kg is more than the ${CHASSIS[d.chassis].driveName.toLowerCase()} can push. Remove equipment or armour.` });
+    issues.push({ severity: 'warning', code: 'excessive-weight', message: `At ${Math.round(stats.mass)} kg the ${chName} cannot overcome rolling resistance on its own: the drone will barely move, if at all. It can still deploy.` });
   else if (stats.maxAccel < 6)
-    issues.push({ severity: 'warning', code: 'underpowered', message: `Sluggish: ${Math.round(stats.mass)} kg accelerates at only ${stats.maxAccel.toFixed(1)} u/s². Lighter armour or a lighter frame helps.` });
+    issues.push({ severity: 'warning', code: 'underpowered', message: `Sluggish: ${Math.round(stats.mass)} kg accelerates at only ${stats.maxAccel.toFixed(1)} u/s². Lighter armour, fewer heavy parts or a chassis rated for more load helps.` });
+  if (stats.load.overload > 0 && stats.load.lift >= 1)
+    issues.push({
+      severity: 'info',
+      code: 'overload',
+      message: `The drone weighs ${Math.round(stats.load.utilization * 100)}% of its rated mass: traction ×${stats.load.traction.toFixed(2)}, rolling resistance ×${stats.load.rolling.toFixed(2)}, and the ${CHASSIS[d.chassis].gearName.toLowerCase()} wear while it moves.`,
+    });
+  for (const pos of SECTION_POSITIONS) {
+    const cool = stats.sectionCooling[pos] + 1.5;
+    if (stats.sectionWeaponHeat[pos] > cool * 2.5)
+      issues.push({
+        severity: 'info',
+        code: 'thermal',
+        message: `${pos[0].toUpperCase() + pos.slice(1)} section: its weapons can make ${stats.sectionWeaponHeat[pos].toFixed(0)} heat/s at full fire against ${cool.toFixed(1)}/s of cooling per part. Sustained fire will be limited by heat.`,
+        section: pos,
+      });
+  }
+  for (const [t, secs] of Object.entries(stats.ammoEndurance) as [AmmoType, number][])
+    if (secs < 20)
+      issues.push({ severity: 'info', code: 'ammo-endurance', message: `${AMMO_TYPES[t].name}: about ${Math.round(secs)} s of continuous fire for every weapon using them, magazines and stores included.` });
   for (const w of stats.weapons) {
     if (w.usableFraction === 0)
       issues.push({ severity: 'warning', code: 'weapon-obstructed', message: `${w.mount} ${w.name}: entire firing arc is obstructed by taller sections.`, mount: w.mount });
@@ -639,8 +744,10 @@ export function parseDesign(json: string | unknown): DroneDesign {
     if (!s) throw new Error(`Design is missing the ${pos} section`);
     const cls = s.class as SectionClass;
     if (!SECTION_CLASSES[cls]) throw new Error(`Unknown section class '${String(s.class)}'`);
-    // schema < 3: every section used what is now the Medium layout
-    const layout = LAYOUT_IDS.includes(s.layout as LayoutId) ? (s.layout as LayoutId) : 'medium';
+    // schema < 3: one arrangement per class; schema 3: the previous layout table. Each maps to
+    // the current layout whose mounts keep the same ids and are at least as large.
+    const stored = LAYOUT_IDS.includes(s.layout as LayoutId) ? (s.layout as LayoutId) : null;
+    const layout: LayoutId = schema >= 4 && stored ? stored : schema === 3 && stored ? SCHEMA3_LAYOUT[cls][stored] : LEGACY_LAYOUT[cls];
     const slots: Record<string, MountDesign | null> = {};
     const rawSlots = (s.slots ?? {}) as Record<string, unknown>;
     for (const [k, val] of Object.entries(rawSlots)) {

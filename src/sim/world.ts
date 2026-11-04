@@ -11,6 +11,7 @@ import { Rng } from './math';
 import { boxPoly, integrate, resolveContact, satCollide, sectionPoly, stepDebrisFriction, stepGroundForces } from './physics';
 import { readRanges, scanLidars } from './sensors';
 import { debrisSolid, droneSolid, stepDebris } from './debris';
+import { droneLoad, stepLoadFatigue } from './load';
 import { stepFires, stepHeat, stepPower, stepShields, stepWeapons } from './systems';
 import type { Arena, BumperSide, Debris, Drone, Projectile, SimEvent } from './types';
 
@@ -147,12 +148,14 @@ export class Simulation implements SimContext {
     // 2) Systems
     for (const d of this.drones) {
       const active = !d.status.disabled;
+      d.load = droneLoad(d);
       stepPower(this, d, dt);
       const load = stepGroundForces(d, dt, active);
       stepWeapons(this, d, dt);
       stepShields(this, d, dt);
       stepHeat(this, d, dt, load);
       stepFires(this, d, dt);
+      stepLoadFatigue(this, d, dt);
     }
     // 3) Integrate bodies
     for (const d of this.drones) integrate(d.body, dt);

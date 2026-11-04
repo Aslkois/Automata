@@ -326,7 +326,7 @@ function SectionProps({ design, stats, pos, update, onSelect }: Props & { pos: S
   const sd = design.sections[pos];
   const layout = sd.layout ?? 'medium';
   const cls = SECTION_CLASSES[sd.class];
-  const load = stats.equipmentMass[pos] / cls.maxEquipmentMass;
+  const load = stats.loadUtilization[pos];
   const [pending, setPending] = useState<{ cls: SectionClass; layout: LayoutId; change: LayoutChange } | null>(null);
   const confirmRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -437,11 +437,11 @@ function SectionProps({ design, stats, pos, update, onSelect }: Props & { pos: S
         <Prop k="Height" v={`class ${cls.height}`} />
         <Prop k="Cooling here" v={`${stats.sectionCooling[pos].toFixed(1)} /s`} />
       </dl>
-      <div className="coverage">
-        <span className="label">Equipment load</span>
-        <Meter v={Math.min(1, load)} tone={load > 1 ? 'fault' : load > 0.85 ? 'warn' : 'signal'} label={`${pos} equipment load`} />
-        <span className={`num ${load > 1 ? 'fault' : ''}`}>
-          {Math.round(stats.equipmentMass[pos])}/{cls.maxEquipmentMass} kg
+      <div className="coverage" title="Rated equipment load for this section on the current chassis. Exceeding it is allowed: grip falls, rolling resistance rises and the running gear wears.">
+        <span className="label">Rated load</span>
+        <Meter v={Math.min(1, load)} tone={load > 1 ? 'warn' : load > 0.85 ? 'warn' : 'signal'} label={`${pos} equipment load against rating`} />
+        <span className={`num ${load > 1 ? 'warn' : ''}`} data-testid={`load-${pos}`}>
+          {Math.round(stats.equipmentMass[pos])}/{Math.round(stats.ratedEquipment[pos])} kg{load > 1 ? ` · ${Math.round(load * 100)}%` : ''}
         </span>
       </div>
       <p className="desc">Weapons cannot fire across a section that is taller than their own.</p>

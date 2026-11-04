@@ -70,7 +70,9 @@ export function stepPower(sim: SimContext, d: Drone, dt: number): void {
     }
   }
   const load = Math.min(1, Math.max(Math.abs(d.throttle), Math.abs(d.steer) * 0.7));
-  const prop = motorOutput(d).electrical * load;
+  // holding the weight up (legs, lift thrusters) costs power whenever the drive is active
+  const support = d.status.disabled ? 0 : d.load.supportPower;
+  const prop = motorOutput(d).electrical * load + support;
   p.demand = { systems: sys, propulsion: prop, weapons: wpn, shields: shd };
 
   let stored = 0,

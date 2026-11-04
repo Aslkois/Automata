@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DESIGNS } from '../../src/data/defaults';
 import { COMPONENT_MAP } from '../../src/sim/content/components';
-import { LAYOUT_IDS, LAYOUTS, SECTION_CLASSES, SLOT_HALF, sectionSlots, type SectionClass } from '../../src/sim/content/sections';
+import { LAYOUT_IDS, LAYOUTS, LEGACY_LAYOUT, SCHEMA3_LAYOUT, SECTION_CLASSES, SLOT_HALF, sectionSlots, type SectionClass } from '../../src/sim/content/sections';
 import { computeStats, footprintsOverlap, parseDesign, relocateSection, validateDesign, type SectionDesign } from '../../src/sim/design';
 import { buildDrone } from '../../src/sim/drone';
 import { design, m } from './helpers';
@@ -30,26 +30,68 @@ describe('hardpoint layouts', () => {
     }
   });
 
-  it('Maximum carries larger equipment than Medium, Minimum fewer mounts', () => {
-    const rank = { S: 1, M: 2, L: 3 } as const;
-    for (const cls of CLASSES) {
-      const L = LAYOUTS[cls];
-      const biggest = (id: 'max' | 'medium' | 'min') => Math.max(...L[id].hardpoints.map((h) => rank[h.size]));
-      expect(biggest('max')).toBeGreaterThanOrEqual(biggest('medium'));
-      expect(L.min.hardpoints.length).toBeLessThanOrEqual(L.medium.hardpoints.length);
-      expect(L.max.frameMass).toBeGreaterThan(0);
-      expect(L.min.frameMass).toBeLessThan(0);
-    }
-    // light max takes a medium weapon that the medium layout cannot
-    expect(LAYOUTS.light.max.hardpoints.some((h) => h.size === 'M')).toBe(true);
-    expect(LAYOUTS.light.medium.hardpoints.every((h) => h.size === 'S')).toBe(true);
+  it('the layout table: Maximum mounts the largest equipment, Minimum more of smaller', () => {
+    const shape = (cls: SectionClass, id: 'max' | 'medium' | 'min') =>
+      LAYOUTS[cls][id].hardpoints
+        .map((h) => h.size)
+        .sort()
+        .join('');
+    expect(shape('light', 'max')).toBe('MS');
+    expect(shape('light', 'medium')).toBe('SS');
+    expect(shape('light', 'min')).toBe('SSS');
+    expect(shape('medium', 'max')).toBe('LS');
+    expect(shape('medium', 'medium')).toBe('MMM');
+    expect(shape('medium', 'min')).toBe('SSSS');
+    expect(shape('heavy', 'max')).toBe('LLM');
+    expect(shape('heavy', 'medium')).toBe('LMM');
+    expect(shape('heavy', 'min')).toBe('MMM');
   });
 
-  it('the Medium layout is the arrangement every earlier design used', () => {
-    for (const cls of CLASSES) {
-      const legacy = SECTION_CLASSES[cls].slots.filter((s) => s.kind === 'hardpoint');
-      expect(LAYOUTS[cls].medium.hardpoints).toEqual(legacy);
+  it('each layout carries the equipment it lists, without construction errors', () => {
+    const cases: [SectionClass, 'max' | 'medium' | 'min', string[]][] = [
+      ['light', 'max', ['quad_mg', 'mg']],
+      ['light', 'medium', ['mg', 'camera']],
+      ['light', 'min', ['mg', 'autocannon', 'point_defense']],
+      ['medium', 'max', ['heavy_cannon', 'camera']],
+      ['medium', 'medium', ['rotary_cannon', 'radar', 'shield_dir']],
+      ['medium', 'min', ['mg', 'mg', 'scatter', 'point_defense']],
+      ['heavy', 'max', ['heavy_cannon', 'coilgun', 'dual_autocannon']],
+      ['heavy', 'medium', ['missile_launcher', 'rocket_pod', 'radar']],
+      ['heavy', 'min', ['dual_autocannon', 'dual_autocannon', 'dual_autocannon']],
+    ];
+    for (const [cls, lid, parts] of cases) {
+      const slots: SectionDesign['slots'] = {};
+      LAYOUTS[cls][lid].hardpoints.forEach((h, i) => (slots[h.id] = m(parts[i])));
+      const d = design({
+        chassis: 'walking',
+        sections: {
+          front: { class: cls, layout: lid, armor: 0, slots },
+          middle: { class: 'medium', layout: 'medium', armor: 0, slots: {} },
+          rear: { class: 'light', layout: 'medium', armor: 0, slots: {} },
+        },
+      });
+      const errs = validateDesign(d).filter((i) => i.severity === 'error');
+      expect(errs, `${cls}/${lid}`).toEqual([]);
     }
+  });
+
+  it('earlier arrangements map to layouts with the same mount ids, at least as large', () => {
+    const rank = { S: 1, M: 2, L: 3 } as const;
+    const covers = (from: { id: string; size: 'S' | 'M' | 'L' }[], to: { id: string; size: 'S' | 'M' | 'L' }[]) =>
+      from.every((f) => to.some((t) => t.id === f.id && rank[t.size] >= rank[f.size]));
+    // schema < 3: one arrangement per class
+    for (const cls of CLASSES) {
+      const legacy = SECTION_CLASSES[cls].slots.filter((x) => x.kind === 'hardpoint');
+      expect(covers(legacy, LAYOUTS[cls][LEGACY_LAYOUT[cls]].hardpoints), cls).toBe(true);
+    }
+    expect(LEGACY_LAYOUT).toEqual({ light: 'medium', medium: 'medium', heavy: 'max' });
+    // the schema-3 layout table
+    const OLD: Record<SectionClass, Record<'max' | 'medium' | 'min', { id: string; size: 'S' | 'M' | 'L' }[]>> = {
+      light: { max: [{ id: 'H1', size: 'M' }, { id: 'H2', size: 'S' }], medium: [{ id: 'H1', size: 'S' }, { id: 'H2', size: 'S' }], min: [{ id: 'H1', size: 'S' }] },
+      medium: { max: [{ id: 'H1', size: 'L' }, { id: 'H2', size: 'S' }], medium: [{ id: 'H1', size: 'M' }, { id: 'H2', size: 'M' }, { id: 'H3', size: 'M' }], min: [{ id: 'H1', size: 'M' }, { id: 'H2', size: 'S' }] },
+      heavy: { max: [{ id: 'H1', size: 'L' }, { id: 'H2', size: 'L' }, { id: 'H3', size: 'M' }], medium: [{ id: 'H1', size: 'L' }, { id: 'H2', size: 'L' }, { id: 'H3', size: 'S' }], min: [{ id: 'H1', size: 'L' }, { id: 'H2', size: 'M' }] },
+    };
+    for (const cls of CLASSES) for (const lid of LAYOUT_IDS) expect(covers(OLD[cls][lid], LAYOUTS[cls][SCHEMA3_LAYOUT[cls][lid]].hardpoints), `${cls}/${lid}`).toBe(true);
   });
 
   it('layout frame mass and exposure have real effects', () => {
@@ -79,7 +121,7 @@ describe('hardpoint layouts', () => {
 });
 
 describe('layout changes relocate equipment', () => {
-  const heavy = (): SectionDesign => ({ class: 'heavy', layout: 'medium', armor: 40, slots: { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('mg', 180), I1: m('ammo_small'), I4: m('shell_rack') } });
+  const heavy = (): SectionDesign => ({ class: 'heavy', layout: 'max', armor: 40, slots: { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('mg', 180), I1: m('ammo_small'), I4: m('shell_rack') } });
 
   it('keeps every part or reports it — nothing is dropped silently', () => {
     const sd = heavy();
@@ -100,26 +142,36 @@ describe('layout changes relocate equipment', () => {
     }
   });
 
-  it('heavy Medium → Minimum keeps one cannon, moves the gun and reports the second cannon', () => {
-    const r = relocateSection(heavy(), 'heavy', 'min');
+  it('heavy Maximum → Medium keeps one cannon, reports the second, keeps the gun and its rotation', () => {
+    const r = relocateSection(heavy(), 'heavy', 'medium');
     expect(r.slots.H1?.component).toBe('heavy_cannon');
     expect(r.displaced.map((x) => x.mount.component)).toEqual(['heavy_cannon']);
-    expect(r.slots.H2?.component).toBe('mg');
-    expect(r.moved).toContainEqual(['H3', 'H2']);
+    expect(r.slots.H3?.component).toBe('mg');
     // mount configuration (rotation) travels with the part
-    expect(r.slots.H2?.rotation).toBe(180);
+    expect(r.slots.H3?.rotation).toBe(180);
+    // Minimum has no large mount: both cannons need a decision
+    expect(relocateSection(heavy(), 'heavy', 'min').displaced.map((x) => x.mount.component)).toEqual(['heavy_cannon', 'heavy_cannon']);
   });
 
-  it('switching back to Medium restores the same slots', () => {
+  it('a part that no longer fits its slot id moves to the nearest compatible one', () => {
+    const sd: SectionDesign = { class: 'medium', layout: 'medium', armor: 0, slots: { H3: m('mg', 90) } };
+    const r = relocateSection(sd, 'medium', 'max');
+    // medium Maximum has no H3: the gun takes the smallest mount that fits, rotation kept
+    expect(r.moved).toEqual([['H3', 'H2']]);
+    expect(r.slots.H2).toEqual(m('mg', 90));
+    expect(r.displaced).toEqual([]);
+  });
+
+  it('switching to the same layout changes nothing', () => {
     const sd = heavy();
-    const r = relocateSection(sd, 'heavy', 'medium');
+    const r = relocateSection(sd, 'heavy', 'max');
     expect(r.moved).toEqual([]);
     expect(r.displaced).toEqual([]);
     expect(r.slots).toEqual(sd.slots);
   });
 });
 
-describe('design migration (schema 2 → 3)', () => {
+describe('design migration (schema 2 and 3 → 4)', () => {
   const legacy = {
     schema: 2,
     id: 'old',
@@ -134,7 +186,7 @@ describe('design migration (schema 2 → 3)', () => {
 
   it('renames the AA autocannon, assigns the Medium layout and keeps positions', () => {
     const d = parseDesign(JSON.stringify(legacy));
-    expect(d.schema).toBe(3);
+    expect(d.schema).toBe(4);
     expect(d.sections.front.layout).toBe('medium');
     expect(d.sections.middle.layout).toBe('medium');
     expect(d.sections.front.slots.H1?.component).toBe('autocannon');
@@ -149,6 +201,26 @@ describe('design migration (schema 2 → 3)', () => {
     const old = SECTION_CLASSES.medium.slots.find((s) => s.id === 'H1')!;
     const c = dr.components.find((x) => x.id === 'F.H1')!;
     expect(c.y).toBeCloseTo(old.y, 5);
+  });
+
+  it('maps old heavy sections to Maximum and schema-3 layouts to the new table without losing parts', () => {
+    const old = {
+      ...legacy,
+      sections: { ...legacy.sections, front: { class: 'heavy', armor: 40, slots: { H1: { component: 'heavy_cannon', rotation: 0 }, H2: { component: 'heavy_cannon', rotation: 0 }, H3: { component: 'mg', rotation: 90 }, I4: { component: 'shell_rack', rotation: 0 } } } },
+    };
+    const d = parseDesign(JSON.stringify(old));
+    expect(d.sections.front.layout).toBe('max');
+    expect(Object.keys(d.sections.front.slots).sort()).toEqual(['H1', 'H2', 'H3', 'I4']);
+    expect(d.sections.front.slots.H3).toEqual({ component: 'mg', rotation: 90 });
+    expect(validateDesign(d).filter((i) => i.severity === 'error')).toEqual([]);
+    // schema 3: heavy "medium" (2 L + 1 S) becomes Maximum; medium "min" (1 M + 1 S) becomes Medium
+    const s3 = { ...old, schema: 3, sections: { ...old.sections, front: { ...old.sections.front, layout: 'medium' }, middle: { class: 'medium', layout: 'min', armor: 10, slots: { H1: { component: 'rotary_cannon', rotation: 0 }, H2: { component: 'camera', rotation: 0 } } } } };
+    const d3 = parseDesign(JSON.stringify(s3));
+    expect(d3.sections.front.layout).toBe('max');
+    expect(d3.sections.middle.layout).toBe('medium');
+    expect(d3.sections.middle.slots.H1?.component).toBe('rotary_cannon');
+    expect(d3.sections.middle.slots.H2?.component).toBe('camera');
+    expect(validateDesign(d3).filter((i) => i.severity === 'error')).toEqual([]);
   });
 
   it('migration is idempotent', () => {

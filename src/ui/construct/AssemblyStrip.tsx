@@ -15,7 +15,7 @@ export function AssemblyStrip({ design, stats, sel, onSelect }: { design: DroneD
       {ORDER.map((pos, i) => {
         const sd = design.sections[pos];
         const cls = SECTION_CLASSES[sd.class];
-        const load = stats.equipmentMass[pos] / cls.maxEquipmentMass;
+        const load = stats.loadUtilization[pos];
         const parts = Object.values(sd.slots).filter(Boolean).map((m) => COMPONENT_MAP[m!.component]);
         const on = sel?.pos === pos;
         return (
@@ -32,7 +32,7 @@ export function AssemblyStrip({ design, stats, sel, onSelect }: { design: DroneD
                 <span className="cls">{cls.name}</span>
                 <span className="num armor">{sd.armor} mm</span>
               </span>
-              <span className="asm-load" title={`Equipment load ${Math.round(stats.equipmentMass[pos])} / ${cls.maxEquipmentMass} kg`}>
+              <span className="asm-load" title={`Equipment ${Math.round(stats.equipmentMass[pos])} kg of ${Math.round(stats.ratedEquipment[pos])} kg rated on this chassis (${Math.round(load * 100)}%) — a rating, not a limit`}>
                 <b style={{ width: `${Math.min(100, load * 100)}%` }} className={load > 1 ? 'over' : load > 0.85 ? 'high' : ''} />
               </span>
               <span className="asm-parts">

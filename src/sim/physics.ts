@@ -72,6 +72,10 @@ export function stepGroundForces(d: Drone, dt: number, active: boolean): number 
   const steer = active ? d.steer : 0;
   const fMax = motor.force * sat;
   const pMax = motor.power * sat;
+  // load response: traction, rolling resistance and (flying) ground drag follow the load
+  const L = d.load;
+  const muLong = ch.muLong * L.traction;
+  const muLat = ch.muLat * L.traction;
   let used = 0;
 
   let width = 0;
@@ -93,7 +97,7 @@ export function stepGroundForces(d: Drone, dt: number, active: boolean): number 
       const lim = (pMax * share) / Math.max(Math.abs(vF), 4);
       f = clamp(f, -lim, lim);
     }
-    const tracLim = ch.muLong * mg * share * tr;
+    const tracLim = muLong * mg * share * tr;
     return clamp(f, -tracLim, tracLim);
   };
 
@@ -109,7 +113,7 @@ export function stepGroundForces(d: Drone, dt: number, active: boolean): number 
     const driveTorque = (fl - fr) * halfTrack;
     used = fMax > 0 ? (Math.abs(fl) + Math.abs(fr)) / Math.max(1, fMax) : 0;
     // Coulomb skid resistance opposes rotation, scaled by remaining traction.
-    const skidMax = ch.skidResistance * mg * (length / 4) * Math.max(0.2, avgTrac);
+    const skidMax = ch.skidResistance * L.rolling * mg * (length / 4) * Math.max(0.2, avgTrac) + L.groundDrag * mg * (length / 4);
     if (Math.abs(b.angVel) < 1e-3) {
       torque = Math.abs(driveTorque) <= skidMax ? 0 : driveTorque - Math.sign(driveTorque) * skidMax;
       if (torque === 0) b.angVel = 0;
@@ -128,13 +132,13 @@ export function stepGroundForces(d: Drone, dt: number, active: boolean): number 
     used = fMax > 0 ? Math.abs(fwdForce) / fMax : 0;
     const wheelbase = Math.max(10, length * 0.7);
     const desired = (vF * Math.tan(steer * ch.maxSteerDeg * DEG)) / wheelbase;
-    const latLim = ch.muLat * mg * (wheelbase / 4) * tr;
+    const latLim = muLat * mg * (wheelbase / 4) * tr;
     torque = clamp(((desired - b.angVel) * b.inertia) / dt * 0.5, -latLim, latLim);
     torque += (trac.right - trac.left) * fwdForce * halfTrack * 0.3;
   }
 
   // Rolling resistance and aerodynamic drag act along the forward axis.
-  const roll = ch.rollingResistance * mg;
+  const roll = (ch.rollingResistance * L.rolling + L.groundDrag) * mg;
   const rollF = -Math.sign(vF) * Math.min(roll, (Math.abs(vF) * m) / dt);
   const dragF = -DRAG_K * vF * Math.abs(vF);
   let totalFwd = fwdForce + rollF + dragF;
@@ -143,7 +147,7 @@ export function stepGroundForces(d: Drone, dt: number, active: boolean): number 
 
   // Lateral friction: cancel sideways sliding up to the grip limit.
   const latNeeded = (-vL * m) / dt;
-  const latMax = ch.muLat * mg * Math.max(0.15, avgTrac);
+  const latMax = muLat * mg * Math.max(0.15, avgTrac) + L.groundDrag * mg;
   const latF = clamp(latNeeded, -latMax, latMax);
 
   b.vel.x += ((fwd.x * totalFwd + right.x * latF) / m) * dt;

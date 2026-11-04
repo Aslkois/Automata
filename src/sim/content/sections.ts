@@ -32,11 +32,11 @@ export interface SectionClassDef {
   structureMass: number;
   structureHp: number;
   maxArmor: number;
-  /** kg of installed equipment the section frame can carry. */
+  /** Rated installed-equipment load (kg) on the reference (wheeled) chassis; scaled by the chassis load rating. A rating, not a limit. */
   maxEquipmentMass: number;
   /** Armor mass per mm of thickness (scales with the section perimeter). */
   armorMassPerMm: number;
-  /** Medium-layout slots (hardpoints and internal bays). Use `sectionSlots` for a design. */
+  /** Internal bays, and the hardpoints every design used before layouts existed (schema < 3). Use `sectionSlots` for a design. */
   slots: SlotDef[];
   /** Recoil impulse (kg·u/s) a standard mount transmits without stressing the section's joints. */
   mountRating: number;
@@ -134,27 +134,44 @@ export const DEFAULT_MOUNT_FACING: Record<SectionPos, number> = { front: 0, midd
 const hp = (id: string, size: SlotSize, x: number, y: number): SlotDef => ({ id, kind: 'hardpoint', size, x, y });
 
 /**
- * Hardpoint layouts per class. "Maximum" carries the largest equipment, "Medium" is the
- * standard arrangement (and what every design before schema 3 used), "Minimum" has fewer,
- * simpler mounts. Coordinates are local to the section centre; footprints never overlap
- * and stay inside the hull (checked by tests).
+ * Hardpoint layouts per class (design schema 4). "Maximum" mounts the largest equipment on
+ * reinforced, more exposed mounts; "Medium" is the balanced arrangement; "Minimum" carries
+ * smaller equipment on more, lower mounts. Coordinates are local to the section centre;
+ * footprints never overlap and stay inside the hull (checked by tests).
+ *
+ * | Class  | Maximum      | Medium       | Minimum |
+ * | Light  | 1 M + 1 S    | 2 S          | 3 S     |
+ * | Medium | 1 L + 1 S    | 3 M          | 4 S     |
+ * | Heavy  | 2 L + 1 M    | 1 L + 2 M    | 3 M     |
  */
 export const LAYOUTS: Record<SectionClass, Record<LayoutId, LayoutDef>> = {
   light: {
     max: { id: 'max', name: 'Maximum', hardpoints: [hp('H1', 'M', 2, -5.5), hp('H2', 'S', 0, 6.5)], frameMass: 60, exposure: 1.15, ratingMul: 1.3, summary: '1 medium + 1 small' },
     medium: { id: 'medium', name: 'Medium', hardpoints: [hp('H1', 'S', 0, -5.5), hp('H2', 'S', 0, 5.5)], frameMass: 0, exposure: 1, ratingMul: 1, summary: '2 small' },
-    min: { id: 'min', name: 'Minimum', hardpoints: [hp('H1', 'S', 0, 0)], frameMass: -25, exposure: 0.85, ratingMul: 1, summary: '1 small' },
+    min: { id: 'min', name: 'Minimum', hardpoints: [hp('H1', 'S', 3.5, -6.5), hp('H2', 'S', 3.5, 6.5), hp('H3', 'S', -4, 0)], frameMass: 15, exposure: 0.9, ratingMul: 0.85, summary: '3 small' },
   },
   medium: {
     max: { id: 'max', name: 'Maximum', hardpoints: [hp('H1', 'L', 2, -6.5), hp('H2', 'S', 2, 7.5)], frameMass: 90, exposure: 1.15, ratingMul: 1.3, summary: '1 large + 1 small' },
     medium: { id: 'medium', name: 'Medium', hardpoints: [hp('H1', 'M', 3, -7.5), hp('H2', 'M', 3, 7.5), hp('H3', 'M', -5.5, 0)], frameMass: 0, exposure: 1, ratingMul: 1, summary: '3 medium' },
-    min: { id: 'min', name: 'Minimum', hardpoints: [hp('H1', 'M', 3, -6), hp('H2', 'S', -4, 6.5)], frameMass: -40, exposure: 0.85, ratingMul: 1, summary: '1 medium + 1 small' },
+    min: { id: 'min', name: 'Minimum', hardpoints: [hp('H1', 'S', 4, -7.5), hp('H2', 'S', 4, 7.5), hp('H3', 'S', -5, -7.5), hp('H4', 'S', -5, 7.5)], frameMass: 20, exposure: 0.9, ratingMul: 0.85, summary: '4 small' },
   },
   heavy: {
     max: { id: 'max', name: 'Maximum', hardpoints: [hp('H1', 'L', 3.5, -8), hp('H2', 'L', 3.5, 8), hp('H3', 'M', -7.5, 0)], frameMass: 140, exposure: 1.15, ratingMul: 1.3, summary: '2 large + 1 medium' },
-    medium: { id: 'medium', name: 'Medium', hardpoints: [hp('H1', 'L', 2, -7), hp('H2', 'L', 2, 7), hp('H3', 'S', -8, 0)], frameMass: 0, exposure: 1, ratingMul: 1, summary: '2 large + 1 small' },
-    min: { id: 'min', name: 'Minimum', hardpoints: [hp('H1', 'L', 3, -6.5), hp('H2', 'M', -5.5, 7)], frameMass: -60, exposure: 0.85, ratingMul: 1, summary: '1 large + 1 medium' },
+    medium: { id: 'medium', name: 'Medium', hardpoints: [hp('H1', 'L', 3, -7.5), hp('H2', 'M', 3.5, 8), hp('H3', 'M', -7, 2)], frameMass: 40, exposure: 1, ratingMul: 1, summary: '1 large + 2 medium' },
+    min: { id: 'min', name: 'Minimum', hardpoints: [hp('H1', 'M', 3.5, -8.5), hp('H2', 'M', 3.5, 8.5), hp('H3', 'M', -6.5, 0)], frameMass: 10, exposure: 0.95, ratingMul: 0.9, summary: '3 medium' },
   },
+};
+
+/**
+ * Where earlier designs land. Schema < 3 had one arrangement per class (the class's legacy
+ * hardpoints); schema 3 had the previous layout table. Each maps to a layout whose mounts
+ * have the same ids and are at least as large, so no part loses its place.
+ */
+export const LEGACY_LAYOUT: Record<SectionClass, LayoutId> = { light: 'medium', medium: 'medium', heavy: 'max' };
+export const SCHEMA3_LAYOUT: Record<SectionClass, Record<LayoutId, LayoutId>> = {
+  light: { max: 'max', medium: 'medium', min: 'min' },
+  medium: { max: 'max', medium: 'medium', min: 'medium' },
+  heavy: { max: 'max', medium: 'max', min: 'medium' },
 };
 
 /** All slots (layout hardpoints + class internal bays) for a section. */

@@ -32,6 +32,24 @@ export interface ChassisDef {
   driveForce: number;
   drivePower: number;
   description: string;
+  /**
+   * Multiplier on every section's rated equipment load. A rating, never a limit: carrying more
+   * is allowed and has the physical consequences below.
+   */
+  loadRating: number;
+  /**
+   * How the running gear responds to load beyond its rating (overload o = mass / rated mass − 1):
+   * traction coefficients divide by (1 + loadSensitivity·o) — tyre and track load sensitivity —
+   * and rolling resistance multiplies by (1 + sinkage·o) — sinking under ground pressure.
+   */
+  loadSensitivity: number;
+  sinkage: number;
+  /** running-gear fatigue per second of travel at overload o: fatigue·o²·(0.3 + speed/100) of gear integrity */
+  fatigue: number;
+  /** electrical power (PU/s per tonne) spent just holding the weight up: legs bracing, thrusters lifting */
+  supportPower: number;
+  /** flying: thrust can support this multiple of the rated mass; beyond it the hull drags on the ground */
+  liftMargin?: number;
 }
 
 export const CHASSIS: Record<ChassisType, ChassisDef> = {
@@ -51,7 +69,12 @@ export const CHASSIS: Record<ChassisType, ChassisDef> = {
     driveName: 'Wheel motors',
     driveForce: 0.85,
     drivePower: 1.15,
-    description: 'Fast on open ground with low rolling resistance. Turns by steering (needs forward speed); lower grip.',
+    loadRating: 1,
+    loadSensitivity: 0.45,
+    sinkage: 0.5,
+    fatigue: 0.03,
+    supportPower: 0,
+    description: 'Fast on open ground with low rolling resistance. Turns by steering (needs forward speed); lower grip, which falls further when overloaded. Rated load ×1.0.',
   },
   tracked: {
     id: 'tracked',
@@ -69,7 +92,12 @@ export const CHASSIS: Record<ChassisType, ChassisDef> = {
     driveName: 'Track drive',
     driveForce: 1,
     drivePower: 1,
-    description: 'High grip and pivot turning in place. Heavier, with higher rolling resistance.',
+    loadRating: 1.25,
+    loadSensitivity: 0.2,
+    sinkage: 0.35,
+    fatigue: 0.02,
+    supportPower: 0,
+    description: 'High grip and pivot turning in place. Heavier, with higher rolling resistance. A stable heavy platform: rated load ×1.25.',
   },
   walking: {
     id: 'walking',
@@ -87,7 +115,12 @@ export const CHASSIS: Record<ChassisType, ChassisDef> = {
     driveName: 'Leg actuators',
     driveForce: 0.95,
     drivePower: 0.42,
-    description: 'Legged frame: sure-footed, turns on the spot and holds a firing line, but walks slowly.',
+    loadRating: 1.6,
+    loadSensitivity: 0.12,
+    sinkage: 0.2,
+    fatigue: 0.04,
+    supportPower: 1.5,
+    description: 'Legged frame: carries the most (rated load ×1.6), turns on the spot and holds a firing line, but walks slowly and spends power holding heavy loads up.',
   },
   flying: {
     id: 'flying',
@@ -105,7 +138,13 @@ export const CHASSIS: Record<ChassisType, ChassisDef> = {
     driveName: 'Lift thrusters',
     driveForce: 0.7,
     drivePower: 1.25,
-    description: 'Skims low over the ground on stabilised thrusters: quick and agile but drifts in turns and is lightly protected. Still blocked by walls.',
+    loadRating: 0.55,
+    loadSensitivity: 0,
+    sinkage: 0,
+    fatigue: 0.03,
+    supportPower: 3,
+    liftMargin: 1.25,
+    description: 'Skims low over the ground on stabilised thrusters: quick and agile but drifts in turns and is lightly protected. Rated load ×0.55: thrust supports at most 1.25× the rated mass; anything heavier drags on the ground. Still blocked by walls.',
   },
 };
 

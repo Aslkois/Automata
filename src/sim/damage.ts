@@ -1,4 +1,5 @@
 // Component, section and joint damage; structural detachment; derived damage states.
+import { ratedMassOf } from './load';
 import { SECTION_POSITIONS, type SectionPos } from './content/sections';
 import type { AmmoType } from './content/components';
 import { moduleRounds } from './ammo';
@@ -153,6 +154,7 @@ export function processJoints(sim: SimContext, d: Drone): void {
   const secs = SECTION_POSITIONS.map((p) => d.sections[p]).filter((s) => s.attached);
   recomputeMass(d.body, secs, d.components, d.chassis.gearMassPerSide);
   d.radius = boundingRadius(secs);
+  d.ratedMass = ratedMassOf(d);
 }
 
 function detachGroup(sim: SimContext, d: Drone, group: SectionPos[]): void {

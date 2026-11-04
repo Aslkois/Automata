@@ -1,3 +1,4 @@
+import type { LoadState } from './load';
 // Runtime (simulation-owned) state types.
 import type { ChassisDef } from './content/chassis';
 import type { AmmoType, ComponentDef, ComponentKind, ProjectileStats } from './content/components';
@@ -265,6 +266,10 @@ export interface Drone {
   shake: number;
   /** seconds since the drone was structurally destroyed (its wreck fades like debris) */
   wreckAge: number;
+  /** mass with every attached section carrying exactly its rated equipment load (kg) */
+  ratedMass: number;
+  /** load response this tick (traction, rolling, lift, support power) */
+  load: LoadState;
 }
 
 export interface Debris {

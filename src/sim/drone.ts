@@ -1,4 +1,5 @@
 // Turns a DroneDesign into runtime simulation state, and maintains mass properties.
+import { loadState, ratedMassOf } from './load';
 import { CHASSIS } from './content/chassis';
 import { INTEGRATED_MASS, integratedParts } from './content/integrated';
 import { FOOTPRINT } from './content/components';
@@ -289,7 +290,11 @@ export function buildDrone(design: DroneDesign, id: number, team: number, x: num
     bumps: { front: { time: -1, impulse: 0 }, rear: { time: -1, impulse: 0 }, left: { time: -1, impulse: 0 }, right: { time: -1, impulse: 0 } },
     shake: 0,
     wreckAge: 0,
+    ratedMass: 0,
+    load: loadState(chassis, body.mass, body.mass),
   };
+  drone.ratedMass = ratedMassOf(drone);
+  drone.load = loadState(chassis, body.mass, drone.ratedMass);
   return drone;
 }
 
