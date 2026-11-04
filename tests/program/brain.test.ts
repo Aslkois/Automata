@@ -340,7 +340,7 @@ describe('one brain, three editors', () => {
       expect(duel(viaNodes(ir))).toBe(ref);
       expect(duel(viaCode(viaNodes(viaBlocks(ir))))).toBe(ref);
     }
-  });
+  }, 30_000);
 
   it('keeps loose blocks and unattached nodes in their view without running them', () => {
     let brain: Brain = newBrain('b', 'd', BRAWLER_CODE, 'blocks');

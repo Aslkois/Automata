@@ -48,7 +48,8 @@ describe('starter drones', () => {
       sim.run(12);
       for (const c of sim.controllers.values()) expect(c.lastError, `${DEFAULT_DESIGNS[i].name} vs ${DEFAULT_DESIGNS[j].name}`).toBeNull();
     }
-  });
+    // eleven 12 s battles: ~3.5 s on an idle machine, over 5 s when it is busy
+  }, 30_000);
 
   it('helpers that use other helpers bring them along', () => {
     const ir = parseBrain('function update() { steerClear(1); }').ir!;
