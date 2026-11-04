@@ -157,6 +157,23 @@ export class Renderer {
       ctx.strokeRect(x, y, o.hw * 2, o.hh * 2);
     }
 
+    // training goal: a ring and a label
+    if (A.goal) {
+      const g = A.goal;
+      ctx.strokeStyle = 'rgba(236,230,216,0.7)';
+      ctx.lineWidth = 1.4 * px;
+      ctx.setLineDash([6 * px, 5 * px]);
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      brackets(ctx, g.x, g.y, g.r * 0.45, g.r * 0.18);
+      ctx.fillStyle = 'rgba(236,230,216,0.75)';
+      ctx.font = `${11 * px}px ${MONO}`;
+      ctx.textAlign = 'center';
+      ctx.fillText('GOAL', g.x, g.y + g.r + 16 * px);
+    }
+
     const sel = opts.selected !== null ? sim.drones.find((d) => d.id === opts.selected) ?? null : null;
     const sensorMode = opts.sensorView && sel;
     const visible = new Set<number>(sensorMode ? [sel.id, ...sel.perception.contacts.map((c) => c.id)] : sim.drones.map((d) => d.id));

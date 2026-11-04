@@ -5,7 +5,7 @@
 // brain. Migration never discards a program: the program clearly associated with a design
 // becomes its brain; every other program is kept in `recovered`, from where the player can
 // load it into any drone (the replaced brain is itself kept as a recovered entry).
-import { DEFAULT_BRAINS, DEFAULT_DESIGNS, LEGACY_DEFAULT_PAIRS } from '../data/defaults';
+import { DEFAULT_BRAINS, DEFAULT_DESIGNS, LEGACY_DEFAULT_PAIRS, STARTER_SET, STARTER_SETS } from '../data/defaults';
 import { irHash } from '../program/brain/ir';
 import { BRAIN_SCHEMA, codeDocFor, newBrain, STARTER_CODE, validateBrain, type Brain } from '../program/brain/model';
 import { parseBrain } from '../program/brain/parse';
@@ -35,12 +35,43 @@ export interface Library {
   designs: DroneDesign[];
   brains: Brain[];
   recovered: RecoveredProgram[];
+  /** newest set of example drones this library has been offered (each set is added once) */
+  starters?: number;
 }
 
 export function defaultLibrary(): Library {
   const designs = DEFAULT_DESIGNS.map(cloneDesign);
   const brains = DEFAULT_BRAINS.map((b) => newBrain(b.id, b.designId, b.code, b.view));
-  return { version: LIBRARY_VERSION, designs, brains, recovered: [] };
+  return { version: LIBRARY_VERSION, designs, brains, recovered: [], starters: STARTER_SET };
+}
+
+/**
+ * Example drones introduced after a library was created are added to it once. A player's
+ * own drones and edited examples are never touched; a newer example whose id is already
+ * taken is skipped, and an example the player deletes later is not brought back.
+ */
+export function addNewStarters(lib: Library, notes: string[]): { library: Library; changed: boolean } {
+  const have = lib.starters ?? 1;
+  if (have >= STARTER_SET) return { library: lib, changed: false };
+  const ids = new Set(lib.designs.map((d) => d.id));
+  const designs = [...lib.designs];
+  const brains = [...lib.brains];
+  const added: string[] = [];
+  for (const set of STARTER_SETS) {
+    if (set.set <= have) continue;
+    for (const id of set.ids) {
+      if (ids.has(id)) continue;
+      const d = DEFAULT_DESIGNS.find((x) => x.id === id);
+      const b = DEFAULT_BRAINS.find((x) => x.designId === id);
+      if (!d || !b) continue;
+      designs.push(cloneDesign(d));
+      brains.push(newBrain(b.id, b.designId, b.code, b.view));
+      ids.add(id);
+      added.push(d.name);
+    }
+  }
+  if (added.length) notes.push(`New example drones added: ${added.join(', ')}`);
+  return { library: { ...lib, designs, brains, starters: STARTER_SET }, changed: true };
 }
 
 const norm = (s: string) =>
@@ -106,7 +137,9 @@ export function migrateLibrary(raw: unknown, now = Date.now()): { library: Libra
       }
     });
     const recovered = Array.isArray(r.recovered) ? (r.recovered as RecoveredProgram[]) : [];
-    return { library: ensureBrains({ version: LIBRARY_VERSION, designs, brains, recovered }), migrated: false, notes };
+    const starters = typeof r.starters === 'number' ? r.starters : 1;
+    const withNew = addNewStarters({ version: LIBRARY_VERSION, designs, brains, recovered, starters }, notes);
+    return { library: ensureBrains(withNew.library), migrated: withNew.changed, notes };
   }
   if (r.version !== 1) return null;
   const programs = (Array.isArray(r.programs) ? r.programs : []) as LegacyProgram[];
@@ -151,7 +184,8 @@ export function migrateLibrary(raw: unknown, now = Date.now()): { library: Libra
       createdAt: now,
     });
   }
-  return { library: ensureBrains({ version: LIBRARY_VERSION, designs, brains, recovered }), migrated: true, notes };
+  const withNew = addNewStarters({ version: LIBRARY_VERSION, designs, brains, recovered, starters: 1 }, notes);
+  return { library: ensureBrains(withNew.library), migrated: true, notes };
 }
 
 /** Invariant: exactly one brain per design; orphaned brains are kept as recovered entries. */

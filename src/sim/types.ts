@@ -336,6 +336,8 @@ export interface Arena {
   height: number;
   obstacles: Obstacle[];
   spawns: { team: number; x: number; y: number; angle: number }[];
+  /** training: a point to reach (public mission data; the walls in between are not) */
+  goal?: { x: number; y: number; r: number };
 }
 
 export type SimEvent =

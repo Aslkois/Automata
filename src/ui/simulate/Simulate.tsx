@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { pickDrone, Renderer, screenToWorld, type Camera } from '../../render/renderer';
 import type { Quality } from '../../render/vfx';
 import { BUSES, type CombatAudio } from '../../render/audio';
+import { TRAINING_MAP, TRAININGS, type TrainingId } from '../../data/training';
 import { comWorld } from '../../sim/drone';
 import type { Drone } from '../../sim/types';
 import { useShell } from '../App';
@@ -488,6 +489,7 @@ function DeploySheet({ onClose, onDeployed }: { onClose: () => void; onDeployed:
   const pr = session.problems(lib, s);
   const ok = !pr.global.length && pr.entries.every((e) => !e.length);
   const ref = useRef<HTMLDivElement>(null);
+  const training = s.training ? TRAINING_MAP[s.training] : null;
   return (
     <aside className="deploy card" ref={ref} aria-label="Scenario" data-testid="scenario">
       <header>
@@ -496,13 +498,45 @@ function DeploySheet({ onClose, onDeployed }: { onClose: () => void; onDeployed:
           <Icon name="close" />
         </button>
       </header>
-      <div className="seg" role="radiogroup" aria-label="Mode">
-        {(['duel', 'sandbox'] as const).map((m) => (
-          <button key={m} role="radio" aria-checked={s.mode === m} className={s.mode === m ? 'on' : ''} onClick={() => set({ mode: m })}>
-            {m === 'duel' ? 'Duel' : 'Sandbox'}
-          </button>
-        ))}
-      </div>
+      <label className="course">
+        <span className="label">Course</span>
+        <select
+          aria-label="Course"
+          data-testid="course"
+          value={s.training ?? ''}
+          onChange={(e) => {
+            const id = (e.target.value || null) as TrainingId | null;
+            const t = id ? TRAINING_MAP[id] : null;
+            set({ training: id, timeLimit: t ? t.timeLimit : 180, roster: t ? s.roster.map((x) => ({ ...x, team: 0 })) : s.roster });
+          }}
+        >
+          <option value="">Battle — Foundry Yard</option>
+          <optgroup label="Training">
+            {TRAININGS.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </optgroup>
+        </select>
+      </label>
+      {training ? (
+        <div className="course-brief" data-testid="course-brief">
+          <p>{training.brief}</p>
+          <p className="muted small">{training.teaches}</p>
+          <p className="muted small">
+            Objective: {training.objective === 'goal' ? 'reach the goal' : training.objective === 'survive' ? `survive ${training.timeLimit} s` : 'knock out every target'} · your drones are {TEAMS[0].name}; built-in targets run their own brains.
+          </p>
+        </div>
+      ) : (
+        <div className="seg" role="radiogroup" aria-label="Mode">
+          {(['duel', 'sandbox'] as const).map((m) => (
+            <button key={m} role="radio" aria-checked={s.mode === m} className={s.mode === m ? 'on' : ''} onClick={() => set({ mode: m })}>
+              {m === 'duel' ? 'Duel' : 'Sandbox'}
+            </button>
+          ))}
+        </div>
+      )}
       <ol className="roster">
         {s.roster.map((en, i) => (
           <li key={en.key} data-testid={`roster-${i}`} style={{ ['--team' as string]: TEAMS[en.team % 4].color }}>
@@ -514,13 +548,15 @@ function DeploySheet({ onClose, onDeployed }: { onClose: () => void; onDeployed:
                 </option>
               ))}
             </select>
-            <select aria-label={`Team ${i + 1}`} value={en.team} onChange={(e) => setEntry(i, { team: Number(e.target.value) })}>
-              {TEAMS.map((t, k) => (
-                <option key={k} value={k}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+            {!training && (
+              <select aria-label={`Team ${i + 1}`} value={en.team} onChange={(e) => setEntry(i, { team: Number(e.target.value) })}>
+                {TEAMS.map((t, k) => (
+                  <option key={k} value={k}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <button className="tool" aria-label={`Remove drone ${i + 1}`} onClick={() => set({ roster: s.roster.filter((_, k) => k !== i) })}>
               <Icon name="close" size={16} />
             </button>
@@ -532,7 +568,7 @@ function DeploySheet({ onClose, onDeployed }: { onClose: () => void; onDeployed:
           </li>
         ))}
       </ol>
-      <button className="btn ghost" onClick={() => set({ roster: [...s.roster, { key: Date.now(), team: s.roster.length % 2, designId: lib.designs[0]?.id ?? '' }] })}>
+      <button className="btn ghost" onClick={() => set({ roster: [...s.roster, { key: Date.now(), team: training ? 0 : s.roster.length % 2, designId: lib.designs[0]?.id ?? '' }] })}>
         <Icon name="plus" /> Add drone
       </button>
       <p className="muted small">Each drone runs its own brain — edit it under Program.</p>

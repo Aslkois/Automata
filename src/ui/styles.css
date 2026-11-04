@@ -1606,6 +1606,24 @@ input[type='range'] {
 .tray .seg.sizes button {
   min-width: 32px;
 }
+.deploy .course {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.deploy .course select {
+  width: 100%;
+  min-height: 40px;
+}
+.course-brief {
+  padding: 8px 10px;
+  border-left: 2px solid var(--line-strong);
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.course-brief p {
+  margin: 0 0 4px;
+}
 .slot-list {
   list-style: none;
   margin: 0;

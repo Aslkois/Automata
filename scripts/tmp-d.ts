@@ -1,0 +1,17 @@
+import { DEFAULT_BRAINS, DEFAULT_DESIGNS } from '../src/data/defaults';
+import { TRAININGS, trainingScenario } from '../src/data/training';
+import { compileBrain } from '../src/program/brain/compile';
+import { irFromCode } from '../src/program/brain/model';
+import { Simulation } from '../src/sim/world';
+const [did, tid, at = '6'] = process.argv.slice(2);
+const b = DEFAULT_BRAINS.find((x) => x.designId === `example-${did}`)!;
+const d = DEFAULT_DESIGNS.find((x) => x.id === `example-${did}`)!;
+const t = TRAININGS.find((x) => x.id === tid)!;
+const sim = new Simulation(trainingScenario(t, [{ design: d, program: compileBrain(irFromCode(b.code), b.id, b.id).program }], 1));
+sim.run(Number(at));
+const me = sim.drones[0];
+console.log('contacts', JSON.stringify(me.perception.contacts.map(c => ({ id: c.id, team: c.team, dist: Math.round(c.distance), dis: c.disabled, s: c.sensors }))));
+const h = sim.controllers.get(me.id)!.history.at(-1)!;
+console.log(h.entries.map(e => `${e.kind}: ${e.text}`).join('\n'));
+console.log(sim.controllers.get(me.id)!.state, sim.controllers.get(me.id)!.lastError);
+console.log(sim.drones.slice(1).map(x => x.status.label));

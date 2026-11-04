@@ -34,6 +34,8 @@ export interface ScenarioConfig {
   /** seconds; 0 = unlimited */
   timeLimit: number;
   decisionHz: number;
+  /** what ends the scenario: defeat the other side (default), reach the arena goal, or survive the time limit */
+  objective?: 'destroy' | 'goal' | 'survive' | 'targets';
 }
 
 export interface BattleResult {
@@ -236,8 +238,48 @@ export class Simulation implements SimContext {
     }
   }
 
+  private finish(winner: number | null, reason: string): void {
+    this.result = { winner, reason, time: this.time };
+    this.emit({ t: this.time, type: 'battle-end', winner, reason });
+  }
+
   private checkResult(): void {
-    if (this.result || this.tick < SIM_HZ) return;
+    if (this.result) return;
+    const objective = this.config.objective ?? 'destroy';
+    const limit = this.config.timeLimit > 0 && this.time >= this.config.timeLimit;
+    if (objective === 'goal') {
+      const g = this.arena.goal;
+      const runners = this.drones.filter((d) => d.team === 0);
+      if (g)
+        for (const d of runners) {
+          if (d.status.disabled || d.status.destroyed) continue;
+          const c = comWorld(d.body);
+          if (Math.hypot(c.x - g.x, c.y - g.y) <= g.r) return this.finish(0, `${d.name} reached the goal in ${this.time.toFixed(1)} s`);
+        }
+      if (runners.length && runners.every((d) => d.status.disabled || d.status.destroyed)) return this.finish(null, 'No drone can reach the goal any more');
+      if (limit) this.finish(null, `Goal not reached within ${this.config.timeLimit} s`);
+      return;
+    }
+    if (objective === 'targets') {
+      // training targets: knocked out once disabled, destroyed or missing a section
+      const down = (d: Drone) => d.status.disabled || d.status.destroyed || Object.values(d.sections).some((x) => x.destroyed || !x.attached);
+      const own = this.drones.filter((d) => d.team === 0);
+      const targets = this.drones.filter((d) => d.team !== 0);
+      const hit = targets.filter(down).length;
+      if (targets.length && hit === targets.length) return this.finish(0, `All ${targets.length} target${targets.length > 1 ? 's' : ''} knocked out in ${this.time.toFixed(1)} s`);
+      if (this.tick >= SIM_HZ && own.length && own.every((d) => d.status.disabled || d.status.destroyed)) return this.finish(targets[0]?.team ?? null, 'Your drones were knocked out');
+      if (limit) this.finish(null, `${hit} of ${targets.length} targets knocked out in ${this.config.timeLimit} s`);
+      return;
+    }
+    if (objective === 'survive') {
+      const own = this.drones.filter((d) => d.team === 0);
+      const others = this.drones.filter((d) => d.team !== 0);
+      if (this.tick >= SIM_HZ && own.length && own.every((d) => combatIneffective(d.status))) return this.finish(others.length ? others[0].team : null, `Did not survive: ${own.map((d) => `${d.name}: ${d.status.label}`).join('; ')}`);
+      if (this.tick >= SIM_HZ && others.length && others.every((d) => combatIneffective(d.status))) return this.finish(0, 'The opposition was knocked out');
+      if (limit) this.finish(0, `Survived ${this.config.timeLimit} s`);
+      return;
+    }
+    if (this.tick < SIM_HZ) return;
     const teams = new Set(this.drones.map((d) => d.team));
     if (teams.size < 2) return;
     const effective = new Set(this.drones.filter((d) => !combatIneffective(d.status)).map((d) => d.team));

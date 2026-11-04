@@ -155,6 +155,10 @@ export function createDroneApi(host: ApiHost): ObjVal {
       return Math.hypot(num(a[0], 'distanceTo x', it) - p.x, num(a[1], 'distanceTo y', it) - p.y);
     }),
     arena: fn('arena', () => makeObj({ width: host.sim.arena.width, height: host.sim.arena.height })),
+    goal: fn('goal', () => {
+      const g = host.sim.arena.goal;
+      return g ? makeObj({ x: g.x, y: g.y, radius: g.r }) : null;
+    }),
     random: fn('random', () => host.rng.next()),
     log: fn('log', (a, it) => {
       it.pushTrace('log', a.map((x) => (typeof x === 'string' ? x : inspect(x))).join(' '));
@@ -549,7 +553,7 @@ export function createDroneApi(host: ApiHost): ObjVal {
 
 /** Names exposed on the `drone` object (for autocomplete and documentation). */
 export const API_NAMES = [
-  'id', 'team', 'time', 'x', 'y', 'position', 'heading', 'speed', 'velocity', 'angleTo', 'distanceTo', 'arena', 'random', 'log',
+  'id', 'team', 'time', 'x', 'y', 'position', 'heading', 'speed', 'velocity', 'angleTo', 'distanceTo', 'arena', 'goal', 'random', 'log',
   'contacts', 'enemies', 'nearestEnemy', 'threats', 'sensors',
   'drive', 'stop', 'turnToward',
   'distance', 'obstacleDetected', 'rangeStatus', 'ranges', 'bumper', 'bumpers', 'lidar', 'lidarAge',

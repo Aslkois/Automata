@@ -18,6 +18,7 @@ export const API_DOCS: ApiDoc[] = [
   { group: 'Self', name: 'angleTo', sig: 'drone.angleTo(x, y)', returns: 'degrees', doc: 'Bearing from self to a point.' },
   { group: 'Self', name: 'distanceTo', sig: 'drone.distanceTo(x, y)', returns: 'number', doc: 'Distance from self to a point.' },
   { group: 'Self', name: 'arena', sig: 'drone.arena()', returns: '{width, height}', doc: 'Arena dimensions (public map knowledge).' },
+  { group: 'Environment', name: 'goal', sig: 'drone.goal()', returns: '{x, y, radius} | null', doc: 'The scenario’s goal point in training courses (public mission data). The walls between you and it are not known — find them with your sensors.' },
   { group: 'Self', name: 'id', sig: 'drone.id()', returns: 'number', doc: 'Own id.' },
   { group: 'Self', name: 'team', sig: 'drone.team()', returns: 'number', doc: 'Own team.' },
   { group: 'Self', name: 'random', sig: 'drone.random()', returns: '0..1', doc: 'Seeded deterministic random number (Math.random is the same source).' },

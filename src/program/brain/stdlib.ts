@@ -138,7 +138,17 @@ export const HELPER_MAP = Object.fromEntries(HELPERS.map((h) => [h.name, h]));
 /** Helpers referenced by name in the text and not defined by the program itself. */
 export function helpersFor(ir: BrainIR, text: string): string {
   const own = new Set(ir.body.flatMap((s) => (s.k === 'func' ? [s.name] : s.k === 'decl' ? [s.name] : [])));
-  const out: string[] = [];
-  for (const h of HELPERS) if (!own.has(h.name) && new RegExp(`\\b${h.name}\\b`).test(text)) out.push(h.code);
-  return out.join('\n');
+  // helpers may call other helpers: include everything reachable from the program text
+  const used = new Set<string>();
+  const scan = (src: string) => {
+    for (const h of HELPERS) {
+      if (own.has(h.name) || used.has(h.name) || !new RegExp(`\\b${h.name}\\b`).test(src)) continue;
+      used.add(h.name);
+      scan(h.code);
+    }
+  };
+  scan(text);
+  return HELPERS.filter((h) => used.has(h.name))
+    .map((h) => h.code)
+    .join('\n');
 }
