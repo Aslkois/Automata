@@ -333,9 +333,16 @@ export function computeStats(d: DroneDesign): DesignStats {
     ratedTotal += ratedEquipment[pos];
     equipTotal += equipmentMass[pos];
   }
-  const load = loadState(ch, mass, mass - equipTotal + ratedTotal);
+  const load = loadState(
+    ch,
+    SECTION_POSITIONS.map((p) => ({ mass: sectionMass[p], equipment: equipmentMass[p], rated: ratedEquipment[p], cls: d.sections[p].class })),
+  );
+  void equipTotal;
+  void ratedTotal;
   const mg = mass * GRAVITY;
   const tractionLimit = ch.muLong * load.traction * mg;
+  motorForce *= load.drive;
+  motorPower *= load.drive;
   const effForce = Math.min(motorForce, tractionLimit);
   const roll = (ch.rollingResistance * load.rolling + load.groundDrag) * mg;
   const maxAccel = Math.max(0, (effForce - roll) / mass);
@@ -584,7 +591,7 @@ export function validateDesign(d: DroneDesign, stats = computeStats(d)): Issue[]
     issues.push({
       severity: 'info',
       code: 'overload',
-      message: `The drone weighs ${Math.round(stats.load.utilization * 100)}% of its rated mass: traction ×${stats.load.traction.toFixed(2)}, rolling resistance ×${stats.load.rolling.toFixed(2)}, and the ${CHASSIS[d.chassis].gearName.toLowerCase()} wear while it moves.`,
+      message: `Overloaded sections: traction ×${stats.load.traction.toFixed(2)}${stats.load.drive < 1 ? `, thrust left to drive ×${stats.load.drive.toFixed(2)}` : ''}, rolling resistance ×${stats.load.rolling.toFixed(2)}, and the ${CHASSIS[d.chassis].gearName.toLowerCase()} under them wear while carrying it.`,
     });
   for (const pos of SECTION_POSITIONS) {
     const cool = stats.sectionCooling[pos] + 1.5;

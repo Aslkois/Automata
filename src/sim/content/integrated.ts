@@ -8,7 +8,7 @@ import { CHASSIS } from './chassis';
 import type { ComponentDef } from './components';
 import { SECTION_CLASSES, type SectionClass, type SectionPos } from './sections';
 
-const CLASS_DRIVE: Record<SectionClass, { force: number; power: number; electrical: number }> = {
+export const CLASS_DRIVE: Record<SectionClass, { force: number; power: number; electrical: number }> = {
   light: { force: 120000, power: 2600000, electrical: 16 },
   medium: { force: 170000, power: 3800000, electrical: 24 },
   heavy: { force: 240000, power: 5400000, electrical: 34 },

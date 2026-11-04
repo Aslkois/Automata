@@ -432,9 +432,12 @@ function fireEvent(sim: SimContext, d: Drone, c: RComponent, ws: WeaponState, di
   d.shake = Math.min(0.03, d.shake + (totalRecoil / Math.max(500, d.body.mass)) * 0.0004);
   // mounting stress: recoil beyond the section's mount rating loads its joints
   const sec = d.sections[c.section];
+  ws.mountStress = totalRecoil / sec.mountRating;
   if (totalRecoil > sec.mountRating) {
     const over = (totalRecoil - sec.mountRating) / sec.mountRating;
+    // the joints carry the excess into the hull, and the mount itself fatigues
     for (const j of d.joints) if (j.intact && (j.a === c.section || j.b === c.section)) damageJoint(sim, d, j, over * 6);
+    damageComponent(sim, d, c, over * c.maxHp * 0.02);
   }
 }
 

@@ -9,6 +9,7 @@ import { useShell } from '../App';
 import { fmt, Icon, PHONE, useMedia, useStoredState } from '../common';
 import { library, useLibrary } from '../store';
 import { AssemblyStrip } from './AssemblyStrip';
+import { Diagnostics } from './Diagnostics';
 import { Properties } from './Properties';
 import { fits, Stage, type Selection } from './Stage';
 import { Tray } from './Tray';
@@ -25,6 +26,7 @@ export function Construct({ active }: { active: boolean }) {
   const [trayOpen, setTrayOpen] = useStoredState('tray-open', true);
   const [showArcs, setShowArcs] = useStoredState('arcs', true);
   const [issuesOpen, setIssuesOpen] = useState(false);
+  const [diagOpen, setDiagOpen] = useState(false);
   const phone = useMedia(PHONE);
   const stacked = useMedia('(max-width: 1100px), (max-height: 560px)');
   const short = useMedia('(max-height: 560px)');
@@ -242,9 +244,9 @@ export function Construct({ active }: { active: boolean }) {
           </div>
         </dl>
         <div className="issues-anchor">
-          <button className={`status-pill ${errors.length ? 'fault' : cautions.length ? 'warn' : 'ok'}`} aria-expanded={issuesOpen} onClick={() => setIssuesOpen((o) => !o)} data-testid="issues-toggle">
+          <button className={`status-pill ${errors.length ? 'fault' : cautions.length ? 'warn' : 'ok'}`} aria-expanded={issuesOpen} onClick={() => (setIssuesOpen((o) => !o), setDiagOpen(false))} data-testid="issues-toggle">
             <Icon name={errors.length || cautions.length ? 'warn' : 'check'} size={16} />
-            {errors.length ? `${errors.length} ${errors.length === 1 ? 'fault' : 'faults'}` : cautions.length ? `${cautions.length} ${cautions.length === 1 ? 'caution' : 'cautions'}` : 'Ready to deploy'}
+            {errors.length ? `${errors.length} ${errors.length === 1 ? 'fault' : 'faults'}` : cautions.length ? `${cautions.length} ${cautions.length === 1 ? 'caution' : 'cautions'} · deployable` : 'Ready to deploy'}
           </button>
           {issuesOpen && (
             <ul className="issues pop" data-testid="issues" aria-label="Construction problems">
@@ -260,6 +262,12 @@ export function Construct({ active }: { active: boolean }) {
               ))}
             </ul>
           )}
+        </div>
+        <div className="issues-anchor">
+          <button className="chip-btn" aria-expanded={diagOpen} onClick={() => (setDiagOpen((o) => !o), setIssuesOpen(false))} data-testid="diagnostics-toggle" title="Mass, load, mobility, power, heat, ammunition and recoil from the design data">
+            <Icon name="gauge" size={16} /> Diagnostics
+          </button>
+          {diagOpen && <Diagnostics design={design} stats={stats} />}
         </div>
         <span className="grow" />
         <button className="tool" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (Ctrl+Z)" data-testid="undo">

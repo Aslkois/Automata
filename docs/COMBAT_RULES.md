@@ -7,6 +7,7 @@
 - Motors provide force limited by power (`force ≤ power / speed`), by the propulsion power supplied, by motor health and heat, and by traction (`μ·m·g` per side, scaled by gear health).
 - Tracked: left/right drive = throttle ± steer. A Coulomb skid resistance opposes turning, so the drone pivots only when the drive torque exceeds it.
 - Wheeled: the steering angle sets the target yaw rate (`v·tan δ / wheelbase`), so a wheeled drone cannot turn at standstill. Uneven gear damage makes it pull to one side.
+- Load: each section's running gear carries that section. Above its rated equipment load, traction falls, rolling resistance rises and the gear fatigues. A flyer whose thrusters cannot hold a section up drags it on the ground and has no thrust left from that section to drive with. Legs and thrusters spend power holding weight up. Walkers with no drive command brace on planted feet. Details and coefficients are in [CONSTRUCTION.md](CONSTRUCTION.md#load-ratings).
 - Rolling resistance, aerodynamic drag and lateral friction limited by grip act every tick. Recoil and impacts are impulses at their actual contact point. They produce linear and angular velocity, which friction then absorbs, so lighter drones are shoved further.
 
 ## Projectiles
@@ -24,6 +25,7 @@ For a hit on a section face at angle θ from the surface normal:
 
 ## Components & structure
 - Components have their own integrity. A destroyed component stops working: weapons stop firing, motors lose force, sensors lose contacts, generators stop supplying, shields drop. Below 50% integrity, turrets traverse at half speed, spread worsens and outputs fall.
+- Joints take damage from recoil above a mount rating and from collision shocks. In a shock, a joint must carry the mass beyond it through the hull's sudden change of velocity. Loads above 600 × the weaker section's structure points (kg·u/s) damage it, so heavy equipment far out on the hull loads its joint most. A Reinforced Coupling cuts joint damage by 35%.
 - A section at 0 structure is destroyed. All its components are destroyed and its joints fail.
 - When a joint fails, the drone splits into connected groups. The group with the working integrated CPU (normally the middle section) stays the drone. Every other group becomes **debris**: a separate rigid body that keeps the same motion, mass and collision shape, plus a small separation push and spin. Detached equipment loses power, control and ammunition feed. The drone's mass, centre of mass and inertia are recomputed.
 - **Debris is temporary.**

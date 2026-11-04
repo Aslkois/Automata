@@ -5,6 +5,8 @@ import type { SimContext } from '../sim/context';
 import { comWorld, functional, localToWorld } from '../sim/drone';
 import { DEG, wrapAngle, type Rng } from '../sim/math';
 import { weaponRange } from '../sim/ammo';
+import { ratedEquipment } from '../sim/load';
+import { mountRecoil } from '../sim/design';
 import type { AmmoType } from '../sim/content/components';
 import type { SectionPos } from '../sim/content/sections';
 import { activeBarrels, ammoReserve, effectiveCycle, requestReload, suppressRequests, weaponObstruction } from '../sim/systems';
@@ -92,6 +94,9 @@ export function weaponInfo(d: Drone, c: RComponent): Record<string, unknown> {
     fireMode: ws.fireMode,
     fireModes: (w.fireModes ?? ['sequence']).slice(),
     rpm: Math.round(60 / effectiveCycle(c)),
+    recoil: mountRecoil(c.def!, { component: c.def!.id, rotation: 0, fireMode: ws.fireMode }),
+    mountRating: d.sections[c.section].mountRating,
+    mountStress: ws.mountStress,
     guided: w.ammo.includes('missile'),
     designated: ws.designated,
     ready: ok && !ws.reloading && ws.mag > 0 && !ws.overheated && ws.cooldown <= 0 && (!w.charge || ws.charge >= 1),
@@ -252,6 +257,36 @@ export function createDroneApi(host: ApiHost): ObjVal {
       const l = d.components.find((c) => c.def?.lidar);
       return l?.scan && l.scan.time >= 0 ? host.sim.time - l.scan.time : null;
     }),
+
+    // ---------------------------------------------------------------- engineering
+    chassis: fn('chassis', () => {
+      const L = d.load;
+      const sectionLoad: Record<string, Value> = {};
+      for (const p of ['front', 'middle', 'rear'] as const) {
+        const sec = d.sections[p];
+        if (!sec.attached) continue;
+        let eq = 0;
+        for (const c of d.components) if (c.section === p && c.def && !c.def.integrated && c.kind !== 'gear') eq += c.def.mass;
+        sectionLoad[p] = eq / ratedEquipment(sec.def.id, d.chassis);
+      }
+      return makeObj({
+        type: d.chassis.id,
+        mass: Math.round(d.body.mass),
+        ratedMass: Math.round(L.rated),
+        load: L.utilization,
+        sectionLoad: makeObj(sectionLoad),
+        traction: L.traction,
+        rolling: L.rolling,
+        lift: L.lift,
+        supportPower: L.supportPower,
+      });
+    }),
+    stability: fn('stability', () => {
+      const fwd = { x: Math.cos(d.body.angle), y: Math.sin(d.body.angle) };
+      const lateral = -d.body.vel.x * fwd.y + d.body.vel.y * fwd.x;
+      return makeObj({ angularVelocity: d.body.angVel / DEG, lateralSpeed: lateral, shake: d.shake / DEG, braced: !!d.braced });
+    }),
+    joints: fn('joints', () => toValue(d.joints.map((j) => ({ between: `${j.a}-${j.b}`, intact: j.intact, integrity: j.intact ? j.hp / j.maxHp : 0 })))),
 
     // ---------------------------------------------------------------- fire
     fires: fn('fires', () => toValue((['front', 'middle', 'rear'] as const).filter((p) => d.sections[p].fire > 0).map((p) => ({ section: p, intensity: d.sections[p].fire, burning: host.sim.time - d.sections[p].fireSince })))),
@@ -559,6 +594,7 @@ export const API_NAMES = [
   'distance', 'obstacleDetected', 'rangeStatus', 'ranges', 'bumper', 'bumpers', 'lidar', 'lidarAge',
   'weapons', 'weapon', 'aim', 'aimAt', 'fire', 'ceaseFire', 'reload', 'setFireMode', 'selectAmmo', 'designate', 'ammoStock', 'missiles', 'canFire', 'inArc', 'aimError', 'lead',
   'fires', 'suppressFire', 'setAutoSuppression',
+  'chassis', 'stability', 'joints',
   'shields', 'raiseShield', 'shieldFace', 'shieldFaceToward',
   'power', 'setPower', 'maxHeat',
   'components', 'component', 'sections', 'count', 'status', 'failures',

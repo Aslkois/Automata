@@ -103,7 +103,7 @@ Limits: call depth 64; arrays and strings up to 10 000 elements or characters.
 
 | Call | Returns | Description |
 | --- | --- | --- |
-| `drone.weapons()` | `Weapon[]` | Own weapons: id, type, functional, ammo, magazine, reserve, ammoTypes, selectedAmmo, loaded, reserveByType, reloading, reloadProgress, charging, charge, spin, barrels, activeBarrels, fireMode, rpm, guided, ready, heat, aim, arcMin/arcMax, range, blocked. |
+| `drone.weapons()` | `Weapon[]` | Own weapons: id, type, functional, ammo, magazine, reserve, ammoTypes, selectedAmmo, loaded, reserveByType, reloading, reloadProgress, charging, charge, spin, barrels, activeBarrels, fireMode, rpm, recoil, mountRating, mountStress (last shot’s recoil / rating), guided, ready, heat, aim, arcMin/arcMax, range, blocked. |
 | `drone.weapon(id)` | `Weapon` | One weapon by id ("F.H1"), index or object. |
 | `drone.aim(id, angle)` |  | Command a turret to a world angle (degrees). Turrets are stabilised and traverse at their rate within their arc. |
 | `drone.aimAt(id, x, y)` |  | Command a turret toward a point. |
@@ -149,6 +149,9 @@ Limits: call depth 64; arrays and strings up to 10 000 elements or characters.
 | `drone.fires()` | `Fire[]` | Burning sections: section, intensity, burning (seconds). |
 | `drone.suppressFire(section)` |  | Fire a suppression charge at the "front", "middle" or "rear" section (needs a Fire Suppression System in it or next to it). |
 | `drone.setAutoSuppression(on = true)` |  | Let suppressors put fires out by themselves after 0.5 s (default), or only when the brain asks. |
+| `drone.chassis()` | `{type, mass, ratedMass, load, sectionLoad, traction, rolling, lift, supportPower}` | Load on the running gear: load = mass / rated mass (above 1 is overloaded), sectionLoad = equipment / rated per section, traction and rolling = multipliers the load causes, lift = share of the weight a flyer’s thrusters carry, supportPower = PU/s spent holding the weight up. |
+| `drone.stability()` | `{angularVelocity, lateralSpeed, shake, braced}` | How settled the hull is: rotation (deg/s), sideways sliding (u/s), recoil shake (degrees of aim disturbance) and, for walkers, whether the feet are planted (no drive command). Wait for small values before a precision shot. |
+| `drone.joints()` | `Joint[]` | Structural joints: between ("front-middle", "middle-rear"), intact, integrity (0..1). Recoil beyond a mount rating and hard collisions wear them. |
 | `drone.failures()` | `Failure[]` | Hardware failure events since the previous decision tick. |
 
 ### Timers
@@ -166,23 +169,6 @@ Limits: call depth 64; arrays and strings up to 10 000 elements or characters.
 | `clamp(x, lo, hi)` | `number` | Clamp a number. |
 | `rad(deg)` | `number` | Degrees to radians. |
 | `deg(rad)` | `number` | Radians to degrees. |
-
-## Navigation without a map
-
-A brain knows the arena's size and, in training courses, the goal point. It does not know where the walls are: it has to measure them.
-
-```js
-// follow the wall on the left (solves any maze without loops)
-function update() {
-  if (drone.bumper("front")) return drone.drive(-0.6, 0);
-  if (drone.obstacleDetected("front", 140)) return drone.drive(0.25, 1);  // turn right
-  const left = openDistance("left");
-  if (left > 260) drone.drive(0.4, -1);                                  // wall ended: go round
-  else drone.drive(0.7, clamp((90 - left) / 120, -0.5, 0.5));            // keep ~90 u from it
-}
-```
-
-The Pathfinder example develops this into a complete state machine, with speed control for its wheels and a LIDAR check before it heads straight for a goal.
 
 ## Blocks, nodes and code
 

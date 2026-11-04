@@ -22,6 +22,8 @@ export interface RigidBody {
 }
 
 export interface WeaponState {
+  /** recoil of the last firing event as a fraction of the mount rating (>1 stresses mount and joints) */
+  mountStress: number;
   /** current turret angle, local radians */
   aim: number;
   /** commanded world angle (radians), or null to hold */
@@ -270,6 +272,8 @@ export interface Drone {
   ratedMass: number;
   /** load response this tick (traction, rolling, lift, support power) */
   load: LoadState;
+  /** walking: standing still on planted feet this tick */
+  braced?: boolean;
 }
 
 export interface Debris {

@@ -11,7 +11,7 @@ import { Rng } from './math';
 import { boxPoly, integrate, resolveContact, satCollide, sectionPoly, stepDebrisFriction, stepGroundForces } from './physics';
 import { readRanges, scanLidars } from './sensors';
 import { debrisSolid, droneSolid, stepDebris } from './debris';
-import { droneLoad, stepLoadFatigue } from './load';
+import { droneLoad, jointShock, stepLoadFatigue } from './load';
 import { stepFires, stepHeat, stepPower, stepShields, stepWeapons } from './systems';
 import type { Arena, BumperSide, Debris, Drone, Projectile, SimEvent } from './types';
 
@@ -222,6 +222,8 @@ export class Simulation implements SimContext {
             const imp = resolveContact(A.body, B.body, mf);
             this.bump(A.drone, mf.n.x, mf.n.y, imp);
             this.bump(B.drone, -mf.n.x, -mf.n.y, imp);
+            if (A.drone) jointShock(this, A.drone, imp);
+            if (B.drone) jointShock(this, B.drone, imp);
             if (imp > 400) this.emit({ t: this.time, type: 'collision', a: A.id, b: B.id, x: mf.point.x, y: mf.point.y, impulse: imp });
           }
       }
@@ -237,6 +239,7 @@ export class Simulation implements SimContext {
           if (mf) {
             const imp = resolveContact(A.body, null, mf, 0.1, 0.5);
             this.bump(A.drone, mf.n.x, mf.n.y, imp);
+            if (A.drone) jointShock(this, A.drone, imp);
             if (imp > 2500) this.emit({ t: this.time, type: 'collision', a: A.id, b: -1, x: mf.point.x, y: mf.point.y, impulse: imp });
           }
         }

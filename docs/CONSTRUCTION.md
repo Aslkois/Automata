@@ -6,7 +6,7 @@ All values come from `src/sim/content/*`. 1 world unit (u) = 0.1 m.
 
 A drone is laid out along its forward axis as **rear | middle | front**. Sections connect through two damageable joints (front–middle and middle–rear).
 
-| Class | Size (L×W) | Height | Frame mass | Structure | Max armor | Equipment limit | Mount rating | Internal bays |
+| Class | Size (L×W) | Height | Frame mass | Structure | Max armor | Rated equipment load (wheeled) | Mount rating | Internal bays |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Light | 16×22 | 1 | 250 kg | 130 | 15 mm | 700 kg | 9 000 | 2×S |
 | Medium | 20×26 | 2 | 450 kg | 230 | 35 mm | 1300 kg | 30 000 | 2×S, 1×M |
@@ -15,23 +15,56 @@ A drone is laid out along its forward axis as **rear | middle | front**. Section
 - Armor costs `0.16 kg × perimeter × mm`. It protects every face of the section.
 - **Height** decides line of fire: a weapon cannot fire across one of its own sections that is *taller* than the section the weapon sits on. Light-section guns cannot shoot over a heavy middle. Heavy-section guns can fire over everything.
 - A slot accepts components of its own size or smaller, of the matching type (hardpoint or internal).
-- **Mount rating**: the recoil impulse per firing event that a section's mounts absorb. Recoil above it damages that section's joints on every shot (see [WEAPONS.md](WEAPONS.md#recoil-and-mounts)).
+- **Mount rating**: the recoil impulse per firing event that a section's mounts absorb. Recoil above it damages the section's joints and wears the mount itself (2% of the part's integrity × the excess fraction per shot). See [WEAPONS.md](WEAPONS.md#recoil-and-mounts).
 
 ### Hardpoint layouts
 
-Each section chooses one of three hardpoint layouts. Internal bays are the same in every layout.
+Each section independently chooses one of three hardpoint layouts (design schema 4). Internal bays are the same in every layout. Smaller equipment fits larger mounts; each part occupies one mount.
 
-| Class | Maximum | Medium (standard) | Minimum |
+| Class | Maximum | Medium | Minimum |
 | --- | --- | --- | --- |
-| Light | 1 M + 1 S · +60 kg | 2 S | 1 S · −25 kg |
-| Medium | 1 L + 1 S · +90 kg | 3 M | 1 M + 1 S · −40 kg |
-| Heavy | 2 L + 1 M · +140 kg | 2 L + 1 S | 1 L + 1 M · −60 kg |
+| Light | 1 M + 1 S · +60 kg | 2 S | 3 S · +15 kg |
+| Medium | 1 L + 1 S · +90 kg | 3 M | 4 S · +20 kg |
+| Heavy | 2 L + 1 M · +140 kg | 1 L + 2 M · +40 kg | 3 M · +10 kg |
 
-- **Maximum** mounts larger equipment on a heavier frame. Its equipment sits higher and is 15% more exposed to hits, and the mounts are rated 30% higher.
-- **Minimum** saves weight and sits lower: equipment is 15% less exposed.
-- Every mount's footprint stays inside the hull and never overlaps another mount (tested for all nine layouts).
-- Every design made before layouts existed uses **Medium**, which is exactly the old arrangement.
-- **Changing class or layout** keeps each part in its slot when it still fits, otherwise moves it to the nearest free compatible slot. If some parts fit nowhere, Construct lists them and asks before taking them off. Undo restores the previous version.
+- **Maximum** mounts the largest equipment on reinforced mounts. They are rated 30% higher for recoil, and their equipment is 15% more exposed to hits.
+- **Minimum** carries more, smaller mounts that sit lower (less exposed) but are rated 10–15% lower for recoil. Minimum is not weaker: three Dual Autocannons on a heavy Minimum section is a valid build.
+- Every mount has a real position. Footprints stay inside the hull and never overlap; tests check all nine layouts.
+- **Earlier designs** keep their mount ids, parts and rotations:
+  - designs from before layouts existed: light → Medium, medium → Medium, heavy → **Maximum**;
+  - designs saved with the previous layout table: heavy Medium → Maximum, heavy Minimum → Medium, medium Minimum → Medium; the others are unchanged.
+
+  Every target layout has the same mount ids at the same or larger size, so nothing is removed. A part that somehow did not fit would stay in the design, flagged, until you move it.
+- **Changing class or layout** in Construct keeps each part in its slot when it still fits, otherwise moves it to the nearest free compatible slot. Parts that fit nowhere are listed and you are asked first. Undo restores the previous version.
+
+## Load ratings
+
+Each section's rated equipment load is its class rating × the chassis load rating:
+
+| Section | Walking ×1.6 | Tracked ×1.25 | Wheeled ×1.0 | Flying ×0.55 |
+| --- | --- | --- | --- | --- |
+| Light | 1120 kg | 875 kg | 700 kg | 385 kg |
+| Medium | 2080 kg | 1625 kg | 1300 kg | 715 kg |
+| Heavy | 4800 kg | 3750 kg | 3000 kg | 1650 kg |
+
+These are **ratings, not limits**. Any design whose parts physically fit can be built and deployed. The drone's mass always includes frames, armor, running gear, integrated systems, mounts and equipment.
+
+Above the rating, physics takes over, section by section. Each section's running gear or thrusters carry that section, and overload o = equipment / rating − 1:
+
+- **Traction** falls to 1 / (1 + k·o): wheels k = 0.45, tracks 0.2, legs 0.12.
+- **Rolling resistance** rises to (1 + s·o) as the gear sinks: wheels s = 0.5, tracks 0.35, legs 0.2.
+- **Running gear fatigues** while it carries the overload: fatigue·o²·(0.3 + speed/100) of its integrity per second. Standing still wears it slowly; driving wears it faster.
+- **Flyers.**
+  - Each section's thrusters lift at most 1.15 × its rated mass, less when damaged or short of power.
+  - Weight beyond that rests on the ground and drags, with a coefficient of 0.6.
+  - The same thrusters drive the drone. A section drives with only √(1 − (mass / lift capacity)²) of its thrust, and with none when it cannot hold itself up.
+- **Holding weight up costs power**: legs 1.5 PU/s and thrusters 3 PU/s per tonne carried, counted as propulsion demand.
+- **Walkers brace**: with no drive command their feet are planted. Static friction, not rolling, resists recoil and impacts, and the legs resist being twisted.
+
+Everything else follows from force and mass:
+- acceleration, braking and turning slow as mass and rotational inertia grow;
+- equipment far from the centre of mass shifts it and adds inertia;
+- recoil turns and shoves the hull by impulse ÷ mass and by arm × impulse ÷ inertia.
 
 ## Chassis
 
@@ -105,29 +138,44 @@ These settings are saved with the design.
 
 ## Validation
 
-**Errors** (block deployment):
+**Errors** (block deployment) are only for things that cannot physically be built or read:
 - a component in the wrong slot type or size, or in a slot the layout does not have;
 - overlapping mounts;
 - armor above the class maximum;
-- equipment over the frame limit;
-- a drone too heavy for its propulsion to move.
+- unknown components or layouts.
 
-**Warnings**:
-- always-on demand above generation, or peak demand above what generation and the buffers supply;
-- coilgun charging demand that the power supply cannot meet;
-- very low acceleration;
+**Engineering warnings** never block deployment:
+- a section above its rated equipment load;
+- thrust that cannot lift the drone;
+- drive too weak to overcome rolling resistance, or very low acceleration;
+- always-on or peak power demand above supply;
+- coilgun charging the power supply cannot meet;
 - firing arcs fully or partly obstructed;
 - a weapon with no storage for its ammunition family (the message names the store it needs);
-- a Reinforced Coupling in the middle section that has no joint chosen;
+- a Reinforced Coupling in the middle section with no joint chosen;
 - recoil above the section's mount rating.
 
 **Information**:
+- overload effects on traction, thrust and wear;
+- weapon heat that cooling cannot offset;
 - a weapon that would overheat within 12 s of continuous fire where it is mounted;
-- a rocket pod with no interceptors (it cannot shoot down missiles);
+- ammunition for less than 20 s of continuous fire;
+- a rocket pod with no interceptors;
 - fewer reserve missiles than one launcher reload;
-- an autoloader with no weapon to serve, or a second autoloader in one section;
+- an idle or extra autoloader;
 - no weapons yet.
 
-Drive motors and control units used to be equipment. Designs saved before schema 2 are migrated by removing them, because every chassis now integrates both. In schema 3, the AA Autocannon became the **Autocannon** (`aa_gun` → `autocannon` on load), and every section without a layout receives the Medium layout.
+**Diagnostics** in the Construct header show the figures behind these messages, computed with the same model the simulation uses:
+- total, rated and per-section load;
+- centre of mass and inertia;
+- acceleration, top speed, pivot or turn rate, traction, rolling, lift and support power;
+- power;
+- heat per section and per weapon;
+- ammunition endurance;
+- recoil, mount rating, and Δv and Δω per shot.
 
-Unusual designs are allowed as long as they physically work. The game has no fixed classes and assigns no labels to designs.
+Estimates say what they assume: flat ground, undamaged, fully powered, continuous fire.
+
+Drive motors and control units used to be equipment. Designs saved before schema 2 are migrated by removing them, because every chassis now integrates both. In schema 3 the AA Autocannon became the **Autocannon** (`aa_gun` → `autocannon` on load). Schema 4 is the current layout table.
+
+Unusual designs are allowed as long as they physically fit. The game has no fixed classes and assigns no labels to designs.

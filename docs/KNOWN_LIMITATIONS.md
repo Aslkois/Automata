@@ -15,7 +15,13 @@
 - **Formatting and comment placement.** Code keeps your own text while the program's meaning is unchanged. After an edit in Blocks or Nodes, code is regenerated: indentation and quote style are normalised, and a comment placed inside an expression moves to just before its statement. Code modules keep their text verbatim.
 - **Shared values in Nodes.** If one value node feeds several inputs, it is evaluated at each use. After a round trip through another view, such a node appears as one copy per use.
 - **Unattached pieces.** Loose blocks and unconnected nodes are kept in the view where you left them; they don't run and don't appear in the other views.
-- **Flying chassis** is simulated on the same ground plane: it skims low, so it is still blocked by walls and terrain.
+- **Flying chassis** is simulated on the same ground plane: it skims low, so it is still blocked by walls and terrain. Insufficient lift is modelled as weight dragging on the ground and lost drive thrust, not as altitude or pitch.
+- **Engineering model.**
+  - Load effects (traction, rolling, fatigue) use per-section equipment against rating, not a full structural analysis.
+  - Mounts are stressed by recoil only; acceleration and impact loads on mounts are not modelled.
+  - Joints are stressed by recoil above a mount rating and by collision shocks, not by steady driving loads or blast impulses.
+  - Fatigue does not recover.
+  - The coefficients are documented in CONSTRUCTION.md. They were chosen to be plausible, not measured from real machines.
 - **Saved-data migration.** A schema-1 program is assigned to a design only when the association is clear: the example pairing, or one best name match. Everything else goes to Recovered programs. Migrated block procedures with parameters use ordinary function parameters, where the old compiler bound them as globals.
 - **Debugging** has no breakpoints. It uses the per-decision trace, history scrubbing, errors with locations, `drone.log`, and single-tick or single-decision stepping.
 - **Replay and timeline scrubbing** are not implemented. Restart re-simulates from the recorded configuration.

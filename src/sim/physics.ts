@@ -70,12 +70,17 @@ export function stepGroundForces(d: Drone, dt: number, active: boolean): number 
   const motor = motorOutput(d);
   const throttle = active ? d.throttle : 0;
   const steer = active ? d.steer : 0;
-  const fMax = motor.force * sat;
-  const pMax = motor.power * sat;
-  // load response: traction, rolling resistance and (flying) ground drag follow the load
+  // load response: traction, rolling resistance and (flying) ground drag follow the load;
+  // a flyer's thrusters also hold its weight up, which leaves less thrust to drive with
   const L = d.load;
+  const fMax = motor.force * sat * L.drive;
+  const pMax = motor.power * sat * L.drive;
   const muLong = ch.muLong * L.traction;
   const muLat = ch.muLat * L.traction;
+  // a walker that is not being driven stands on planted feet: static friction, not rolling,
+  // resists being pushed, and its legs resist being twisted (recoil, impacts)
+  const braced = ch.id === 'walking' && active && Math.abs(throttle) < 0.05 && Math.abs(steer) < 0.05;
+  d.braced = braced;
   let used = 0;
 
   let width = 0;
@@ -113,7 +118,7 @@ export function stepGroundForces(d: Drone, dt: number, active: boolean): number 
     const driveTorque = (fl - fr) * halfTrack;
     used = fMax > 0 ? (Math.abs(fl) + Math.abs(fr)) / Math.max(1, fMax) : 0;
     // Coulomb skid resistance opposes rotation, scaled by remaining traction.
-    const skidMax = ch.skidResistance * L.rolling * mg * (length / 4) * Math.max(0.2, avgTrac) + L.groundDrag * mg * (length / 4);
+    const skidMax = (braced ? muLat : ch.skidResistance * L.rolling) * mg * (length / 4) * Math.max(0.2, avgTrac) + L.groundDrag * mg * (length / 4);
     if (Math.abs(b.angVel) < 1e-3) {
       torque = Math.abs(driveTorque) <= skidMax ? 0 : driveTorque - Math.sign(driveTorque) * skidMax;
       if (torque === 0) b.angVel = 0;
@@ -138,7 +143,7 @@ export function stepGroundForces(d: Drone, dt: number, active: boolean): number 
   }
 
   // Rolling resistance and aerodynamic drag act along the forward axis.
-  const roll = (ch.rollingResistance * L.rolling + L.groundDrag) * mg;
+  const roll = ((braced ? muLong * avgTrac : ch.rollingResistance * L.rolling) + L.groundDrag) * mg;
   const rollF = -Math.sign(vF) * Math.min(roll, (Math.abs(vF) * m) / dt);
   const dragF = -DRAG_K * vF * Math.abs(vF);
   let totalFwd = fwdForce + rollF + dragF;

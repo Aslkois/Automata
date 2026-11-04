@@ -115,4 +115,18 @@ Every shot adds the weapon's heat. Above 100 the weapon locks out until it cools
 
 Recoil is an impulse at the firing barrel. It pushes and turns the hull, and adds aim disturbance that decays over ~0.2 s; a Gyroscopic Stabilizer reduces it by 25%.
 
-Each section's mounts carry a recoil rating: light 9 000, medium 30 000, heavy 75 000, and 30% more on a Maximum layout. Recoil beyond the rating damages that section's joints on every shot, by 6 × the excess fraction. A Reinforced Coupling cuts that joint damage by 35%.
+Each section's mounts carry a recoil rating:
+- light 9 000, medium 30 000, heavy 75 000;
+- 30% more on a Maximum layout, 10–15% less on Minimum.
+
+Recoil beyond the rating has two costs on every shot:
+- it damages the section's joints by 6 × the excess fraction;
+- it wears the mount itself by 2% of the part's integrity × the excess fraction. A weapon below half integrity traverses at half speed and its spread widens.
+
+A Reinforced Coupling cuts the joint damage by 35%.
+
+How much a shot moves the drone depends on the whole machine, as Diagnostics shows per weapon:
+- velocity change = impulse ÷ mass;
+- spin = arm × impulse ÷ inertia.
+
+A braced walker or a tracked hull barely moves. A light flyer is shoved and turned by the same gun.
