@@ -46,6 +46,7 @@ export function projectileFor(w: WeaponStats, type: AmmoType): ProjectileStats {
     ricochetDeg: w.ricochetDeg,
     interceptable: w.interceptable,
     canIntercept: w.canIntercept,
+    integrity: w.integrity,
   };
   return { ...base, ...(w.projectiles?.[type] ?? {}) } as ProjectileStats;
 }

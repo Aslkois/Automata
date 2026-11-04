@@ -181,6 +181,15 @@ function inSeeker(sim: SimContext, p: Projectile, pt: Vec2): boolean {
   return lineOfSight(sim, p.pos, pt);
 }
 
+/** A seeker's measurement of a point: true range, bearing with the seeker's angular error. */
+function measured(sim: SimContext, p: Projectile, pt: Vec2): Vec2 {
+  const dx = pt.x - p.pos.x;
+  const dy = pt.y - p.pos.y;
+  const r = Math.hypot(dx, dy);
+  const a = Math.atan2(dy, dx) + sim.rng.gauss() * p.guidance!.noiseDeg * DEG;
+  return { x: p.pos.x + Math.cos(a) * r, y: p.pos.y + Math.sin(a) * r };
+}
+
 /**
  * Steering. Missiles (targets: drones) take their track from the launching drone's sensor
  * contacts (uplink) and from their own seeker; interceptors (targets: projectiles) use their
@@ -211,7 +220,10 @@ function guide(sim: SimContext, p: Projectile, dt: number): void {
     }
     if (tgt) {
       const c = comWorld(tgt.body);
-      if (inSeeker(sim, p, c)) p.track = { x: c.x, y: c.y, vx: tgt.body.vel.x, vy: tgt.body.vel.y, time: sim.time, source: 'seeker' };
+      if (inSeeker(sim, p, c)) {
+        const m = measured(sim, p, c);
+        p.track = { x: m.x, y: m.y, vx: tgt.body.vel.x, vy: tgt.body.vel.y, time: sim.time, source: 'seeker' };
+      }
       else if (g.uplink) {
         // uplink: the launcher's latest legitimate observation of the target
         const owner = sim.drones.find((d) => d.id === p.owner);
@@ -233,7 +245,8 @@ function guide(sim: SimContext, p: Projectile, dt: number): void {
     }
     if (best) {
       p.target = best.id;
-      p.track = { x: best.pos.x, y: best.pos.y, vx: best.vel.x, vy: best.vel.y, time: sim.time, source: 'seeker' };
+      const m = measured(sim, p, best.pos);
+      p.track = { x: m.x, y: m.y, vx: best.vel.x, vy: best.vel.y, time: sim.time, source: 'seeker' };
     }
   }
   const tr = p.track;
@@ -311,9 +324,20 @@ function resolveHit(sim: SimContext, p: Projectile, hit: Hit, at: Vec2): void {
       return;
     case 'intercept': {
       const q = hit.target!;
-      q.alive = false;
+      // an interceptor rocket's warhead goes off on contact; its fragments still have to kill
+      if (p.explosive && p.kind === 'interceptor') {
+        detonate(sim, p, at, 'interceptor');
+        return;
+      }
       p.alive = false;
-      sim.emit({ t: sim.time, type: 'intercept', x: at.x, y: at.y, by: p.owner, what: q.kind });
+      // a hit has to break the round up: missiles and shells take several
+      q.integrity = (q.integrity ?? 0) - energy;
+      if (q.integrity > 0) {
+        sim.emit({ t: sim.time, type: 'intercept', x: at.x, y: at.y, by: p.owner, what: q.kind, kill: false });
+        return;
+      }
+      q.alive = false;
+      sim.emit({ t: sim.time, type: 'intercept', x: at.x, y: at.y, by: p.owner, what: q.kind, kill: true });
       // a shot-down warhead breaks up with a fraction of its yield
       if (q.explosive) detonate(sim, q, at, 'intercepted');
       if (p.explosive && p.kind === 'interceptor') detonate(sim, p, at, 'interceptor');
@@ -383,9 +407,13 @@ export function explode(sim: SimContext, at: Vec2, ex: ExplosiveStats, owner: nu
   if (killsProjectiles) {
     for (const q of sim.projectiles) {
       if (!q.alive || !q.interceptable || q.team === team) continue;
-      if (Math.hypot(q.pos.x - at.x, q.pos.y - at.y) <= R + q.radius) {
+      const dq = Math.hypot(q.pos.x - at.x, q.pos.y - at.y);
+      if (dq > R + q.radius) continue;
+      // fragments must actually strike it: the kill chance falls off from the burst point
+      const pk = 0.8 * (1 - (dq / (R + q.radius)) ** 2);
+      if (sim.rng.next() < pk) {
         q.alive = false;
-        sim.emit({ t: sim.time, type: 'intercept', x: q.pos.x, y: q.pos.y, by: owner, what: q.kind });
+        sim.emit({ t: sim.time, type: 'intercept', x: q.pos.x, y: q.pos.y, by: owner, what: q.kind, kill: true });
         if (q.explosive && !(q as { _boom?: boolean })._boom) {
           (q as { _boom?: boolean })._boom = true;
           explode(sim, q.pos, { radius: q.explosive.radius * 0.6, damage: q.explosive.damage * 0.35, fragPen: q.explosive.fragPen * 0.5 }, q.owner, q.team, 'intercepted', false);
@@ -629,6 +657,7 @@ export function spawnProjectile(sim: SimContext, d: Drone, c: RComponent, worldA
     ricochetDeg: ps.ricochetDeg,
     interceptable: ps.interceptable,
     canIntercept: ps.canIntercept,
+    integrity: ps.integrity,
     fixedYield: !!ps.fixedYield,
     explosive: ps.explosive,
     rocket: ps.rocket,

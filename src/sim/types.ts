@@ -298,6 +298,8 @@ export interface Projectile {
   ricochetDeg: number;
   interceptable: boolean;
   canIntercept: boolean;
+  /** remaining point-defense damage it can take (interceptable rounds; undefined = one hit) */
+  integrity?: number;
   fixedYield: boolean;
   explosive?: ProjectileStats['explosive'];
   rocket?: ProjectileStats['rocket'];
@@ -371,7 +373,7 @@ export type SimEvent =
   | { t: number; type: 'section-destroyed'; drone: number; section: SectionPos; x: number; y: number }
   | { t: number; type: 'detached'; drone: number; sections: SectionPos[]; debris: number; x: number; y: number }
   | { t: number; type: 'shield-overload'; drone: number; component: string; x: number; y: number }
-  | { t: number; type: 'intercept'; x: number; y: number; by: number; what: Projectile['kind'] }
+  | { t: number; type: 'intercept'; x: number; y: number; by: number; what: Projectile['kind']; kill: boolean }
   | { t: number; type: 'cookoff'; drone: number; component: string; x: number; y: number; energy: number }
   | { t: number; type: 'collision'; a: number; b: number; x: number; y: number; impulse: number }
   | { t: number; type: 'status'; drone: number; label: string }

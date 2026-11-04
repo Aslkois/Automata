@@ -409,7 +409,8 @@ function fireEvent(sim: SimContext, d: Drone, c: RComponent, ws: WeaponState, di
     applyImpulse(d.body, { x: -dx * w.recoilImpulse, y: -dy * w.recoilImpulse }, muzzle);
     totalRecoil += w.recoilImpulse;
     sim.emit({
-      t: sim.time,
+      // the event's true time inside the tick (sub-tick scheduling)
+      t: sim.time + spawnLag,
       type: 'shot',
       drone: d.id,
       mount: c.id,
