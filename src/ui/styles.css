@@ -1642,7 +1642,7 @@ input[type='range'] {
   position: absolute;
   z-index: 20;
   top: calc(100% + 8px);
-  left: 0;
+  right: 0;
   width: min(460px, calc(100vw - 32px));
   max-height: min(70vh, 640px);
   overflow: auto;
@@ -1682,6 +1682,8 @@ input[type='range'] {
   gap: 8px;
   align-items: center;
   font-size: 12px;
+}
+.dg-meter > span:first-child {
   text-transform: capitalize;
 }
 .dg-note {

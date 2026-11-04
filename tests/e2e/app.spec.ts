@@ -180,21 +180,27 @@ test('deployment is blocked by a brain that does nothing, and explains why', asy
 test('construct: hardpoint layouts relocate parts, ask before removing any, and undo restores', async ({ page }) => {
   await go(page, 'Construct');
   await page.getByTestId('section-front').click();
-  // Assault Platform front: two heavy cannons on a heavy section; Minimum has one large mount
-  await page.getByTestId('layout-pick-front').getByTestId('layout-min').click();
+  // Assault Platform front: two heavy cannons on a heavy Maximum section; Medium has one large mount
+  await expect(page.getByTestId('layout-pick-front').getByTestId('layout-max')).toHaveAttribute('aria-checked', 'true');
+  await page.getByTestId('layout-pick-front').getByTestId('layout-medium').click();
   const confirm = page.getByTestId('layout-confirm');
   await expect(confirm).toContainText('Heavy Cannon');
   await confirm.getByRole('button', { name: 'Keep current' }).click();
-  await expect(page.getByTestId('layout-pick-front').getByTestId('layout-medium')).toHaveAttribute('aria-checked', 'true');
-  await page.getByTestId('layout-pick-front').getByTestId('layout-min').click();
+  await expect(page.getByTestId('layout-pick-front').getByTestId('layout-max')).toHaveAttribute('aria-checked', 'true');
+  await page.getByTestId('layout-pick-front').getByTestId('layout-medium').click();
   await page.getByTestId('layout-confirm').getByRole('button', { name: /Change and remove/ }).click();
-  await expect(page.getByTestId('layout-pick-front').getByTestId('layout-min')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('layout-pick-front').getByTestId('layout-medium')).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByTestId('slot-F.H1')).toHaveAttribute('aria-label', /Heavy Cannon/);
   // undo brings the second cannon back
   await page.getByTestId('undo').click();
   await expect(page.getByTestId('notice')).toContainText('front section');
-  await expect(page.getByTestId('layout-pick-front').getByTestId('layout-medium')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('layout-pick-front').getByTestId('layout-max')).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByTestId('slot-F.H2')).toHaveAttribute('aria-label', /Heavy Cannon/);
+  // engineering diagnostics come from the design data
+  await page.getByTestId('diagnostics-toggle').click();
+  await expect(page.getByTestId('diagnostics')).toContainText('Rated mass on this chassis');
+  await expect(page.getByTestId('diagnostics')).toContainText('Recoil and mounts');
+  await page.getByTestId('diagnostics-toggle').click();
   // a mount setting: the rocket cassette's interceptor split on an empty bay
   await page.getByTestId('slot-F.H3').click();
   await page.getByTestId('move-part').click();
@@ -202,9 +208,15 @@ test('construct: hardpoint layouts relocate parts, ask before removing any, and 
   await page.getByRole('radio', { name: 'Internal bays' }).click();
   await page.getByRole('radio', { name: 'Hardpoints' }).click();
   await page.getByTestId('slot-M.H3').click();
-  // M.H3 holds the radar, which does not fit the small F.H3 mount: refused with a reason
-  await expect(page.getByTestId('notice')).toContainText('would not fit back');
-  await expect(page.getByTestId('slot-F.H3')).toHaveAttribute('aria-label', /Optical Camera/);
+  // M.H3 holds the radar; the heavy Maximum F.H3 mount is medium-size, so the two swap
+  await expect(page.getByTestId('notice')).toContainText('Swapped');
+  await expect(page.getByTestId('slot-F.H3')).toHaveAttribute('aria-label', /Search Radar/);
+  await expect(page.getByTestId('slot-M.H3')).toHaveAttribute('aria-label', /Optical Camera/);
+  // and a part that cannot fit back is refused with a reason: the heavy cannon onto a medium mount
+  await page.getByTestId('slot-F.H1').click();
+  await page.getByTestId('move-part').click();
+  await page.getByTestId('slot-M.H1').click();
+  await expect(page.getByTestId('notice')).toContainText('does not fit');
 });
 
 test('simulate: a training course deploys with its targets, objective and goal', async ({ page }) => {
