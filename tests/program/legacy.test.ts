@@ -1,16 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { AA_PROGRAM, ASSAULT_PROGRAM, BRAWLER_PROGRAM } from '../../src/data/defaults';
-import { compileBlocks, compileNodes, compileProgram } from '../../src/program/compile';
-import { BLOCK_DEFS } from '../../src/program/blockDefs';
-import { NODE_DEFS } from '../../src/program/nodeDefs';
+import { LEGACY_DEFAULT_PROGRAMS } from '../../src/data/defaults';
+import { compileBlocks } from '../../src/program/legacy/blocks';
+import { compileNodes } from '../../src/program/legacy/nodes';
+import { BLOCK_DEFS } from '../../src/program/legacy/blockDefs';
+import { NODE_DEFS } from '../../src/program/legacy/nodeDefs';
+import { legacyToCode } from '../../src/program/legacy/migrate';
 import { parseProgram } from '../../src/program/interpreter';
+import { parseBrain } from '../../src/program/brain/parse';
 
-describe('program compilers', () => {
-  it('compiles the example programs of all three kinds', () => {
-    for (const p of [ASSAULT_PROGRAM, AA_PROGRAM, BRAWLER_PROGRAM]) {
-      const r = compileProgram(p);
+// The schema-1 compilers survive only to migrate stored programs into brains.
+describe('legacy program compilers (migration)', () => {
+  it('converts the schema-1 example programs of all three kinds into valid brains', () => {
+    for (const p of LEGACY_DEFAULT_PROGRAMS) {
+      const r = legacyToCode(p);
       expect(r.errors, p.name).toEqual([]);
-      expect(parseProgram(r.js).diagnostics, p.name).toEqual([]);
+      expect(r.code).not.toMatch(/__at\(/);
+      expect(parseBrain(r.code).diagnostics, p.name).toEqual([]);
     }
   });
 

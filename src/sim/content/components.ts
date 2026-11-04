@@ -117,6 +117,8 @@ export interface ComponentDef {
   /** For hardpoint components: chance (0..1) that a projectile crossing the component footprint strikes it instead of hull. */
   profile: number;
   description: string;
+  /** part of the chassis (built automatically, never installed by the player) */
+  integrated?: boolean;
   weapon?: WeaponStats;
   sensor?: SensorStats;
   shield?: ShieldStats;
@@ -310,6 +312,67 @@ export const COMPONENTS: ComponentDef[] = [
     description: 'Stores 180 PU·s; discharges up to 300 PU/s for burst demand.',
     power: { storage: 180, maxDischarge: 300 },
   },
+  // ---------------- Thermal ----------------
+  {
+    id: 'cooler',
+    name: 'Cooling Unit',
+    kind: 'cooler',
+    slot: 'internal',
+    size: 'S',
+    mass: 80,
+    hp: 30,
+    armor: 0,
+    profile: 0,
+    description: 'Removes 7 heat/s from each component in its section (half in adjacent sections).',
+    cooler: { cooling: 7, power: 4 },
+  },
+  // ---------------- Ammunition ----------------
+  {
+    id: 'ammo_small',
+    name: 'Small-Calibre Magazine',
+    kind: 'ammo',
+    slot: 'internal',
+    size: 'S',
+    mass: 110,
+    hp: 30,
+    armor: 0,
+    profile: 0,
+    description: '1500 small-calibre rounds (MG, point defense).',
+    ammo: { caliber: 'small', rounds: 1500, cookOffPerRound: 0.02 },
+  },
+  {
+    id: 'ammo_medium',
+    name: 'Medium-Calibre Magazine',
+    kind: 'ammo',
+    slot: 'internal',
+    size: 'S',
+    mass: 140,
+    hp: 30,
+    armor: 0,
+    profile: 0,
+    description: '400 medium-calibre rounds (AA autocannon, rotary cannon).',
+    ammo: { caliber: 'medium', rounds: 400, cookOffPerRound: 0.12 },
+  },
+  {
+    id: 'shell_rack',
+    name: 'Shell Rack',
+    kind: 'ammo',
+    slot: 'internal',
+    size: 'M',
+    mass: 260,
+    hp: 45,
+    armor: 0,
+    profile: 0,
+    description: '20 large-calibre shells. Destruction causes a cook-off inside the section.',
+    ammo: { caliber: 'large', rounds: 20, cookOffPerRound: 9 },
+  },
+];
+
+/**
+ * Drive motors and control units are now integrated into every chassis (see integrated.ts).
+ * Their definitions remain only so older designs can be read; migration removes them.
+ */
+export const RETIRED_COMPONENTS: ComponentDef[] = [
   // ---------------- Propulsion ----------------
   {
     id: 'motor_s',
@@ -377,61 +440,8 @@ export const COMPONENTS: ComponentDef[] = [
     description: 'Runs the drone program. 12000 operations per decision tick.',
     controller: { opsBudget: 12000, power: 6 },
   },
-  // ---------------- Thermal ----------------
-  {
-    id: 'cooler',
-    name: 'Cooling Unit',
-    kind: 'cooler',
-    slot: 'internal',
-    size: 'S',
-    mass: 80,
-    hp: 30,
-    armor: 0,
-    profile: 0,
-    description: 'Removes 7 heat/s from each component in its section (half in adjacent sections).',
-    cooler: { cooling: 7, power: 4 },
-  },
-  // ---------------- Ammunition ----------------
-  {
-    id: 'ammo_small',
-    name: 'Small-Calibre Magazine',
-    kind: 'ammo',
-    slot: 'internal',
-    size: 'S',
-    mass: 110,
-    hp: 30,
-    armor: 0,
-    profile: 0,
-    description: '1500 small-calibre rounds (MG, point defense).',
-    ammo: { caliber: 'small', rounds: 1500, cookOffPerRound: 0.02 },
-  },
-  {
-    id: 'ammo_medium',
-    name: 'Medium-Calibre Magazine',
-    kind: 'ammo',
-    slot: 'internal',
-    size: 'S',
-    mass: 140,
-    hp: 30,
-    armor: 0,
-    profile: 0,
-    description: '400 medium-calibre rounds (AA autocannon, rotary cannon).',
-    ammo: { caliber: 'medium', rounds: 400, cookOffPerRound: 0.12 },
-  },
-  {
-    id: 'shell_rack',
-    name: 'Shell Rack',
-    kind: 'ammo',
-    slot: 'internal',
-    size: 'M',
-    mass: 260,
-    hp: 45,
-    armor: 0,
-    profile: 0,
-    description: '20 large-calibre shells. Destruction causes a cook-off inside the section.',
-    ammo: { caliber: 'large', rounds: 20, cookOffPerRound: 9 },
-  },
 ];
+export const RETIRED_IDS = new Set(RETIRED_COMPONENTS.map((c) => c.id));
 
 export const COMPONENT_MAP: Record<string, ComponentDef> = Object.fromEntries(COMPONENTS.map((c) => [c.id, c]));
 

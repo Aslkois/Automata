@@ -1,7 +1,11 @@
-// Example designs and programs. Designs use the same schema and validation as player
-// designs; programs are genuine code / block / node programs run by the shared runtime.
+// Example designs and their brains. Designs use the same schema and validation as player
+// designs; brains are ordinary AutoScript brains (one per design) run by the shared runtime.
+// The schema-1 example programs are kept to exercise and test the library migration.
 import { DESIGN_SCHEMA_VERSION, type DroneDesign, type MountDesign } from '../sim/design';
-import { PROGRAM_SCHEMA_VERSION, type BlockJson, type BlocksState, type NodeGraph, type ProgramSource } from '../program/types';
+import type { BlockJson, BlocksState, NodeGraph, LegacyProgram } from '../program/legacy/types';
+import { compileBrain } from '../program/brain/compile';
+import { irFromCode } from '../program/brain/model';
+const PROGRAM_SCHEMA_VERSION = 1;
 
 const m = (component: string, rotation = 0): MountDesign => ({ component, rotation });
 
@@ -14,12 +18,12 @@ export const ASSAULT_PLATFORM: DroneDesign = {
     front: {
       class: 'heavy',
       armor: 70,
-      slots: { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('camera'), I1: m('cooler'), I2: m('shell_rack'), I3: m('motor_m'), I4: m('reactor') },
+      slots: { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('camera'), I1: m('cooler'), I2: m('shell_rack'), I3: m('battery'), I4: m('reactor') },
     },
     middle: {
       class: 'medium',
       armor: 30,
-      slots: { H1: m('mg', -60), H2: m('mg', 60), H3: m('radar'), I1: m('controller'), I2: m('ammo_small'), I3: m('motor_m') },
+      slots: { H1: m('mg', -60), H2: m('mg', 60), H3: m('radar'), I1: m('cooler'), I2: m('ammo_small') },
     },
     rear: {
       class: 'light',
@@ -43,7 +47,7 @@ export const AA_DESTROYER: DroneDesign = {
     middle: {
       class: 'heavy',
       armor: 66,
-      slots: { H1: m('radar'), H2: m('shield_dir'), H3: m('camera'), I1: m('controller'), I2: m('motor_m'), I3: m('battery'), I4: m('reactor') },
+      slots: { H1: m('radar'), H2: m('shield_dir'), H3: m('camera'), I1: m('cooler'), I3: m('battery'), I4: m('reactor') },
     },
     rear: {
       class: 'light',
@@ -60,10 +64,74 @@ export const SKIRMISHER: DroneDesign = {
   chassis: 'wheeled',
   sections: {
     front: { class: 'light', armor: 15, slots: { H1: m('camera'), H2: m('mg'), I1: m('ammo_small'), I2: m('cooler') } },
-    middle: { class: 'medium', armor: 25, slots: { H1: m('rotary_cannon'), H2: m('shield_dir'), H3: m('camera', 180), I1: m('controller'), I2: m('ammo_medium'), I3: m('motor_m') } },
+    middle: { class: 'medium', armor: 25, slots: { H1: m('rotary_cannon'), H2: m('shield_dir'), H3: m('camera', 180), I2: m('ammo_medium') } },
     rear: { class: 'light', armor: 8, slots: { H1: m('mg', 180), I1: m('generator_s'), I2: m('generator_s') } },
   },
 };
+
+export const STRIDER: DroneDesign = {
+  schema: DESIGN_SCHEMA_VERSION,
+  id: 'example-strider',
+  name: 'Strider',
+  chassis: 'walking',
+  sections: {
+    front: { class: 'medium', armor: 30, slots: { H1: m('rotary_cannon'), H3: m('camera'), I2: m('ammo_medium') } },
+    middle: { class: 'medium', armor: 25, slots: { H1: m('mg', -90), H2: m('mg', 90), I1: m('ammo_small') } },
+    rear: { class: 'light', armor: 10, slots: { H1: m('point_defense', 180) } },
+  },
+};
+
+export const WISP: DroneDesign = {
+  schema: DESIGN_SCHEMA_VERSION,
+  id: 'example-wisp',
+  name: 'Wisp',
+  chassis: 'flying',
+  sections: {
+    front: { class: 'light', armor: 8, slots: { H1: m('mg'), H2: m('mg'), I1: m('ammo_small') } },
+    middle: { class: 'light', armor: 6, slots: { H1: m('camera'), H2: m('camera', 180) } },
+    rear: { class: 'light', armor: 4, slots: {} },
+  },
+};
+
+export const STRIDER_CODE = `// Strider — walks into cannon range, plants its feet and fires.
+let anchored = false;
+
+function update() {
+  const enemy = drone.nearestEnemy();
+  if (enemy == null) {
+    anchored = false;
+    drone.drive(0.6, 0.25);
+    engageAll(null);
+    return;
+  }
+  engageAll(enemy);
+  const turn = clamp(angleDiff(drone.heading(), enemy.bearing) / 25, -1, 1);
+  // close to 380 units, then hold position and keep the front toward the target
+  anchored = enemy.distance < 380;
+  drone.drive(anchored ? 0 : 0.9, turn);
+}
+`;
+
+export const WISP_CODE = `// Wisp — fast flyer: circle the enemy at close range and strafe.
+let side = 1;
+
+function update() {
+  const enemy = drone.nearestEnemy();
+  if (enemy == null) {
+    drone.drive(0.7, 0.4);
+    engageAll(null);
+    return;
+  }
+  engageAll(enemy);
+  // switch orbit direction every few seconds to be hard to hit
+  if (drone.elapsed("orbit") > 4) {
+    side = -side;
+    drone.resetTimer("orbit");
+  }
+  const offset = enemy.distance > 260 ? 25 * side : 80 * side;
+  drone.drive(1, clamp(angleDiff(drone.heading(), enemy.bearing + offset) / 30, -1, 1));
+}
+`;
 
 export const ASSAULT_CODE = `// Assault Platform — heavy cannons forward, MGs and point defense for close work.
 // Runs every decision tick (10 Hz). Globals persist between ticks.
@@ -283,9 +351,90 @@ function brawlerNodes(): NodeGraph {
   };
 }
 
-export const ASSAULT_PROGRAM: ProgramSource = { schema: PROGRAM_SCHEMA_VERSION, id: 'example-assault-code', name: 'Assault Doctrine (code)', kind: 'code', code: ASSAULT_CODE };
-export const AA_PROGRAM: ProgramSource = { schema: PROGRAM_SCHEMA_VERSION, id: 'example-aa-blocks', name: 'AA Orbit (blocks)', kind: 'blocks', blocks: aaBlocks() };
-export const BRAWLER_PROGRAM: ProgramSource = { schema: PROGRAM_SCHEMA_VERSION, id: 'example-brawler-nodes', name: 'Brawler (nodes)', kind: 'nodes', nodes: brawlerNodes() };
+export const LEGACY_ASSAULT_PROGRAM: LegacyProgram = { schema: PROGRAM_SCHEMA_VERSION, id: 'example-assault-code', name: 'Assault Doctrine (code)', kind: 'code', code: ASSAULT_CODE };
+export const LEGACY_AA_PROGRAM: LegacyProgram = { schema: PROGRAM_SCHEMA_VERSION, id: 'example-aa-blocks', name: 'AA Orbit (blocks)', kind: 'blocks', blocks: aaBlocks() };
+export const LEGACY_BRAWLER_PROGRAM: LegacyProgram = { schema: PROGRAM_SCHEMA_VERSION, id: 'example-brawler-nodes', name: 'Brawler (nodes)', kind: 'nodes', nodes: brawlerNodes() };
 
-export const DEFAULT_DESIGNS = [ASSAULT_PLATFORM, AA_DESTROYER, SKIRMISHER];
-export const DEFAULT_PROGRAMS = [ASSAULT_PROGRAM, AA_PROGRAM, BRAWLER_PROGRAM];
+export const DEFAULT_DESIGNS = [ASSAULT_PLATFORM, AA_DESTROYER, SKIRMISHER, STRIDER, WISP];
+/** The schema-1 example programs (separate code/block/node programs), kept for migration. */
+export const LEGACY_DEFAULT_PROGRAMS = [LEGACY_ASSAULT_PROGRAM, LEGACY_AA_PROGRAM, LEGACY_BRAWLER_PROGRAM];
+/** Schema-1 example pairing of designs and programs (the old default battle roster). */
+export const LEGACY_DEFAULT_PAIRS: Record<string, string> = {
+  'example-assault': 'example-assault-code',
+  'example-aa-destroyer': 'example-aa-blocks',
+  'example-skirmisher': 'example-brawler-nodes',
+};
+
+export const AA_CODE = `// AA Destroyer — circles its target so both gun groups get firing arcs.
+let target = null;
+let orbitHeading = 0;
+drone.setPower(1, 1, 1.5);
+
+function update() {
+  target = drone.nearestEnemy();
+  // Weapons and the shield work independently of movement.
+  if (target != null) {
+    shieldFaceContact("M.H2", target);
+    engageAll(target);
+  } else {
+    engageAll(null);
+  }
+  // Stuck: the wheeled chassis cannot steer at a standstill, so back out.
+  if (Math.abs(drone.speed()) > 12) {
+    drone.resetTimer("moving");
+  }
+  if (drone.elapsed("moving") > 1.2) {
+    drone.drive(-0.8, 0.9);
+    if (drone.elapsed("moving") > 3) {
+      drone.resetTimer("moving");
+    }
+  } else if (target != null) {
+    if (target.distance < 320) {
+      // Too close: open the range at an angle.
+      orbitHeading = target.bearing + 130;
+    } else {
+      // Otherwise circle the target at a tangent.
+      orbitHeading = target.bearing + 80;
+    }
+    drone.drive(0.9, clamp(angleDiff(drone.heading(), orbitHeading) / 30, -1, 1));
+  } else {
+    drone.turnToward(1050, 250, 0.6);
+  }
+}
+
+function onFailure(event) {
+  drone.log(event.detail);
+  // Shield gone: give everything to guns and engines.
+  if (!drone.component("M.H2").functional) {
+    drone.setPower(1, 2, 0);
+  }
+}
+`;
+
+export const BRAWLER_CODE = `// Skirmisher — closes in behind its shield and fires everything that bears.
+function update() {
+  const enemy = drone.nearestEnemy();
+  if (enemy != null) {
+    shieldFaceContact("M.H2", enemy);
+    turnTowardContact(enemy, 0.85);
+    engageAll(enemy);
+  } else {
+    drone.drive(0.5, 0.35);
+    engageAll(null);
+  }
+}
+`;
+
+/** Example brains: one per example design, each opening in a different editor. */
+export const DEFAULT_BRAINS: { designId: string; id: string; code: string; view: 'blocks' | 'nodes' | 'code' }[] = [
+  { designId: 'example-assault', id: 'brain-example-assault', code: ASSAULT_CODE, view: 'code' },
+  { designId: 'example-aa-destroyer', id: 'brain-example-aa-destroyer', code: AA_CODE, view: 'blocks' },
+  { designId: 'example-skirmisher', id: 'brain-example-skirmisher', code: BRAWLER_CODE, view: 'nodes' },
+  { designId: 'example-strider', id: 'brain-example-strider', code: STRIDER_CODE, view: 'blocks' },
+  { designId: 'example-wisp', id: 'brain-example-wisp', code: WISP_CODE, view: 'blocks' },
+];
+
+/** The example brains compiled to runnable programs (tests, headless tools). */
+export const ASSAULT_PROGRAM = compileBrain(irFromCode(ASSAULT_CODE), 'brain-example-assault', 'Assault Platform brain').program;
+export const AA_PROGRAM = compileBrain(irFromCode(AA_CODE), 'brain-example-aa-destroyer', 'AA Destroyer brain').program;
+export const BRAWLER_PROGRAM = compileBrain(irFromCode(BRAWLER_CODE), 'brain-example-skirmisher', 'Skirmisher brain').program;

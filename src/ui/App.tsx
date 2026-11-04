@@ -1,73 +1,106 @@
-import { createContext, useCallback, useContext, useState } from 'react';
-import type { TraceLoc } from '../program/interpreter';
-import { Battle } from './battle/Battle';
-import { Logo } from './common';
-import { Hangar } from './hangar/Hangar';
-import { Programs } from './program/Programs';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { ViewKind } from '../program/brain/model';
+import { Construct } from './construct/Construct';
+import { Program } from './program/Program';
+import { Rail } from './shell/Rail';
+import { Simulate } from './simulate/Simulate';
+import { useStoredState } from './common';
 import { useLibrary } from './store';
 
-export type Tab = 'hangar' | 'programs' | 'battle';
+export type Workspace = 'construct' | 'program' | 'simulate';
 
-export interface NavTarget {
-  tab: Tab;
-  designId?: string;
-  programId?: string;
-  highlight?: TraceLoc;
+export interface FocusRequest {
+  designId: string;
+  /** IR id to reveal */
+  id: string;
+  view?: ViewKind;
+  nonce: number;
+}
+export interface TestRequest {
+  designId: string;
+  nonce: number;
 }
 
-interface Nav {
-  target: NavTarget;
-  navigate(t: NavTarget): void;
+interface ShellState {
+  ws: Workspace;
+  go(ws: Workspace): void;
+  /** the active drone, shared by every workspace */
+  designId: string;
+  setDesignId(id: string): void;
+  focus: FocusRequest | null;
+  openBrainAt(designId: string, id: string, view?: ViewKind): void;
+  test: TestRequest | null;
+  testDrone(designId: string): void;
 }
 
-const NavContext = createContext<Nav>({ target: { tab: 'hangar' }, navigate: () => {} });
-export const useNav = () => useContext(NavContext);
-
-// The three volumes of the archive.
-const VOLUMES: { id: Tab; roman: string; label: string; hint: string }[] = [
-  { id: 'hangar', roman: 'I', label: 'Hangar', hint: 'Specimen archive — construct and catalogue machines' },
-  { id: 'programs', roman: 'II', label: 'Programs', hint: 'Intelligence laboratory — write machine behaviour' },
-  { id: 'battle', roman: 'III', label: 'Battle', hint: 'Observation — deploy machines and watch them act' },
-];
+const ShellContext = createContext<ShellState | null>(null);
+export function useShell(): ShellState {
+  const s = useContext(ShellContext);
+  if (!s) throw new Error('useShell outside App');
+  return s;
+}
 
 export function App() {
-  const [target, setTarget] = useState<NavTarget>({ tab: 'battle' });
-  const navigate = useCallback((t: NavTarget) => setTarget(t), []);
   const lib = useLibrary();
+  const [ws, setWs] = useStoredState<Workspace>('workspace', 'construct');
+  const [storedDesign, setStoredDesign] = useStoredState<string>('design', lib.designs[0]?.id ?? '');
+  const [focus, setFocus] = useState<FocusRequest | null>(null);
+  const [test, setTest] = useState<TestRequest | null>(null);
+  const designId = lib.designs.some((d) => d.id === storedDesign) ? storedDesign : (lib.designs[0]?.id ?? '');
+  useEffect(() => {
+    if (designId !== storedDesign) setStoredDesign(designId);
+  }, [designId, storedDesign, setStoredDesign]);
+
+  const go = useCallback((w: Workspace) => setWs(w), [setWs]);
+  const openBrainAt = useCallback(
+    (d: string, id: string, view?: ViewKind) => {
+      setStoredDesign(d);
+      setFocus({ designId: d, id, view, nonce: Date.now() });
+      setWs('program');
+    },
+    [setStoredDesign, setWs],
+  );
+  const testDrone = useCallback(
+    (d: string) => {
+      setStoredDesign(d);
+      setTest({ designId: d, nonce: Date.now() });
+      setWs('simulate');
+    },
+    [setStoredDesign, setWs],
+  );
+  const value = useMemo<ShellState>(() => ({ ws, go, designId, setDesignId: setStoredDesign, focus, openBrainAt, test, testDrone }), [ws, go, designId, setStoredDesign, focus, openBrainAt, test, testDrone]);
+
+  // Keyboard: Alt+1/2/3 switch activities.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      const w = ({ '1': 'construct', '2': 'program', '3': 'simulate' } as const)[e.key as '1' | '2' | '3'];
+      if (w) {
+        e.preventDefault();
+        setWs(w);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [setWs]);
+
   return (
-    <NavContext.Provider value={{ target, navigate }}>
+    <ShellContext.Provider value={value}>
       <div className="app">
-        <header className="mast">
-          <Logo />
-          <nav className="vols" role="tablist" aria-label="Archive volumes">
-            {VOLUMES.map((v) => (
-              <button key={v.id} role="tab" aria-selected={target.tab === v.id} aria-label={v.label} title={v.hint} className={target.tab === v.id ? 'on' : ''} onClick={() => navigate({ tab: v.id })}>
-                <span className="roman">{v.roman}</span>
-                {v.label}
-              </button>
-            ))}
-          </nav>
-          <span className="spacer" />
-          <span className="census" aria-label="Archive contents">
-            <span>
-              <b>{lib.designs.length}</b> specimens
-            </span>
-            <span>
-              <b>{lib.programs.length}</b> intelligence records
-            </span>
-          </span>
-        </header>
-        {/* Volumes stay mounted so editors and the running battle keep their state. */}
-        <div className={`view ${target.tab === 'hangar' ? 'shown' : ''}`} style={{ display: target.tab === 'hangar' ? 'block' : 'none' }}>
-          <Hangar />
-        </div>
-        <div className={`view ${target.tab === 'programs' ? 'shown' : ''}`} style={{ display: target.tab === 'programs' ? 'block' : 'none' }}>
-          <Programs />
-        </div>
-        <div className={`view ${target.tab === 'battle' ? 'shown' : ''}`} style={{ display: target.tab === 'battle' ? 'block' : 'none' }}>
-          <Battle active={target.tab === 'battle'} />
-        </div>
+        <Rail />
+        {/* Workspaces stay mounted so editors, camera and the running simulation keep their state. */}
+        <main className="workspaces">
+          <section className={`ws ${ws === 'construct' ? 'shown' : ''}`} hidden={ws !== 'construct'} aria-label="Construct">
+            <Construct active={ws === 'construct'} />
+          </section>
+          <section className={`ws ${ws === 'program' ? 'shown' : ''}`} hidden={ws !== 'program'} aria-label="Program">
+            <Program active={ws === 'program'} />
+          </section>
+          <section className={`ws ${ws === 'simulate' ? 'shown' : ''}`} hidden={ws !== 'simulate'} aria-label="Simulate">
+            <Simulate active={ws === 'simulate'} />
+          </section>
+        </main>
       </div>
-    </NavContext.Provider>
+    </ShellContext.Provider>
   );
 }

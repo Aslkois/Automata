@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { AA_DESTROYER, AA_PROGRAM, ASSAULT_PLATFORM, ASSAULT_PROGRAM, BRAWLER_PROGRAM, SKIRMISHER } from '../../src/data/defaults';
-import { PROGRAM_SCHEMA_VERSION, type ProgramSource } from '../../src/program/types';
+import { parseBrain } from '../../src/program/brain/parse';
+import { blocksToIR, irToBlocks } from '../../src/program/brain/blocks';
+import { graphToIR, irToGraph } from '../../src/program/brain/graph';
+import { compileBrain } from '../../src/program/brain/compile';
 import { damageComponent, processJoints } from '../../src/sim/damage';
 import { computeStats, parseDesign, serializeDesign, validateDesign } from '../../src/sim/design';
 import { defaultArena, Simulation } from '../../src/sim/world';
@@ -19,7 +22,7 @@ const cameraOnly = () =>
   design({
     sections: {
       front: { class: 'light', armor: 10, slots: { H1: m('camera') } },
-      middle: { class: 'medium', armor: 10, slots: { I1: m('controller'), I2: m('generator_s') } },
+      middle: { class: 'medium', armor: 10, slots: { I2: m('generator_s') } },
       rear: { class: 'light', armor: 10, slots: {} },
     },
   });
@@ -31,10 +34,10 @@ describe('information access', () => {
       drone.log('seen', e == null ? 'none' : e.x);
       drone.log('scope', typeof globalThis, typeof window, typeof process, typeof Function, typeof sim, typeof eval);
     }`);
-    // Enemy directly behind a forward-only camera.
+    // Enemy directly behind a forward-only camera, beyond the integrated proximity array.
     const sim = makeSim([
-      { design: cameraOnly(), program: watcher, team: 0, x: 600, y: 500, angle: 0 },
-      { design: cameraOnly(), program: idle, team: 1, x: 300, y: 500, angle: 0 },
+      { design: cameraOnly(), program: watcher, team: 0, x: 900, y: 500, angle: 0 },
+      { design: cameraOnly(), program: idle, team: 1, x: 250, y: 500, angle: 0 },
     ]);
     sim.run(0.5);
     expect(sim.drones[0].perception.contacts).toHaveLength(0);
@@ -70,7 +73,7 @@ describe('information access', () => {
     expect(c.team).toBe('enemy');
     expect(Math.abs(c.distance - 400)).toBeLessThan(15);
     expect(c.size).not.toBeNull(); // camera classifies
-    expect(logs(sim, sim.drones[0].id).some((l) => l.startsWith(`enemy ${Math.round(c.x)}`) && l.endsWith('F.H1'))).toBe(true);
+    expect(logs(sim, sim.drones[0].id).some((l) => l.startsWith(`enemy ${Math.round(c.x)}`) && l.includes('F.H1'))).toBe(true);
     expect(Math.abs(c.x - (enemy.body.pos.x + 0))).toBeLessThan(10);
   });
 });
@@ -93,78 +96,40 @@ describe('program execution', () => {
     expect(sim.time).toBeCloseTo(2, 5);
   });
 
-  it('13. block, node and code programs issue real movement and firing commands', () => {
+  it('13. one brain edited as code, blocks or nodes issues the same real commands', () => {
     const fixed = design({
       sections: {
-        front: { class: 'light', armor: 10, slots: { H1: m('mg'), I1: m('ammo_small'), I2: m('motor_s') } },
-        middle: { class: 'medium', armor: 10, slots: { I1: m('controller'), I2: m('generator_s'), I3: m('motor_m') } },
+        front: { class: 'light', armor: 10, slots: { H1: m('mg'), I1: m('ammo_small') } },
+        middle: { class: 'medium', armor: 10, slots: { I2: m('generator_s') } },
         rear: { class: 'light', armor: 10, slots: {} },
       },
     });
-    const programs: ProgramSource[] = [
-      code("function update(){ drone.drive(1, 0); drone.aim('F.H1', drone.heading()); drone.fire('F.H1'); }"),
-      {
-        schema: PROGRAM_SCHEMA_VERSION,
-        id: 'b',
-        name: 'b',
-        kind: 'blocks',
-        blocks: {
-          blocks: {
-            languageVersion: 0,
-            blocks: [
-              {
-                type: 'event_update',
-                id: 'ev',
-                inputs: {
-                  DO: {
-                    block: {
-                      type: 'drone_drive',
-                      id: 'drv',
-                      inputs: { THROTTLE: { block: { type: 'math_number', id: 'n1', fields: { NUM: 1 } } }, STEER: { block: { type: 'math_number', id: 'n2', fields: { NUM: 0 } } } },
-                      next: { block: { type: 'drone_fire', id: 'fire', fields: { ON: 'TRUE', WEAPON: 'F.H1' } } },
-                    },
-                  },
-                },
-              },
-            ],
-          },
-        },
-      },
-      {
-        schema: PROGRAM_SCHEMA_VERSION,
-        id: 'n',
-        name: 'n',
-        kind: 'nodes',
-        nodes: {
-          nodes: [
-            { id: 'tick', type: 'OnTick', x: 0, y: 0, params: {} },
-            { id: 'one', type: 'Number', x: 0, y: 100, params: { value: 1 } },
-            { id: 'drive', type: 'Drive', x: 200, y: 0, params: {} },
-            { id: 'fire', type: 'Fire', x: 400, y: 0, params: { weapon: 'F.H1' } },
-          ],
-          edges: [
-            { id: 'a', source: 'tick', sourcePort: 'out', target: 'drive', targetPort: 'in' },
-            { id: 'b', source: 'one', sourcePort: 'out', target: 'drive', targetPort: 'throttle' },
-            { id: 'c', source: 'drive', sourcePort: 'out', target: 'fire', targetPort: 'in' },
-          ],
-        },
-      },
-    ];
-    for (const p of programs) {
-      const sim = makeSim([{ design: fixed, program: p, team: 0, x: 300, y: 550, angle: 0 }]);
-      expect(sim.controllers.get(sim.drones[0].id)!.compiled.errors).toEqual([]);
+    const ir = parseBrain("function update(){ drone.drive(1, 0); drone.aim('F.H1', drone.heading()); drone.fire('F.H1'); }").ir!;
+    const viaBlocks = blocksToIR(irToBlocks(ir), ir).ir!;
+    const viaNodes = graphToIR(irToGraph(ir), ir).ir!;
+    const results: string[] = [];
+    for (const [label, b] of [['code', ir], ['blocks', viaBlocks], ['nodes', viaNodes]] as const) {
+      const c = compileBrain(b);
+      const sim = makeSim([{ design: fixed, program: c.program, team: 0, x: 300, y: 550, angle: 0 }]);
+      expect(sim.controllers.get(sim.drones[0].id)!.compiled.errors, label).toEqual([]);
       let shots = 0;
       for (let i = 0; i < 120; i++) {
         sim.step();
         shots += sim.takeEvents().filter((e) => e.type === 'shot').length;
       }
-      expect(sim.drones[0].body.pos.x - 300, p.kind).toBeGreaterThan(30);
-      expect(shots, p.kind).toBeGreaterThan(5);
-      // the trace points at the source construct that issued the command
+      expect(sim.drones[0].body.pos.x - 300, label).toBeGreaterThan(30);
+      expect(shots, label).toBeGreaterThan(5);
+      // the trace points at the brain statement that issued the command
       const entries = sim.controllers.get(sim.drones[0].id)!.history.at(-1)!.entries;
       const fire = entries.find((e) => e.kind === 'command' && e.text.startsWith('fire('))!;
-      expect(fire.loc.kind).toBe(p.kind === 'code' ? 'line' : p.kind === 'blocks' ? 'block' : 'node');
+      expect(fire.loc.kind).toBe('line');
+      const id = c.printed.lineIds[(fire.loc as { line: number }).line];
+      const fireStmt = b.body[0].k === 'func' ? b.body[0].body[2] : null;
+      expect(id, label).toBe(fireStmt?.id);
+      results.push(`${shots}:${sim.drones[0].body.pos.x.toFixed(6)}`);
     }
+    // identical behaviour, whichever editor the brain went through
+    expect(new Set(results).size).toBe(1);
   });
 
   it('14. lost components are reflected in program-visible hardware state', () => {
@@ -186,7 +151,7 @@ describe('structure', () => {
     const dz = design({
       sections: {
         front: { class: 'medium', armor: 10, slots: { I1: m('generator_s') } },
-        middle: { class: 'medium', armor: 10, slots: { I1: m('controller'), I2: m('generator_s') } },
+        middle: { class: 'medium', armor: 10, slots: { I2: m('generator_s') } },
         rear: { class: 'light', armor: 10, slots: {} },
       },
     });
@@ -195,7 +160,7 @@ describe('structure', () => {
     sim.step();
     const massBefore = d.body.mass;
     const genBefore = d.power.generation;
-    expect(genBefore).toBe(90);
+    expect(genBefore).toBe(160); // 2 × 45 PU/s generators + the integrated core (70)
     d.joints[0].hp = 0; // front-middle
     processJoints(sim, d);
     sim.step();
@@ -203,8 +168,8 @@ describe('structure', () => {
     expect(sim.debris).toHaveLength(1);
     expect(d.body.mass).toBeLessThan(massBefore);
     expect(sim.debris[0].body.mass + d.body.mass).toBeCloseTo(massBefore, 3);
-    expect(d.power.generation).toBe(45); // the front generator no longer supplies the drone
-    expect(d.status.disabled).toBe(false); // controller is in the middle
+    expect(d.power.generation).toBe(115); // the front generator no longer supplies the drone
+    expect(d.status.disabled).toBe(false); // the integrated CPU is in the middle
     // Collision: a round fired at the old front position now strikes the debris, not the drone.
     const fx = sim.debris[0].body.pos.x + 20;
     shoot(sim, 'mg', { x: fx, y: 300 }, { x: fx, y: 500 });
@@ -216,7 +181,7 @@ describe('structure', () => {
     d2.joints[0].hp = 0;
     d2.joints[1].hp = 0;
     processJoints(sim2, d2);
-    damageComponent(sim2, d2, comp(d2, 'M.I1'), 999);
+    damageComponent(sim2, d2, comp(d2, 'M.CPU'), 999);
     sim2.step();
     expect(d2.status.disabled).toBe(true);
   });

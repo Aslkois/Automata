@@ -1,78 +1,82 @@
-// Library of player designs and programs, persisted to localStorage with a versioned schema.
+// The player's library: drone designs, the one brain each design runs, and programs
+// recovered during migration. Persisted to localStorage with a versioned schema.
 import { useSyncExternalStore } from 'react';
-import { DEFAULT_DESIGNS, DEFAULT_PROGRAMS } from '../data/defaults';
-import { cloneDesign, parseDesign, type DroneDesign } from '../sim/design';
-import { PROGRAM_SCHEMA_VERSION, type ProgramSource } from '../program/types';
+import { compileBrain } from '../program/brain/compile';
+import { freshIds } from '../program/brain/ir';
+import { applyEdit, codeDocFor, irFromCode, newBrain, validateBrain, type Brain, type ViewDocs, type ViewKind } from '../program/brain/model';
+import type { ProgramSource } from '../program/types';
+import { cloneDesign, newDesign, parseDesign, type DroneDesign } from '../sim/design';
+import { defaultLibrary, ensureBrains, LIBRARY_VERSION, migrateLibrary, recoveredFromBrain, type Library, type RecoveredProgram } from './migrate';
 
-const KEY = 'automata.library';
-const LIBRARY_VERSION = 1;
+export type { Library, RecoveredProgram };
 
-export interface Library {
-  version: number;
-  designs: DroneDesign[];
-  programs: ProgramSource[];
-}
+export const KEY = 'automata.library';
+export const BACKUP_KEY = 'automata.library.v1-backup';
 
-function defaults(): Library {
-  return { version: LIBRARY_VERSION, designs: DEFAULT_DESIGNS.map(cloneDesign), programs: JSON.parse(JSON.stringify(DEFAULT_PROGRAMS)) };
-}
-
-export function parseProgram(json: string | unknown): ProgramSource {
-  const raw = (typeof json === 'string' ? JSON.parse(json) : json) as Record<string, unknown>;
-  if (!raw || typeof raw !== 'object') throw new Error('Program must be an object');
-  if (raw.kind !== 'code' && raw.kind !== 'blocks' && raw.kind !== 'nodes') throw new Error(`Unknown program kind '${String(raw.kind)}'`);
-  if (typeof raw.name !== 'string') throw new Error('Program is missing a name');
-  if ((raw.schema as number) > PROGRAM_SCHEMA_VERSION) throw new Error('Program schema is newer than supported');
-  const p: ProgramSource = { schema: PROGRAM_SCHEMA_VERSION, id: typeof raw.id === 'string' ? raw.id : uid('prog'), name: raw.name, kind: raw.kind };
-  if (raw.kind === 'code') p.code = typeof raw.code === 'string' ? raw.code : '';
-  if (raw.kind === 'blocks') p.blocks = (raw.blocks as ProgramSource['blocks']) ?? {};
-  if (raw.kind === 'nodes') {
-    const g = raw.nodes as ProgramSource['nodes'];
-    if (!g || !Array.isArray(g.nodes) || !Array.isArray(g.edges)) throw new Error('Node program has no graph');
-    p.nodes = g;
-  }
-  return p;
-}
+let migrationNotes: string[] = [];
 
 function load(): Library {
+  let s: string | null = null;
   try {
-    const s = globalThis.localStorage?.getItem(KEY);
-    if (!s) return defaults();
-    const raw = JSON.parse(s) as Library;
-    if (raw.version !== LIBRARY_VERSION) return defaults();
-    const designs = raw.designs.flatMap((d) => {
-      try {
-        return [parseDesign(d)];
-      } catch {
-        return [];
-      }
-    });
-    const programs = raw.programs.flatMap((p) => {
-      try {
-        return [parseProgram(p)];
-      } catch {
-        return [];
-      }
-    });
-    return { version: LIBRARY_VERSION, designs, programs };
+    s = globalThis.localStorage?.getItem(KEY) ?? null;
   } catch {
-    return defaults();
+    s = null;
+  }
+  if (!s) return defaultLibrary();
+  let raw: unknown;
+  try {
+    raw = JSON.parse(s);
+  } catch {
+    // unreadable: keep the original text aside rather than overwrite it silently
+    try {
+      globalThis.localStorage?.setItem(`${KEY}.unreadable-${Date.now()}`, s);
+    } catch {
+      /* ignore */
+    }
+    return defaultLibrary();
+  }
+  const version = (raw as { version?: number })?.version;
+  if (version !== LIBRARY_VERSION) {
+    try {
+      if (!globalThis.localStorage?.getItem(BACKUP_KEY)) globalThis.localStorage?.setItem(BACKUP_KEY, s);
+    } catch {
+      /* storage full: the migrated library still carries every program in `recovered` */
+    }
+  }
+  const m = migrateLibrary(raw);
+  if (!m) return defaultLibrary();
+  migrationNotes = m.notes;
+  if (m.migrated) persistNow(m.library);
+  return m.library;
+}
+
+function persistNow(lib: Library) {
+  try {
+    globalThis.localStorage?.setItem(KEY, JSON.stringify(lib));
+  } catch {
+    /* storage unavailable: the library stays in memory */
   }
 }
 
 let state: Library = load();
 const listeners = new Set<() => void>();
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let lastSaved = Date.now();
+let pending = false;
+const saveListeners = new Set<() => void>();
 
 function persist() {
+  if (!pending) {
+    pending = true;
+    for (const l of saveListeners) l();
+  }
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    try {
-      globalThis.localStorage?.setItem(KEY, JSON.stringify(state));
-    } catch {
-      /* storage unavailable: the library stays in memory */
-    }
-  }, 250);
+    persistNow(state);
+    pending = false;
+    lastSaved = Date.now();
+    for (const l of saveListeners) l();
+  }, 300);
 }
 
 function set(next: Library) {
@@ -87,33 +91,138 @@ export const library = {
     listeners.add(l);
     return () => listeners.delete(l);
   },
+  saveState: () => ({ pending, lastSaved }),
+  migrationNotes: () => migrationNotes,
+  brainFor(designId: string): Brain | undefined {
+    return state.brains.find((b) => b.designId === designId);
+  },
   upsertDesign(d: DroneDesign) {
     const i = state.designs.findIndex((x) => x.id === d.id);
     const designs = state.designs.slice();
     if (i >= 0) designs[i] = d;
     else designs.push(d);
-    set({ ...state, designs });
+    set(ensureBrains({ ...state, designs }));
   },
+  /** A new design always gets exactly one brain. */
+  createDesign(name = 'New drone'): DroneDesign {
+    const d = newDesign(uid('design'), name);
+    set(ensureBrains({ ...state, designs: [...state.designs, d], brains: [...state.brains, newBrain(uid('brain'), d.id)] }));
+    return d;
+  },
+  duplicateDesign(id: string): DroneDesign | null {
+    const src = state.designs.find((d) => d.id === id);
+    if (!src) return null;
+    const d = { ...cloneDesign(src), id: uid('design'), name: `${src.name} copy` };
+    const b = library.brainFor(id);
+    const brain: Brain = b ? { ...JSON.parse(JSON.stringify(b)), id: uid('brain'), designId: d.id, ir: { body: freshIds(b.ir.body) }, views: {}, origin: undefined } : newBrain(uid('brain'), d.id);
+    set(ensureBrains({ ...state, designs: [...state.designs, d], brains: [...state.brains, brain] }));
+    return d;
+  },
+  /** Deleting a drone keeps its brain under Recovered programs. */
   deleteDesign(id: string) {
-    set({ ...state, designs: state.designs.filter((d) => d.id !== id) });
+    const d = state.designs.find((x) => x.id === id);
+    const b = library.brainFor(id);
+    const recovered = b ? [...state.recovered, recoveredFromBrain(b, `Brain of the deleted drone "${d?.name ?? id}".`, `${d?.name ?? 'Deleted drone'} brain`)] : state.recovered;
+    set({ ...state, designs: state.designs.filter((x) => x.id !== id), brains: state.brains.filter((x) => x.designId !== id), recovered });
   },
-  upsertProgram(p: ProgramSource) {
-    const i = state.programs.findIndex((x) => x.id === p.id);
-    const programs = state.programs.slice();
-    if (i >= 0) programs[i] = p;
-    else programs.push(p);
-    set({ ...state, programs });
+  saveBrain(b: Brain) {
+    set({ ...state, brains: state.brains.map((x) => (x.id === b.id ? b : x)) });
   },
-  deleteProgram(id: string) {
-    set({ ...state, programs: state.programs.filter((p) => p.id !== id) });
+  /** Apply an edit from one of the three views to a design's brain. */
+  editBrain<K extends ViewKind>(designId: string, kind: K, doc: ViewDocs[K]) {
+    const b = library.brainFor(designId);
+    if (!b) return null;
+    const r = applyEdit(b, kind, doc);
+    library.saveBrain(r.brain);
+    return r;
+  },
+  /** Load a recovered program into a drone. The drone's current brain is kept as a recovered entry. */
+  adoptRecovered(recoveredId: string, designId: string): { ok: boolean; error?: string } {
+    const rec = state.recovered.find((r) => r.id === recoveredId);
+    const cur = library.brainFor(designId);
+    if (!rec || !cur) return { ok: false, error: 'not found' };
+    let ir;
+    if (rec.kind === 'brain' && rec.source && typeof rec.source === 'object') {
+      try {
+        ir = validateBrain(rec.source).ir;
+      } catch {
+        ir = null;
+      }
+    }
+    if (!ir) {
+      try {
+        ir = irFromCode(rec.code);
+      } catch (e) {
+        return { ok: false, error: (e as Error).message };
+      }
+    }
+    const d = state.designs.find((x) => x.id === designId);
+    const keep = recoveredFromBrain(cur, `Replaced by "${rec.name}".`, `${d?.name ?? 'Drone'} brain (before loading “${rec.name}”)`);
+    const brain: Brain = { ...cur, ir, views: {}, updatedAt: Date.now(), origin: { programId: rec.id, kind: rec.kind, name: rec.name } };
+    set({ ...state, brains: state.brains.map((b) => (b.id === cur.id ? brain : b)), recovered: [...state.recovered.filter((r) => r.id !== recoveredId), keep] });
+    return { ok: true };
+  },
+  dismissRecovered(id: string) {
+    set({ ...state, recovered: state.recovered.filter((r) => r.id !== id) });
   },
   restoreExamples() {
-    const d = defaults();
-    const designs = [...state.designs.filter((x) => !d.designs.some((y) => y.id === x.id)), ...d.designs];
-    const programs = [...state.programs.filter((x) => !d.programs.some((y) => y.id === x.id)), ...d.programs];
-    set({ ...state, designs, programs });
+    const d = defaultLibrary();
+    const ids = new Set(d.designs.map((x) => x.id));
+    const replaced = state.brains.filter((b) => ids.has(b.designId)).map((b) => recoveredFromBrain(b, 'Replaced when the examples were restored.', `${state.designs.find((x) => x.id === b.designId)?.name ?? b.designId} brain (before restoring examples)`));
+    set(
+      ensureBrains({
+        ...state,
+        designs: [...state.designs.filter((x) => !ids.has(x.id)), ...d.designs],
+        brains: [...state.brains.filter((b) => !ids.has(b.designId)), ...d.brains],
+        recovered: [...state.recovered, ...replaced],
+      }),
+    );
+  },
+  importBundle(raw: unknown): DroneDesign {
+    const r = raw as { design?: unknown; brain?: unknown };
+    const src = r && typeof r === 'object' && 'design' in r ? r.design : raw;
+    const d = parseDesign(src);
+    const nd = { ...d, id: uid('design') };
+    let brain = newBrain(uid('brain'), nd.id);
+    if (r && typeof r === 'object' && 'brain' in r && r.brain) {
+      const b = validateBrain(r.brain);
+      brain = { ...b, id: uid('brain'), designId: nd.id };
+    }
+    set(ensureBrains({ ...state, designs: [...state.designs, nd], brains: [...state.brains, brain] }));
+    return nd;
+  },
+  exportBundle(designId: string) {
+    const d = state.designs.find((x) => x.id === designId);
+    const b = library.brainFor(designId);
+    return { format: 'automata.drone', version: LIBRARY_VERSION, design: d, brain: b ? { ...b, views: {} } : null, code: b ? codeDocFor(b.ir).text : '' };
+  },
+  /** For tests: replace the whole library. */
+  _reset(lib: Library) {
+    state = lib;
+    for (const l of listeners) l();
   },
 };
+
+/** The runnable program for a design (its brain compiled). */
+export function programFor(designId: string, lib = state): { program: ProgramSource; errors: { message: string }[] } | null {
+  const b = lib.brains.find((x) => x.designId === designId);
+  if (!b) return null;
+  const d = lib.designs.find((x) => x.id === designId);
+  const c = compileBrain(b.ir, b.id, `${d?.name ?? 'drone'} brain`);
+  return { program: c.program, errors: c.errors };
+}
+
+/** Whether a save is pending (for the "Saving… / Saved" indicator). */
+export function useSaving(): boolean {
+  return useSyncExternalStore(
+    (l) => {
+      saveListeners.add(l);
+      return () => saveListeners.delete(l);
+    },
+    () => pending,
+    () => pending,
+  );
+}
 
 export function useLibrary(): Library {
   return useSyncExternalStore(library.subscribe, library.get, library.get);

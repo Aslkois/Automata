@@ -1,154 +1,192 @@
-import { useEffect, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import * as Blockly from 'blockly/core';
-import 'blockly/blocks';
-import * as En from 'blockly/msg/en';
-import { BLOCK_DEFS, TOOLBOX_CATEGORIES } from '../../program/blockDefs';
-import type { BlocksState } from '../../program/types';
-import { PROG } from '../theme';
+import { fragmentBlocks, type BJ, type BlocksDoc } from '../../program/brain/blocks';
+import { blockTheme, moduleHooks, registerBlocks } from './blockTypes';
+import { CodeEditor } from './CodeEditor';
 
-let registered = false;
-function register() {
-  if (registered) return;
-  registered = true;
-  Blockly.setLocale(En as unknown as Record<string, string>);
-  Blockly.common.defineBlocksWithJsonArray(BLOCK_DEFS);
+export interface EditorHandle {
+  insert(code: string, kind: 'stmt' | 'expr' | 'top'): boolean;
+  reveal(id: string): void;
 }
 
-const num = (n: number) => ({ shadow: { type: 'math_number', fields: { NUM: n } } });
-const DEFAULT_INPUTS: Record<string, Record<string, unknown>> = {
-  drone_drive: { THROTTLE: num(1), STEER: num(0) },
-  drone_turn_toward_contact: { CONTACT: { block: { type: 'drone_nearest_enemy' } }, THROTTLE: num(1) },
-  drone_turn_toward: { X: num(900), Y: num(550), THROTTLE: num(0.6) },
-  drone_aim_at_contact: { CONTACT: { block: { type: 'drone_nearest_enemy' } } },
-  drone_aim_angle: { ANGLE: num(0) },
-  drone_engage_all: { CONTACT: { block: { type: 'drone_nearest_enemy' } } },
-  drone_shield_face_contact: { CONTACT: { block: { type: 'drone_nearest_enemy' } } },
-  drone_set_power: { P: num(1), W: num(1), S: num(1) },
-  drone_contact_exists: { CONTACT: { block: { type: 'drone_nearest_enemy' } } },
-  drone_contact_prop: { CONTACT: { block: { type: 'drone_nearest_enemy' } } },
-  drone_can_fire: { CONTACT: { block: { type: 'drone_nearest_enemy' } } },
-  drone_angle_to: { X: num(0), Y: num(0) },
-  drone_distance_to: { X: num(0), Y: num(0) },
-  drone_angle_diff: { A: num(0), B: num(0) },
-  drone_log: { VALUE: { shadow: { type: 'text', fields: { TEXT: 'hello' } } } },
-  controls_repeat_ext: { TIMES: num(3) },
-  math_arithmetic: { A: num(1), B: num(1) },
-  math_single: { NUM: num(9) },
-  math_trig: { NUM: num(45) },
-  math_round: { NUM: num(3.1) },
-  math_modulo: { DIVIDEND: num(64), DIVISOR: num(10) },
-  math_constrain: { VALUE: num(50), LOW: num(1), HIGH: num(100) },
-  controls_for: { FROM: num(1), TO: num(10), BY: num(1) },
-  list_item: { INDEX: num(1) },
-};
-
-function toolbox() {
-  return {
-    kind: 'categoryToolbox',
-    contents: TOOLBOX_CATEGORIES.map((c) =>
-      c.custom
-        ? { kind: 'category', name: c.name, colour: c.colour, custom: c.custom }
-        : { kind: 'category', name: c.name, colour: c.colour, contents: c.blocks.map((type) => ({ kind: 'block', type, ...(DEFAULT_INPUTS[type] ? { inputs: DEFAULT_INPUTS[type] } : {}) })) },
-    ),
-  };
+interface Props {
+  doc: BlocksDoc;
+  onChange: (doc: BlocksDoc) => void;
+  highlight: string | null;
+  errorRefs: Set<string>;
+  visible: boolean;
 }
 
-const style = (primary: string, secondary: string, tertiary: string) => ({ colourPrimary: primary, colourSecondary: secondary, colourTertiary: tertiary });
-const BLOCK_STYLES = {
-  event_blocks: style(PROG.event.fill, '#55524c', PROG.event.dark),
-  sensor_blocks: style(PROG.sensor.fill, '#6f887a', PROG.sensor.dark),
-  move_blocks: style(PROG.move.fill, '#6b7c92', PROG.move.dark),
-  weapon_blocks: style(PROG.weapon.fill, '#a5604f', PROG.weapon.dark),
-  system_blocks: style(PROG.system.fill, '#7f7a69', PROG.system.dark),
-  data_blocks: style(PROG.data.fill, '#938c7a', PROG.data.dark),
-  logic_blocks: style(PROG.logic.fill, '#7b6f62', PROG.logic.dark),
-  loop_blocks: style(PROG.logic.fill, '#7b6f62', PROG.logic.dark),
-  math_blocks: style(PROG.math.fill, '#a68e60', PROG.math.dark),
-  text_blocks: style(PROG.data.fill, '#938c7a', PROG.data.dark),
-  list_blocks: style(PROG.data.fill, '#938c7a', PROG.data.dark),
-  variable_blocks: style(PROG.memory.fill, '#887485', PROG.memory.dark),
-  variable_dynamic_blocks: style(PROG.memory.fill, '#887485', PROG.memory.dark),
-  procedure_blocks: style(PROG.memory.fill, '#887485', PROG.memory.dark),
-  colour_blocks: style(PROG.data.fill, '#938c7a', PROG.data.dark),
-  hat_blocks: style(PROG.event.fill, '#55524c', PROG.event.dark),
-};
-
-const theme = () =>
-  Blockly.Theme.defineTheme('automata-archive', {
-    name: 'automata-archive',
-    base: Blockly.Themes.Classic,
-    blockStyles: BLOCK_STYLES,
-    componentStyles: {
-      workspaceBackgroundColour: '#f4f0e6',
-      toolboxBackgroundColour: '#e8e2d4',
-      toolboxForegroundColour: '#2b2925',
-      flyoutBackgroundColour: '#ddd5c3',
-      flyoutForegroundColour: '#2b2925',
-      flyoutOpacity: 0.98,
-      scrollbarColour: '#b7ad98',
-      scrollbarOpacity: 0.9,
-      insertionMarkerColour: '#2b2925',
-      insertionMarkerOpacity: 0.25,
-      cursorColour: '#2b2925',
-      selectedGlowColour: '#2b2925',
-    },
-    fontStyle: { family: 'IBM Plex Sans, system-ui, sans-serif', weight: '500', size: 11 },
-    startHats: true,
-  });
-
-export function BlockEditor({ state, onChange, highlight, visible }: { state: BlocksState; onChange: (s: BlocksState) => void; highlight: string | null; visible: boolean }) {
+export const BlockEditor = forwardRef<EditorHandle, Props>(function BlockEditor({ doc, onChange, highlight, errorRefs, visible }, ref) {
   const host = useRef<HTMLDivElement>(null);
   const ws = useRef<Blockly.WorkspaceSvg | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const loading = useRef(false);
+  const emitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [module, setModule] = useState<{ id: string; code: string; isStmt: boolean } | null>(null);
+
+  const emitNow = () => {
+    const w = ws.current;
+    if (!w) return;
+    if (emitTimer.current) clearTimeout(emitTimer.current);
+    onChangeRef.current(Blockly.serialization.workspaces.save(w) as BlocksDoc);
+  };
+  const emitSoon = () => {
+    if (emitTimer.current) clearTimeout(emitTimer.current);
+    emitTimer.current = setTimeout(emitNow, 180);
+  };
 
   useEffect(() => {
-    register();
+    registerBlocks();
     const w = Blockly.inject(host.current!, {
-      toolbox: toolbox() as Blockly.utils.toolbox.ToolboxDefinition,
-      theme: theme(),
+      theme: blockTheme(),
       renderer: 'thrasos',
-      trashcan: true,
+      trashcan: false,
       sounds: false,
-      grid: { spacing: 24, length: 1, colour: '#c8bea9', snap: true },
-      zoom: { controls: true, wheel: true, startScale: 0.85, maxScale: 2, minScale: 0.3 },
+      grid: { spacing: 24, length: 2, colour: '#ddd5c5', snap: true },
+      zoom: { controls: true, wheel: true, startScale: 0.95, maxScale: 2, minScale: 0.35, pinch: true },
       move: { scrollbars: true, drag: true, wheel: false },
     });
     ws.current = w;
     loading.current = true;
     try {
-      Blockly.serialization.workspaces.load(state as object, w);
+      Blockly.serialization.workspaces.load(doc as object, w);
     } catch (e) {
-      console.error('Failed to load block program', e);
+      console.error('Failed to load blocks', e);
     }
     loading.current = false;
     const listener = (e: Blockly.Events.Abstract) => {
       if (loading.current || e.isUiEvent) return;
-      onChangeRef.current(Blockly.serialization.workspaces.save(w) as BlocksState);
+      emitSoon();
     };
     w.addChangeListener(listener);
+    moduleHooks.edit = (b) => {
+      const bb = b as Blockly.Block & { code: string };
+      setModule({ id: b.id, code: bb.code, isStmt: b.type === 'code_stmt' });
+    };
     return () => {
+      if (emitTimer.current) {
+        clearTimeout(emitTimer.current);
+        emitNow();
+      }
       w.dispose();
       ws.current = null;
     };
-    // The workspace is (re)created per program; parent keys this component by program id.
+    // The workspace is created once per document load; the parent keys this component.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (visible && ws.current) Blockly.svgResize(ws.current);
   }, [visible]);
+  useEffect(() => {
+    const el = host.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => ws.current && Blockly.svgResize(ws.current));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const reveal = (id: string) => {
+    const w = ws.current;
+    if (!w) return;
+    const b = w.getBlockById(id) as Blockly.BlockSvg | null;
+    if (!b) return;
+    w.highlightBlock(null);
+    w.highlightBlock(id);
+    w.centerOnBlock(id);
+    b.select();
+  };
 
   useEffect(() => {
     const w = ws.current;
     if (!w) return;
-    w.highlightBlock(highlight);
-    if (highlight && w.getBlockById(highlight)) {
-      w.centerOnBlock(highlight);
-      (w.getBlockById(highlight) as Blockly.BlockSvg).select();
-    }
+    if (highlight) reveal(highlight);
+    else w.highlightBlock(null);
   }, [highlight]);
 
-  return <div ref={host} className="blockly-host" data-testid="block-editor" />;
+  // mark blocks that have errors
+  useEffect(() => {
+    const w = ws.current;
+    if (!w) return;
+    for (const b of w.getAllBlocks(false)) {
+      const bad = errorRefs.has(b.id);
+      const svg = (b as Blockly.BlockSvg).getSvgRoot?.();
+      svg?.classList.toggle('blk-error', bad);
+    }
+  }, [errorRefs]);
+
+  useImperativeHandle(ref, () => ({
+    insert(code, kind) {
+      const w = ws.current;
+      if (!w) return false;
+      const frag = fragmentBlocks(code, kind);
+      if (!frag) return false;
+      const sel = Blockly.common.getSelected() as Blockly.BlockSvg | null;
+      const metrics = w.getMetricsManager().getViewMetrics(true);
+      let placed: Blockly.BlockSvg | null = null;
+      frag.forEach((json: BJ, i: number) => {
+        const b = Blockly.serialization.blocks.append(json as Blockly.serialization.blocks.State, w) as Blockly.BlockSvg;
+        // attach a statement after the selected statement when possible
+        if (i === 0 && kind === 'stmt' && sel && sel.nextConnection && b.previousConnection) {
+          const after = sel.nextConnection.targetBlock();
+          sel.nextConnection.connect(b.previousConnection);
+          let last = b;
+          while (last.getNextBlock()) last = last.getNextBlock() as Blockly.BlockSvg;
+          if (after && last.nextConnection && after.previousConnection && !after.previousConnection.isConnected()) last.nextConnection.connect(after.previousConnection);
+        } else {
+          b.moveTo(new Blockly.utils.Coordinate(metrics.left + 60 + i * 24, metrics.top + 60 + i * 24));
+        }
+        placed ??= b;
+      });
+      if (placed) (placed as Blockly.BlockSvg).select();
+      emitNow();
+      return true;
+    },
+    reveal,
+  }));
+
+  const applyModule = (code: string) => {
+    const w = ws.current;
+    if (!w || !module) return;
+    const b = w.getBlockById(module.id) as (Blockly.BlockSvg & { setCode(c: string): void; ir?: unknown }) | null;
+    if (b) {
+      b.setCode(code);
+      b.ir = undefined;
+      b.render();
+    }
+    setModule(null);
+    emitNow();
+  };
+
+  return (
+    <div className="editor-surface">
+      <div ref={host} className="blockly-host" data-testid="block-editor" />
+      {module && <ModuleDialog code={module.code} isStmt={module.isStmt} onApply={applyModule} onCancel={() => setModule(null)} />}
+    </div>
+  );
+});
+
+export function ModuleDialog({ code, isStmt, onApply, onCancel }: { code: string; isStmt: boolean; onApply: (c: string) => void; onCancel: () => void }) {
+  const [text, setText] = useState(code);
+  return (
+    <div className="module-dialog card" role="dialog" aria-label="Edit code module">
+      <header>
+        <h3>{isStmt ? 'Code module' : 'Value module'}</h3>
+        <p className="muted">AutoScript, kept exactly as written. If it can be shown as {isStmt ? 'blocks or nodes' : 'a value'}, it will be after you apply.</p>
+      </header>
+      <div className="module-code">
+        <CodeEditor value={code} onChange={setText} highlightLine={null} compact />
+      </div>
+      <footer>
+        <button className="btn" onClick={onCancel}>
+          Cancel
+        </button>
+        <button className="btn primary" onClick={() => onApply(text)}>
+          Apply
+        </button>
+      </footer>
+    </div>
+  );
 }

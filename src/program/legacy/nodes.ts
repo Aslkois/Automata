@@ -1,7 +1,7 @@
 // Headless compiler: node graph -> AutoScript. Validates port types, required inputs,
 // data cycles and exec cycles. Each exec node is prefixed with __at("<nodeId>").
-import { identFor, NODE_MAP, portCompatible, type NodeGenCtx } from '../nodeDefs';
-import type { CompileResult, GraphEdge, GraphNode, NodeGraph } from '../types';
+import { identFor, NODE_MAP, portCompatible, type NodeGenCtx } from './nodeDefs';
+import type { CompileResult, GraphEdge, GraphNode, NodeGraph } from './types';
 import { PRELUDE } from './prelude';
 
 export function validateGraph(g: NodeGraph): CompileResult['errors'] {

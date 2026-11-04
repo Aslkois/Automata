@@ -20,6 +20,8 @@ export interface DecisionRecord {
   error: string | null;
   contacts: number;
   threats: number;
+  /** values of the brain's top-level variables after this decision */
+  vars?: [string, string][];
 }
 
 export type ControllerState = 'ok' | 'compile-error' | 'runtime-error' | 'offline';
@@ -47,7 +49,7 @@ export class DroneController {
       this.lastError = this.compiled.errors.map((e) => (e.line ? `line ${e.line}: ${e.message}` : e.message)).join('; ');
       return;
     }
-    const interp = new Interpreter({ locMode: this.compiled.locMode, markerKind: this.compiled.markerKind, source: this.compiled.js, random: () => this.rng.next() });
+    const interp = new Interpreter({ locMode: this.compiled.locMode, markerKind: this.compiled.markerKind, source: this.compiled.js, random: () => this.rng.next(), libraryFrom: this.compiled.libraryFrom });
     const diags = interp.load();
     if (diags.length) {
       this.state = 'compile-error';
@@ -121,6 +123,7 @@ export class DroneController {
     rec.entries = it.trace;
     rec.dropped = it.traceDropped;
     rec.ops = it.ops;
+    rec.vars = it.globalVariables();
     this.push(rec);
   }
 

@@ -26,7 +26,7 @@ const TEAM_FILL = ['#262b31', '#2f2a22', '#262d27', '#2d262d'];
 const BONE = '#ece6d8';
 const BONE_DIM = '#b9b2a3';
 const RUST = '#c9735e';
-const MONO = "'IBM Plex Mono', ui-monospace, monospace";
+const MONO = "'JetBrains Mono', ui-monospace, monospace";
 
 /** Four corner brackets around a point: the archive's understated target marker. */
 function brackets(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, len: number) {
@@ -283,18 +283,52 @@ export class Renderer {
 
   private drawGear(d: Drone | Debris, s: RSection, px: number, phase: { left: number; right: number } | null) {
     const ctx = this.ctx;
-    const tracked = d.chassis.id === 'tracked';
+    const kind = d.chassis.id;
     for (const side of ['left', 'right'] as const) {
       const g = d.components.find((c) => c.kind === 'gear' && c.section === s.pos && c.gearSide === side);
       const y = side === 'left' ? -s.width / 2 - 3 : s.width / 2;
       const broken = !g || g.destroyed;
+      const ph = phase ? (side === 'left' ? phase.left : phase.right) : 0;
+      if (kind === 'walking') {
+        // two jointed feet per side, stepping with distance travelled
+        for (const f of [-0.25, 0.25]) {
+          const lift = Math.sin(ph * 0.35 + (f > 0 ? Math.PI : 0) + (side === 'left' ? 0 : Math.PI / 2));
+          const x = s.cx + f * s.length + lift * 1.2;
+          ctx.fillStyle = broken ? '#3a2723' : '#1b1a18';
+          ctx.fillRect(x - 2.2, y - 0.3, 4.4, 3.6);
+          ctx.strokeStyle = broken ? RUST : '#7a7468';
+          ctx.lineWidth = 0.4;
+          ctx.strokeRect(x - 2.2, y - 0.3, 4.4, 3.6);
+        }
+        continue;
+      }
+      if (kind === 'flying') {
+        // thruster pods; a faint warm wash beneath working ones
+        for (const f of [-0.28, 0.28]) {
+          const x = s.cx + f * s.length;
+          if (!broken) {
+            ctx.fillStyle = 'rgba(230, 200, 150, 0.10)';
+            ctx.beginPath();
+            ctx.arc(x, y + 1.5, 4.2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.fillStyle = broken ? '#3a2723' : '#1b1a18';
+          ctx.beginPath();
+          ctx.arc(x, y + 1.5, 2.1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = broken ? RUST : '#8a8478';
+          ctx.lineWidth = 0.4;
+          ctx.stroke();
+        }
+        continue;
+      }
+      const tracked = kind === 'tracked';
       ctx.fillStyle = broken ? '#3a2723' : '#1b1a18';
       ctx.fillRect(s.cx - s.length / 2 + 0.5, y, s.length - 1, 3);
       if (!broken) {
         ctx.strokeStyle = '#7a7468';
         ctx.lineWidth = 0.5;
         ctx.beginPath();
-        const ph = phase ? (side === 'left' ? phase.left : phase.right) : 0;
         const spacing = tracked ? 2.4 : 6;
         const off = ((ph % spacing) + spacing) % spacing;
         for (let x = s.cx - s.length / 2 + off; x < s.cx + s.length / 2; x += spacing) {

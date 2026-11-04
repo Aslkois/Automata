@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AA_DESTROYER, AA_PROGRAM, ASSAULT_PLATFORM, ASSAULT_PROGRAM } from '../../src/data/defaults';
 import { defaultArena, Simulation, type ScenarioConfig } from '../../src/sim/world';
-import { SimRunner } from '../../src/ui/battle/runner';
+import { SimRunner } from '../../src/ui/simulate/runner';
 
 const cfg: ScenarioConfig = { seed: 11, arena: defaultArena(), mode: 'duel', timeLimit: 0, decisionHz: 10, drones: [{ design: ASSAULT_PLATFORM, program: ASSAULT_PROGRAM, team: 0 }, { design: AA_DESTROYER, program: AA_PROGRAM, team: 1 }] };
 

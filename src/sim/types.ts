@@ -78,6 +78,8 @@ export interface RComponent {
   battery?: { charge: number };
   ammo?: { rounds: number };
   gearSide?: GearSide;
+  /** built into the chassis (propulsion, CPU, power core, coolant loop, proximity array) */
+  integrated?: boolean;
 }
 
 export interface RSection {

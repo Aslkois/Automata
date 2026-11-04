@@ -207,6 +207,8 @@ export interface InterpreterOptions {
   source: string;
   random: () => number;
   maxTrace?: number;
+  /** lines from here on are library helpers: traces inside them keep the caller's line */
+  libraryFrom?: number;
 }
 
 export class Interpreter {
@@ -267,6 +269,13 @@ export class Interpreter {
 
   defineGlobal(name: string, value: Value): void {
     this.globals.vars.set(name, { value, kind: 'builtin' });
+  }
+
+  /** Player-declared top-level variables and their current values (for the debugger). */
+  globalVariables(): [string, string][] {
+    const out: [string, string][] = [];
+    for (const [k, b] of this.globals.vars) if ((b.kind === 'var' || b.kind === 'let' || b.kind === 'const') && !k.startsWith('__')) out.push([k, inspect(b.value)]);
+    return out;
   }
 
   pushTrace(kind: TraceEntry['kind'], text: string): void {
@@ -353,7 +362,7 @@ export class Interpreter {
   }
 
   private setLine(n: N): void {
-    if (this.opts.locMode === 'line' && n.loc) this.loc = { kind: 'line', line: n.loc.start.line };
+    if (this.opts.locMode === 'line' && n.loc && !(this.opts.libraryFrom && n.loc.start.line >= this.opts.libraryFrom)) this.loc = { kind: 'line', line: n.loc.start.line };
   }
 
   private src(n: N): string {

@@ -2,7 +2,9 @@
 
 **Modular autonomous combat engineering sandbox.** You design the machine, you program its intelligence, and it fights on its own.
 
-AUTOMATA is a browser-based 2D top-down game. Drones are assembled from three structural sections (front / middle / rear, each light, medium or heavy) on a wheeled or tracked chassis, with weapons, sensors, shields, power, cooling, ammunition and control units mounted in physical slots. Their behaviour is written as **blocks**, **nodes** or **code**. All three compile to the same sandboxed language and run against the same drone API. Combat is fully simulated: moving projectiles, armor penetration, component damage, joints and detachment, shields, power, heat and recoil.
+AUTOMATA is a browser-based 2D top-down game for desktop, tablet and phone. A drone is three structural sections (front / middle / rear, each light, medium or heavy) on a **wheeled, tracked, walking or flying** chassis. Every chassis carries its own propulsion, autonomous CPU, power core, coolant loop and proximity sensors, so a new drone is already a working machine. You add weapons, shields, sensors and optional power, cooling and ammunition in physical slots.
+
+Each drone has **one brain**: a single program you can edit as **Blocks**, **Nodes** or **Code**. These are three views of the same program, not three programs. Combat is fully simulated: moving projectiles, armor penetration, component damage, joints and detachment, shields, power, heat and recoil.
 
 ## Quick start
 
@@ -16,7 +18,7 @@ npm run dev          # http://localhost:5173
 | `npm run dev` | Development server |
 | `npm run build` | Typecheck + production build into `dist/` |
 | `npm run typecheck` | Strict TypeScript check |
-| `npm test` | Simulation, runtime, compiler and battle-control tests (Vitest) |
+| `npm test` | Simulation, runtime, brain (one program, three views), migration and battle-control tests (Vitest) |
 | `npm run test:e2e` | Browser integration tests (Playwright; builds and serves the app) |
 | `npm run sim:headless -- <seed> <seconds> [assault-vs-aa\|skirm-vs-aa\|assault-vs-skirm]` | Run a duel headlessly and print the combat log |
 
@@ -33,25 +35,34 @@ npm run dev          # http://localhost:5173
 
 ## Using the game
 
-The interface is presented as **the Machine Archive**: an operating system left behind by the makers of autonomous machines. It is almost monochrome, built from parchment and ivory records, graphite instruments, and one muted rust reserved for faults and damage. See [docs/DESIGN.md](docs/DESIGN.md) for the design system.
+1. **Construct**:
+   - Choose a chassis, then set each section's class and armour on the assembly strip.
+   - To install equipment, select a slot on the drone and pick a part from the equipment tray. You can also pick a part first and then tap a highlighted slot, or drag it onto the drone.
+   - The properties surface shows power, mass, durability, mounting, facing and firing arc.
+   - A new drone starts with two machine guns, a magazine and a camera.
+2. **Program**:
+   - Choose **Blocks**, **Nodes** or **Code** at the top. Switching shows the same brain another way; it never creates another program.
+   - **Insert** (searchable, with the most common actions first) adds steps in any view. **Reference** documents the drone API.
+   - **Debug** shows the live decision trace and variable values of the drone on the battlefield. Entries jump to the logic that produced them.
+   - Anything a visual editor can't draw appears there as an editable **code module** that runs unchanged.
+   - Edits that don't convert yet are kept as a draft; the drone keeps running the last complete brain.
+3. **Simulate**:
+   - The battlefield fills the screen. Use the transport to play, pause, step a tick or a decision, change speed and restart.
+   - The Scenario sheet picks the drones. **Test** in Construct or Program deploys the current drone immediately.
+   - Selecting a drone (on the field or from the list) opens its spectator card: integrity, weapons, power and heat, sensors, components, the current action and the decision trace. Close it to return to freecam.
+   - Pan with drag or WASD, zoom with the wheel or a pinch. The app pauses when it goes to the background.
 
-- **I · Hangar (specimen archive)**:
-  - The left index lists catalogued specimens (*No. 001…*, each with a READY / CAUTION / FAULT mark) and the equipment catalogue. Equipment is told apart by schematic glyph and catalogue code rather than by colour.
-  - To install equipment, click a part to arm it (compatible slots are marked), then click a slot, or drag the part onto a slot.
-  - The drawing sheet shows the specimen as a technical record: hatched armor bands, a centreline, chain dimensions per section, numbered callouts with leader lines, firing arcs (rust hatching where an arc is blocked by the drone's own hull), and a title block of real figures.
-  - The three-segment selector under the sheet chooses rear, middle or front.
-  - The specification sheet on the right has four tabs: Selection, Performance, Register (numbered to match the callouts) and Checks.
-- **II · Programs (intelligence laboratory)**:
-  - The left index holds intelligence records (*IR-001…*) and an instrument palette that changes with the record type: node parts for node records, drone API calls for code records (click one to insert it), and the category key for block records.
-  - The record is edited in the centre. A dark compiler transcript sits under the editor; click a listed problem to jump to it.
-  - The reference volume on the right can be resized. Block and node records can switch to their compiled AutoScript or be converted to code.
-- **III · Battle (observation)**:
-  - The field is a graphite scope with calibrated edges and stays dominant.
-  - The thin strip above it holds transport controls (Play, Step tick, Step decision, Restart, the speed scale and the clock), plus the Scenario drawer, the Specimens tags overlay and the event Ledger.
-  - Freecam leaves the field unobstructed. Selecting a machine (on the field or from its tag) opens a **diagnostic report**: a live silhouette of its actual structure and failed components, plus Diagnostics, Components, Sensors and Program tabs with the full decision trace and *Show in editor*.
-  - The report briefly loses signal only when real hardware is destroyed.
+**Examples:**
 
-Examples included: **Assault Platform** (tracked; heavy front with two heavy cannons, medium middle with MGs and radar, light rear with point defense), run by the code program *Assault Doctrine*. **AA Destroyer** (wheeled; light front and rear with AA autocannons, heavy middle with a directional shield, radar and reactor), run by the block program *AA Orbit*. **Skirmisher**, run by the node program *Brawler*.
+| Drone | Chassis | Build | Brain opens in |
+| --- | --- | --- | --- |
+| Assault Platform | tracked | heavy cannons, MGs, radar, point defence | Code |
+| AA Destroyer | wheeled | AA autocannons, directional shield; circles its target | Blocks |
+| Skirmisher | wheeled | rotary cannon and shield; charges | Nodes |
+| Strider | walking | plants its feet at cannon range | Blocks |
+| Wisp | flying | light; strafes in orbit | Blocks |
+
+**Saved data:** libraries from earlier versions migrate automatically. Each design gets the program it was clearly paired with. Any other program is kept under **Program → Recovered**, and the original data is backed up in `localStorage` as `automata.library.v1-backup`.
 
 ## Documentation
 
@@ -61,3 +72,4 @@ Examples included: **Assault Platform** (tracked; heavy front with two heavy can
 - [Simulation & combat rules](docs/COMBAT_RULES.md)
 - [Roadmap & milestone checklist](docs/ROADMAP.md)
 - [Known limitations](docs/KNOWN_LIMITATIONS.md)
+- [Interface design](docs/DESIGN.md)
