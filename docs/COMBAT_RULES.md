@@ -11,7 +11,9 @@
 
 ## Projectiles
 - Projectiles are real bodies with velocity, drag, lifetime and travel time. Each tick a swept segment is tested against obstacles, shields, drone sections, debris and (for point defense rounds) interceptable shells. Fast rounds cannot tunnel through targets.
-- Penetration and damage scale with remaining speed: penetration ∝ v/v₀, damage ∝ (v/v₀)².
+- Penetration and damage scale with remaining speed: penetration ∝ v/v₀, damage ∝ (v/v₀)². Rocket and missile warheads keep their full values (shaped charge).
+- **Fire scheduling** is finer than the tick. A weapon fires every event whose time falls inside the tick, and each projectile starts with the part of the tick it has already flown. Rates above 60 per second are therefore exact.
+- Weapons, ammunition, rockets, guided missiles, pellets, explosions, interception and coilgun charging are specified in [WEAPONS.md](WEAPONS.md).
 
 ## Armor
 For a hit on a section face at angle θ from the surface normal:
@@ -34,6 +36,21 @@ For a hit on a section face at angle θ from the surface normal:
 - **Destroyed**: no intact section remains.
 - A team is defeated when none of its drones remains combat-effective (combat-ineffective = disabled, destroyed or disarmed). If both sides are still effective when the time limit expires, the battle is a draw.
 
+## Explosions
+- Rockets, missiles, interceptor rockets, warheads that break up when shot down, and cook-offs explode.
+- A blast's damage falls linearly to zero at its radius, measured to the nearest point of each section. Walls between the blast and a section block it.
+- A raised shield facing the blast absorbs it first.
+- Structure damage is reduced by armor (`1 − armor/90`, at least 25%). Fragments reach internal equipment only through plate thinner than their penetration. Exposed equipment within the radius is hit directly.
+- Every section and component is affected at most once per blast.
+
+## Fire
+- Fires start, deterministically:
+  - when an ammunition store cooks off with enough stock;
+  - when a generator of 60 PU/s or more, or a battery holding over 150 PU·s, is wrecked;
+  - when ammunition, a generator or a battery exceeds 210 heat.
+- A burning section damages its equipment (1.6 × intensity per second) and its structure (1.2 × intensity per second), and heats its equipment. A fire burns until its fuel runs out.
+- A Fire Suppression System in the section, or an adjacent one, puts it out after 0.5 s and spends one of its three charges. Programs can turn automatic release off and call `drone.suppressFire(section)` instead.
+
 ## Shields
 - A shield is a 120° barrier arc of radius 44 u, centred on its emitter. Its facing can be rotated by the program. It intercepts only rounds that cross into the barrier from outside and within the arc.
 - Each hit subtracts the round's energy (damage) from the charge. If the charge is insufficient, the shield **overloads** for 3.5 s and the round passes through with the leftover energy.
@@ -49,4 +66,14 @@ For a hit on a section face at angle θ from the surface normal:
 
 ## Sensors
 - A target is detected if any sensor that works and is powered has any point of it (centre of mass or a section centre) within range and arc, with clear line of sight past obstacles.
-- Cameras classify targets (size, heading, disabled) and measure velocity. Radar measures velocity, tracks incoming shells and is 360°, but does not classify.
+- Cameras classify targets (size, heading, disabled) and measure velocity. Radar measures velocity and is 360°, but does not classify. It tracks incoming shells and rockets on a collision course, and guided missiles closing within 900 u.
+- **Distance sensors** (front, left, right) are built into every chassis. Each casts one ray up to 500 u against walls, obstacles, other hulls and wrecks, sampled at every decision. A reading is a number, or `null` when nothing is in range. A separate status tells "nothing there" apart from a sensor that is destroyed, detached or unpowered. Damage shortens the range.
+- **Bumpers** report which side of the hull (front, rear, left, right) was in physical contact during the last 0.15 s, with the contact impulse. They come from the collision solver.
+- **LIDAR** casts 31 rays across 180° every 0.25 s. Each ray reports its angle relative to the hull heading and the distance, or `null`. It measures geometry only and never creates contacts.
+
+## Objectives
+- **Battle** (duel or sandbox): a side wins when no opposing drone is combat-effective. A battle still running at the time limit is a draw.
+- **Training** courses use one of three objectives:
+  - reach the goal point (`drone.goal()` gives its position, never the route);
+  - knock out every target (a target is out when disabled, destroyed or missing a section — an unarmed target is not out);
+  - survive the time limit.

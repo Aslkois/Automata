@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "sim:headless": "vite-node scripts/headless-duel.ts"
+    "sim:headless": "vite-node scripts/headless-duel.ts",
+    "balance": "vite-node scripts/balance.ts"
   },
   "license": "MIT",
   "dependencies": {

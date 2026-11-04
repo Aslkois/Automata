@@ -3,7 +3,13 @@
 - **Determinism** is verified in tests by comparing seeded runs within the same runtime (Node/V8). Cross-browser and cross-platform bit-for-bit reproducibility has not been verified.
 - **Armor** is one thickness per section, applied to all of that section's faces, and ablates as a single value. Impact location within a section matters for components, joints and angle, but not for the thickness itself.
 - **Exposed equipment** (turrets, sensors) is hit by a seeded probability (its *profile*), not by 3D geometry.
-- **Line of sight** for sensors checks static obstacles only. Wrecks and other drones do not block sensors, but they do block projectiles.
+- **Line of sight** for target sensors (cameras, radar, proximity array, missile seekers) checks static obstacles only. Wrecks and other drones do not block them, but they do block projectiles. Distance sensors and LIDAR do see hulls and wrecks.
+- **Distance sensors** are single rays. A thin gap or a surface just beside the ray is not seen. LIDAR has 6° between rays, so small objects at long range can fall between them.
+- **Bumpers** report contact per side of the whole hull (front, rear, left, right), not per section.
+- **Interception** uses straight-line swept tests against each round's position at the start of its own update. Two very fast rounds crossing can occasionally pass without a hit test registering a crossing in between. The rates in BALANCE.md are measured with this model.
+- **Fire** affects a whole section. It does not spread between sections, and it is not affected by movement.
+- **Explosions** are 2-D and instantaneous. There is no overpressure over time, and a blast affects each section and component at most once.
+- **Guided missiles** treat a target's centre of mass as the aim point and lead it linearly. Targets that change direction sharply can make them overshoot within their 95°/s turn limit.
 - **Detached sections** become inert debris. Equipment that is independently powered but detached does not keep operating, because brains run only on the part of the drone that still holds the integrated CPU (the middle section).
 - **Visual coverage of the language.** Blocks and Nodes draw the common structured subset natively: declarations, assignment, calls, if/else, while, do-while, for, for-of, return/break/continue, operators, member and index access, lists and comments. Other constructs are shown as editable code modules, not as native blocks or nodes. They round-trip exactly and run unchanged.
 - **Formatting and comment placement.** Code keeps your own text while the program's meaning is unchanged. After an edit in Blocks or Nodes, code is regenerated: indentation and quote style are normalised, and a comment placed inside an expression moves to just before its statement. Code modules keep their text verbatim.
@@ -13,7 +19,12 @@
 - **Saved-data migration.** A schema-1 program is assigned to a design only when the association is clear: the example pairing, or one best name match. Everything else goes to Recovered programs. Migrated block procedures with parameters use ordinary function parameters, where the old compiler bound them as globals.
 - **Debugging** has no breakpoints. It uses the per-decision trace, history scrubbing, errors with locations, `drone.log`, and single-tick or single-decision stepping.
 - **Replay and timeline scrubbing** are not implemented. Restart re-simulates from the recorded configuration.
-- **Modes**: only Duel and Sandbox exist. Team Battle, Fleet Battle, Challenges, Tournament and Replay Laboratory are not implemented. Sandbox already allows multi-drone, multi-team battles.
+- **Modes**: Duel, Sandbox and seven training courses exist. Team Battle, Fleet Battle, Challenges, Tournament and Replay Laboratory are not implemented. Sandbox already allows multi-drone, multi-team battles.
+- **Balance**: there is no points or weight budget. In straight duels the heavy starters beat the light ones most of the time, and about 40% of starter duels end in a draw at 120 s (see [BALANCE.md](BALANCE.md)).
+- **Audio** is synthesised in WebAudio and was checked for errors and routing in a headless browser only. How it sounds on real speakers and phones has not been judged by a person in this environment.
+- **Physical devices**: phone and tablet layouts were tested with Playwright's device emulation (iPhone 13, and the touch-phone end-to-end test). No physical phone or tablet was available. Keyboard behaviour that depends on `visualViewport` (the bottom bar hiding while typing) was implemented against the standard API but not observed on a real on-screen keyboard.
 - **Friendly communication API**: not implemented yet. Electronic warfare is excluded by design.
 - **Layout** adapts from 375 px phones (portrait and landscape) to large desktops. Panels are not dockable or resizable. Code editing on phones relies on the system keyboard plus a symbol bar. Node ports have enlarged touch targets, but dense graphs are still easiest to edit on a tablet or desktop.
 - **Example programs** are reasonable but simple. With default settings the Assault Platform usually beats the AA Destroyer, as the design brief intends: heavy cannons counter it.
+  - Only Pathfinder's brain navigates mazes.
+  - Example brains keep firing at a target that is knocked out but not disabled.

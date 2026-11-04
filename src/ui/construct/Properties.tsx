@@ -12,7 +12,7 @@ interface Props {
   design: DroneDesign;
   stats: DesignStats;
   sel: NonNullable<Selection>;
-  update: (fn: (d: DroneDesign) => void) => void;
+  update: (fn: (d: DroneDesign) => void, what?: string) => void;
   install: (pos: SectionPos, slotId: string, def: ComponentDef | null) => void;
   onSelect: (s: Selection) => void;
   onClose: () => void;
@@ -334,10 +334,13 @@ function SectionProps({ design, stats, pos, update, onSelect }: Props & { pos: S
   }, [pending]);
   useEffect(() => setPending(null), [pos]);
   const apply = (c: SectionClass, l: LayoutId, change: LayoutChange) =>
-    update((d) => {
-      const s = d.sections[pos];
-      d.sections[pos] = { class: c, layout: l, armor: Math.min(s.armor, SECTION_CLASSES[c].maxArmor), slots: change.slots };
-    });
+    update(
+      (d) => {
+        const s = d.sections[pos];
+        d.sections[pos] = { class: c, layout: l, armor: Math.min(s.armor, SECTION_CLASSES[c].maxArmor), slots: change.slots };
+      },
+      `${pos} section to ${SECTION_CLASSES[c].name.toLowerCase()}, ${LAYOUTS[c][l].name} layout`,
+    );
   /** Re-seat equipment; ask before anything would have to come off the drone. */
   const change = (c: SectionClass, l: LayoutId) => {
     if (c === sd.class && l === layout) return;

@@ -38,7 +38,8 @@ npm run dev          # http://localhost:5173
 1. **Construct**:
    - Choose a chassis, then set each section's class and armour on the assembly strip.
    - To install equipment, select a slot on the drone and pick a part from the equipment tray. You can also pick a part first and then tap a highlighted slot, or drag it onto the drone.
-   - The properties surface shows power, mass, durability, mounting, facing and firing arc.
+   - Each section chooses a **hardpoint layout** (Maximum, Medium or Minimum) next to its class. Equipment is moved to fitting slots. If something would not fit, you are asked first, and **Undo** (Ctrl+Z) restores the previous version.
+   - The properties surface shows power, mass, durability, mounting, facing, firing arc, mount stress and overheat time. It also has the part's own settings: fire mode, interceptor load, payload, braced joint. **Move…** relocates a part to another slot, swapping when both fit.
    - A new drone starts with two machine guns, a magazine and a camera.
 2. **Program**:
    - Choose **Blocks**, **Nodes** or **Code** at the top. Switching shows the same brain another way; it never creates another program.
@@ -52,17 +53,34 @@ npm run dev          # http://localhost:5173
    - Selecting a drone (on the field or from the list) opens its spectator card: integrity, weapons, power and heat, sensors, components, the current action and the decision trace. Close it to return to freecam.
    - Pan with drag or WASD, zoom with the wheel or a pinch. The app pauses when it goes to the background.
 
-**Examples:**
+**Examples** (eleven starters, one brain each):
 
-| Drone | Chassis | Build | Brain opens in |
-| --- | --- | --- | --- |
-| Assault Platform | tracked | heavy cannons, MGs, radar, point defence | Code |
-| AA Destroyer | wheeled | AA autocannons, directional shield; circles its target | Blocks |
-| Skirmisher | wheeled | rotary cannon and shield; charges | Nodes |
-| Strider | walking | plants its feet at cannon range | Blocks |
-| Wisp | flying | light; strafes in orbit | Blocks |
+| Drone | Level | Chassis | Build | Brain opens in |
+| --- | --- | --- | --- | --- |
+| Pathfinder | beginner | wheeled | LIDAR, machine gun; follows walls, solves the maze | Blocks |
+| Assault Platform | intermediate | tracked | heavy cannons, MGs, radar, point defence | Code |
+| AA Destroyer | intermediate | wheeled | autocannons, directional shield; circles its target | Blocks |
+| Skirmisher | intermediate | wheeled | rotary cannon and shield; charges | Nodes |
+| Strider | intermediate | walking | plants its feet at cannon range | Blocks |
+| Wisp | intermediate | flying | light; strafes in orbit | Blocks |
+| Mantis | intermediate | walking | two scatter cannons, spall liner; closes to point-blank range | Blocks |
+| Harrier | intermediate | flying | rocket pod on a Maximum-layout light front; rocket runs, breaks away to reload | Nodes |
+| Needle | advanced | wheeled | coilgun with capacitor and generator; shoots from a standstill | Code |
+| Aegis | advanced | tracked | radar, two point-defense guns, compact and directional shields, dual autocannon | Nodes |
+| Bastion | expert | tracked | twin heavy cannons, autoloader, spall liner, braced joint, fire suppression; angles its armor | Code |
+
+**Training** (Simulate → Scenario → Course): basic maze, obstacle course, weapon range, armor test, interception test, missile test, and cooling and power stress. Each course has built-in targets and an objective: reach the goal, knock out every target, or survive.
+
+**Sound** is off until you turn it on under **View**, where master, weapons and explosions, mechanical, environment and interface volumes are set and remembered. Every sound is synthesised in the browser; the game ships no recorded audio.
 
 **Saved data:** libraries from earlier versions migrate automatically. Each design gets the program it was clearly paired with. Any other program is kept under **Program → Recovered**, and the original data is backed up in `localStorage` as `automata.library.v1-backup`.
+
+When you load a design, it is migrated to schema 3:
+- the AA Autocannon becomes the Autocannon;
+- every section gets the Medium layout, which is the old arrangement;
+- configuration fields are validated.
+
+The six new example drones are added to an existing library once. Drones you made or edited are never replaced, and a deleted example is not brought back.
 
 ## Documentation
 
@@ -70,6 +88,8 @@ npm run dev          # http://localhost:5173
 - [Programming API](docs/API.md)
 - [Drone construction reference](docs/CONSTRUCTION.md)
 - [Simulation & combat rules](docs/COMBAT_RULES.md)
+- [Weapons and ammunition](docs/WEAPONS.md)
+- [Balance measurements and findings](docs/BALANCE.md) — regenerate with `npm run balance`
 - [Roadmap & milestone checklist](docs/ROADMAP.md)
 - [Known limitations](docs/KNOWN_LIMITATIONS.md)
 - [Interface design](docs/DESIGN.md)

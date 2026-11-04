@@ -300,7 +300,7 @@ const ROCKET: Partial<ProjectileStats> = {
   ricochetDeg: 90,
   interceptable: true,
   canIntercept: false,
-  integrity: 2,
+  integrity: 6,
   fixedYield: true,
   explosive: { radius: 35, damage: 15, fragPen: 6 },
   rocket: { accel: 520, maxSpeed: 700 },
@@ -332,7 +332,7 @@ const MISSILE: Partial<ProjectileStats> = {
   ricochetDeg: 90,
   interceptable: true,
   canIntercept: false,
-  integrity: 9,
+  integrity: 10,
   fixedYield: true,
   explosive: { radius: 40, damage: 24, fragPen: 8 },
   rocket: { accel: 260, maxSpeed: 560 },
@@ -394,8 +394,8 @@ export const COMPONENTS: ComponentDef[] = [
     armor: 7,
     profile: 0.32,
     description: 'Fires ten physical pellets per shell in a 5° cone. Devastating up close; pellets miss small targets at range.',
-    notes: 'Each pellet: 8 mm, 3 damage. Strong recoil and heat per blast. Uses scatter shells (Medium-Calibre Magazine, scatter payload).',
-    weapon: W({ caliber: 'medium', ammo: ['scatter'], cycleTime: 0.5, muzzleVelocity: 650, penetration: 8, damage: 3, magazine: 8, reloadTime: 3.2, spreadDeg: 0.8, recoilImpulse: 5200, heatPerShot: 5, traverseRate: 240, arcDeg: 240, projectileLife: 0.62, drag: 1.1, projectileRadius: 0.5, pellets: 10, pelletConeDeg: 5, power: 2 }),
+    notes: 'Each pellet: 13 mm, 4 damage, losing both quickly with distance. Strong recoil and heat per blast. Uses scatter shells (Medium-Calibre Magazine, scatter payload).',
+    weapon: W({ caliber: 'medium', ammo: ['scatter'], cycleTime: 0.5, muzzleVelocity: 650, penetration: 13, damage: 4, magazine: 8, reloadTime: 3.2, spreadDeg: 0.8, recoilImpulse: 5200, heatPerShot: 5, traverseRate: 240, arcDeg: 240, projectileLife: 0.62, drag: 1.1, projectileRadius: 0.5, pellets: 10, pelletConeDeg: 5, power: 2 }),
   },
   // ---------------- Weapons: medium hardpoints ----------------
   {
@@ -467,7 +467,7 @@ export const COMPONENTS: ComponentDef[] = [
     profile: 0.45,
     description: 'Large-calibre gun. Defeats heavy armor; slow to traverse and reload, heavy recoil.',
     notes: '100 mm, 120 damage per shell, one shell per 3.2 s. The greatest conventional single-shot impact; its shells can be shot down.',
-    weapon: W({ caliber: 'large', ammo: ['shell'], cycleTime: 0.2, muzzleVelocity: 780, penetration: 100, damage: 120, magazine: 1, reloadTime: 3.2, spreadDeg: 0.3, recoilImpulse: 60000, heatPerShot: 20, traverseRate: 55, arcDeg: 150, projectileLife: 1.7, drag: 0.12, ricochetDeg: 72, interceptable: true, integrity: 4, projectileRadius: 2.2, power: 10 }),
+    weapon: W({ caliber: 'large', ammo: ['shell'], cycleTime: 0.2, muzzleVelocity: 780, penetration: 100, damage: 120, magazine: 1, reloadTime: 3.2, spreadDeg: 0.3, recoilImpulse: 60000, heatPerShot: 20, traverseRate: 55, arcDeg: 150, projectileLife: 1.7, drag: 0.12, ricochetDeg: 72, interceptable: true, integrity: 4, projectileRadius: 1, power: 10 }),
   },
   {
     id: 'coilgun',

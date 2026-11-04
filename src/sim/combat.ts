@@ -298,11 +298,26 @@ function proximityFuze(sim: SimContext, p: Projectile): void {
     if (d.team === p.team || d.status.destroyed) continue;
     const c = comWorld(d.body);
     if (Math.hypot(c.x - p.pos.x, c.y - p.pos.y) > d.radius + g.fuze + 2) continue;
-    if (hullDistance(d, p.pos) <= g.fuze) {
+    // a round on a collision course is left to strike (its direct-hit penetration applies);
+    // the proximity fuze is for near misses
+    if (hullDistance(d, p.pos) <= g.fuze && !onCollisionCourse(d, p, g.fuze * 3)) {
       detonate(sim, p, p.pos, 'missile');
       return;
     }
   }
+}
+
+/** Does the projectile's straight path over the next `ahead` units cross an attached hull section? */
+function onCollisionCourse(d: Drone, p: Projectile, ahead: number): boolean {
+  const sp = Math.hypot(p.vel.x, p.vel.y) || 1;
+  const a = worldToLocal(d.body, p.pos);
+  const b = worldToLocal(d.body, { x: p.pos.x + (p.vel.x / sp) * ahead, y: p.pos.y + (p.vel.y / sp) * ahead });
+  for (const s of Object.values(d.sections)) {
+    if (!s.attached) continue;
+    const r = segmentBox(a, b, s.cx, 0, s.length / 2 + p.radius, s.width / 2 + p.radius);
+    if (r) return true;
+  }
+  return false;
 }
 
 function resolveHit(sim: SimContext, p: Projectile, hit: Hit, at: Vec2): void {

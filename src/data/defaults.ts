@@ -707,8 +707,11 @@ let run = "attack";
 function update() {
   const enemy = drone.nearestEnemy();
   if (enemy == null) {
+    // search: head for the middle of the arena, keeping clear of walls
     drone.ceaseFire();
-    drone.drive(0.8, 0.3);
+    const a = drone.arena();
+    if (drone.distanceTo(a.width / 2, a.height / 2) > 300 && !drone.obstacleDetected("front", 220)) drone.turnToward(a.width / 2, a.height / 2, 0.8);
+    else steerClear(0.8);
     return;
   }
   const pod = drone.weapon(POD);
@@ -722,8 +725,9 @@ function update() {
     turnTowardContact(enemy, 1);
   } else {
     drone.ceaseFire(POD);
-    // break away at an angle, then come round for the next run
-    drone.drive(1, clamp(angleDiff(drone.heading(), enemy.bearing + 150) / 30, -1, 1));
+    // break away at an angle, then come round for the next run — never into a wall
+    if (drone.obstacleDetected("front", 200)) drone.drive(0.6, openDistance("left") > openDistance("right") ? -1 : 1);
+    else drone.drive(1, clamp(angleDiff(drone.heading(), enemy.bearing + 150) / 30, -1, 1));
   }
 }
 `;
