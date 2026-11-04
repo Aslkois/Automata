@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { pickDrone, Renderer, screenToWorld, type Camera } from '../../render/renderer';
 import type { Quality } from '../../render/vfx';
+import { BUSES, type CombatAudio } from '../../render/audio';
 import { comWorld } from '../../sim/drone';
 import type { Drone } from '../../sim/types';
 import { useShell } from '../App';
@@ -312,7 +313,7 @@ export function Simulate({ active }: { active: boolean }) {
             </button>
           </>
         )}
-        <ViewMenu open={viewMenu} setOpen={setViewMenu} {...{ showArcs, setShowArcs, showSensors, setShowSensors, quality, setQuality, sound, setSound }} onFit={() => (fitRequest.current = true)} />
+        <ViewMenu open={viewMenu} setOpen={setViewMenu} {...{ showArcs, setShowArcs, showSensors, setShowSensors, quality, setQuality, sound, setSound }} audio={runner.audio} onFit={() => (fitRequest.current = true)} />
       </div>
 
       {sim?.result && (
@@ -364,8 +365,9 @@ export function Simulate({ active }: { active: boolean }) {
   );
 }
 
-function ViewMenu(p: { open: boolean; setOpen: (o: boolean) => void; showArcs: boolean; setShowArcs: (v: boolean) => void; showSensors: boolean; setShowSensors: (v: boolean) => void; quality: Quality; setQuality: (q: Quality) => void; sound: boolean; setSound: (v: boolean) => void; onFit: () => void }) {
+function ViewMenu(p: { open: boolean; setOpen: (o: boolean) => void; showArcs: boolean; setShowArcs: (v: boolean) => void; showSensors: boolean; setShowSensors: (v: boolean) => void; quality: Quality; setQuality: (q: Quality) => void; sound: boolean; setSound: (v: boolean) => void; audio: CombatAudio; onFit: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [, redraw] = useState(0);
   useDismiss(p.open, () => p.setOpen(false), ref);
   return (
     <div className="menu-anchor" ref={ref}>
@@ -375,7 +377,7 @@ function ViewMenu(p: { open: boolean; setOpen: (o: boolean) => void; showArcs: b
       {p.open && (
         <div className="menu pop" role="menu" aria-label="View options">
           <label className="switch-label">
-            <input type="checkbox" className="switch" checked={p.showSensors} onChange={(e) => p.setShowSensors(e.target.checked)} /> Sensor cones
+            <input type="checkbox" className="switch" checked={p.showSensors} onChange={(e) => p.setShowSensors(e.target.checked)} /> Sensors &amp; ranging
           </label>
           <label className="switch-label">
             <input type="checkbox" className="switch" checked={p.showArcs} onChange={(e) => p.setShowArcs(e.target.checked)} /> Weapon arcs
@@ -383,6 +385,28 @@ function ViewMenu(p: { open: boolean; setOpen: (o: boolean) => void; showArcs: b
           <label className="switch-label">
             <input type="checkbox" className="switch" checked={p.sound} onChange={(e) => p.setSound(e.target.checked)} /> Sound
           </label>
+          {p.sound && (
+            <div className="volumes" role="group" aria-label="Volume">
+              {BUSES.map((b) => (
+                <label key={b.id} className="volume-row" title={b.hint}>
+                  <span>{b.name}</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    aria-label={`${b.name} volume`}
+                    value={Math.round(p.audio.settings.volumes[b.id] * 100)}
+                    onChange={(e) => {
+                      p.audio.setVolume(b.id, Number(e.target.value) / 100);
+                      redraw((x) => x + 1);
+                    }}
+                  />
+                  <span className="mono small">{Math.round(p.audio.settings.volumes[b.id] * 100)}</span>
+                </label>
+              ))}
+            </div>
+          )}
           <label className="select-row">
             Effects
             <select aria-label="Effects quality" value={p.quality} onChange={(e) => p.setQuality(e.target.value as Quality)}>

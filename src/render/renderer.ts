@@ -2,7 +2,8 @@
 import { comWorld, localToWorld } from '../sim/drone';
 import { activeSensors } from '../sim/sensors';
 import type { Simulation } from '../sim/world';
-import type { Debris, Drone, RComponent, RSection } from '../sim/types';
+import type { Debris, Drone, Projectile, RComponent, RSection } from '../sim/types';
+import { DISTANCE_RANGE } from '../sim/content/integrated';
 import type { Vfx } from './vfx';
 import { TEAM_LIGHT } from '../ui/theme';
 
@@ -161,23 +162,16 @@ export class Renderer {
     const visible = new Set<number>(sensorMode ? [sel.id, ...sel.perception.contacts.map((c) => c.id)] : sim.drones.map((d) => d.id));
 
     for (const b of sim.debris) this.drawDebris(b, px);
-    if (sel && (opts.showSensors || sensorMode)) this.drawSensors(sel, px);
+    if (sel && (opts.showSensors || sensorMode)) {
+      this.drawSensors(sel, px);
+      this.drawEnvironment(sim, sel, px);
+    }
     if (sel && opts.showArcs) this.drawArcs(sel, px);
     for (const d of sim.drones) if (visible.has(d.id)) this.drawDrone(d, px, sel?.id === d.id);
 
-    // projectiles
+    // projectiles, drawn by what they physically are
     ctx.lineCap = 'round';
-    for (const p of sim.projectiles) {
-      const large = p.caliber === 'large';
-      ctx.strokeStyle = large ? '#f4ead2' : p.caliber === 'medium' ? '#e6d3a3' : '#d9cfb8';
-      ctx.lineWidth = Math.max(px * (large ? 2.2 : 1.2), large ? 1.6 : 0.6);
-      const sp = Math.hypot(p.vel.x, p.vel.y) || 1;
-      const tail = Math.min(large ? 14 : 9, Math.hypot(p.pos.x - p.prev.x, p.pos.y - p.prev.y));
-      ctx.beginPath();
-      ctx.moveTo(p.pos.x, p.pos.y);
-      ctx.lineTo(p.pos.x - (p.vel.x / sp) * tail, p.pos.y - (p.vel.y / sp) * tail);
-      ctx.stroke();
-    }
+    for (const p of sim.projectiles) this.drawProjectile(p, px);
     vfx.draw(ctx, z);
 
     // contacts of the selected drone (what its program can see)
@@ -359,11 +353,38 @@ export class Renderer {
       const len = c.def?.size === 'L' ? 15 : c.def?.size === 'M' ? 9 : 6.5;
       ctx.strokeStyle = col;
       ctx.lineWidth = c.def?.size === 'L' ? 2.4 : c.def?.size === 'M' ? 1.5 : 1;
+      const w = c.def?.weapon;
       if (!dead) {
-        ctx.beginPath();
-        ctx.moveTo(c.x + Math.cos(a) * r * 0.5, c.y + Math.sin(a) * r * 0.5);
-        ctx.lineTo(c.x + Math.cos(a) * (r + len), c.y + Math.sin(a) * (r + len));
-        ctx.stroke();
+        const barrels = w?.barrels ?? [0];
+        const launcher = !!w && (w.ammo.includes('rocket') || w.ammo.includes('missile'));
+        if (launcher) {
+          // a box of launch tubes
+          const bl = len * 0.75;
+          const bw = (Math.max(...barrels.map(Math.abs)) + 1.2) * 1;
+          ctx.save();
+          ctx.translate(c.x, c.y);
+          ctx.rotate(a);
+          ctx.fillStyle = '#22211e';
+          ctx.fillRect(-r * 0.2, -bw, r * 0.2 + bl, bw * 2);
+          ctx.strokeRect(-r * 0.2, -bw, r * 0.2 + bl, bw * 2);
+          for (let i = 0; i < barrels.length; i++) {
+            const loaded = i < (c.weapon?.mag ?? 0);
+            ctx.beginPath();
+            ctx.arc(bl - 0.9, barrels[i], 0.55, 0, Math.PI * 2);
+            if (loaded) ctx.fill();
+            ctx.stroke();
+          }
+          ctx.restore();
+        } else {
+          const nx = -Math.sin(a);
+          const ny = Math.cos(a);
+          for (const off of barrels) {
+            ctx.beginPath();
+            ctx.moveTo(c.x + Math.cos(a) * r * 0.5 + nx * off, c.y + Math.sin(a) * r * 0.5 + ny * off);
+            ctx.lineTo(c.x + Math.cos(a) * (r + len) + nx * off, c.y + Math.sin(a) * (r + len) + ny * off);
+            ctx.stroke();
+          }
+        }
       } else {
         // broken barrel: short, bent
         ctx.beginPath();
@@ -378,6 +399,15 @@ export class Renderer {
       ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+      // coilgun capacitor bank: charge shown as a closing ring
+      if (!dead && w?.charge && c.weapon) {
+        const ch = c.weapon.charge;
+        ctx.strokeStyle = ch >= 1 ? '#f7f3ea' : 'rgba(226,228,226,0.6)';
+        ctx.lineWidth = Math.max(px * 1.2, 0.7);
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, r + 1.6, -Math.PI / 2, -Math.PI / 2 + ch * Math.PI * 2);
+        ctx.stroke();
+      }
     } else if (c.kind === 'sensor') {
       ctx.strokeStyle = dead ? '#4a4843' : BONE;
       ctx.fillStyle = '#22211e';
@@ -538,6 +568,119 @@ export class Renderer {
       }
       ctx.fill();
       ctx.stroke();
+    }
+  }
+
+  private drawProjectile(p: Projectile, px: number) {
+    const ctx = this.ctx;
+    const sp = Math.hypot(p.vel.x, p.vel.y) || 1;
+    const ux = p.vel.x / sp;
+    const uy = p.vel.y / sp;
+    const moved = Math.hypot(p.pos.x - p.prev.x, p.pos.y - p.prev.y);
+    switch (p.kind) {
+      case 'pellet': {
+        ctx.strokeStyle = '#d9cfb8';
+        ctx.lineWidth = Math.max(px * 0.9, 0.5);
+        const tail = Math.min(4, moved);
+        ctx.beginPath();
+        ctx.moveTo(p.pos.x, p.pos.y);
+        ctx.lineTo(p.pos.x - ux * tail, p.pos.y - uy * tail);
+        ctx.stroke();
+        return;
+      }
+      case 'slug': {
+        // coilgun penetrator: a long, bright, perfectly straight streak
+        const tail = Math.min(36, moved);
+        ctx.strokeStyle = 'rgba(226,228,226,0.35)';
+        ctx.lineWidth = Math.max(px * 4, 2.4);
+        ctx.beginPath();
+        ctx.moveTo(p.pos.x, p.pos.y);
+        ctx.lineTo(p.pos.x - ux * tail, p.pos.y - uy * tail);
+        ctx.stroke();
+        ctx.strokeStyle = '#f7f3ea';
+        ctx.lineWidth = Math.max(px * 1.4, 0.9);
+        ctx.stroke();
+        return;
+      }
+      case 'rocket':
+      case 'interceptor':
+      case 'missile': {
+        const len = p.kind === 'missile' ? 7 : p.kind === 'rocket' ? 4.5 : 3.2;
+        const wid = p.kind === 'missile' ? 1.8 : 1.1;
+        // exhaust plume while the motor burns
+        if (p.rocket) {
+          ctx.fillStyle = p.kind === 'interceptor' ? 'rgba(236,230,216,0.8)' : 'rgba(227,196,146,0.85)';
+          ctx.beginPath();
+          ctx.moveTo(p.pos.x - ux * len, p.pos.y - uy * len);
+          ctx.lineTo(p.pos.x - ux * (len + 5 + Math.random() * 3) - uy * wid * 0.6, p.pos.y - uy * (len + 5 + Math.random() * 3) + ux * wid * 0.6);
+          ctx.lineTo(p.pos.x - ux * (len + 5 + Math.random() * 3) + uy * wid * 0.6, p.pos.y - uy * (len + 5 + Math.random() * 3) - ux * wid * 0.6);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.strokeStyle = p.kind === 'interceptor' ? '#ece6d8' : '#d8cdb4';
+        ctx.lineWidth = Math.max(px * wid * 1.3, wid);
+        ctx.beginPath();
+        ctx.moveTo(p.pos.x, p.pos.y);
+        ctx.lineTo(p.pos.x - ux * len, p.pos.y - uy * len);
+        ctx.stroke();
+        return;
+      }
+      default: {
+        const large = p.caliber === 'large';
+        ctx.strokeStyle = large ? '#f4ead2' : p.caliber === 'medium' ? '#e6d3a3' : '#d9cfb8';
+        ctx.lineWidth = Math.max(px * (large ? 2.2 : 1.2), large ? 1.6 : 0.6);
+        const tail = Math.min(large ? 14 : 9, moved);
+        ctx.beginPath();
+        ctx.moveTo(p.pos.x, p.pos.y);
+        ctx.lineTo(p.pos.x - ux * tail, p.pos.y - uy * tail);
+        ctx.stroke();
+      }
+    }
+  }
+
+  /** What the selected drone measures of its surroundings: distance rays, LIDAR returns, missile tracks. */
+  private drawEnvironment(sim: Simulation, d: Drone, px: number) {
+    const ctx = this.ctx;
+    ctx.lineWidth = px;
+    for (const r of d.ranges) {
+      const ok = r.status === 'ok';
+      const hit = ok && r.distance !== null;
+      ctx.strokeStyle = !ok ? 'rgba(201,115,94,0.55)' : hit ? 'rgba(236,230,216,0.5)' : 'rgba(236,230,216,0.18)';
+      ctx.setLineDash(hit ? [] : [3 * px, 4 * px]);
+      const len = hit ? r.distance! : ok ? DISTANCE_RANGE : 18;
+      ctx.beginPath();
+      ctx.moveTo(r.ox, r.oy);
+      ctx.lineTo(r.ox + Math.cos(r.dir) * len, r.oy + Math.sin(r.dir) * len);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (hit) {
+        ctx.beginPath();
+        ctx.moveTo(r.hx! - 4 * px, r.hy! - 4 * px);
+        ctx.lineTo(r.hx! + 4 * px, r.hy! + 4 * px);
+        ctx.moveTo(r.hx! + 4 * px, r.hy! - 4 * px);
+        ctx.lineTo(r.hx! - 4 * px, r.hy! + 4 * px);
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = 'rgba(236,230,216,0.75)';
+    for (const c of d.components) {
+      if (!c.scan) continue;
+      for (const ray of c.scan.rays) {
+        if (ray.x === null || ray.y === null) continue;
+        ctx.fillRect(ray.x - 1.2 * px, ray.y - 1.2 * px, 2.4 * px, 2.4 * px);
+      }
+    }
+    // this drone's guided rounds: where each believes its target is
+    for (const p of sim.projectiles) {
+      if (p.owner !== d.id || !p.guidance || !p.track) continue;
+      const fresh = sim.time - p.track.time <= p.guidance.memory + 0.12;
+      ctx.strokeStyle = fresh ? (p.track.source === 'seeker' ? 'rgba(236,230,216,0.55)' : 'rgba(185,178,163,0.45)') : 'rgba(201,115,94,0.5)';
+      ctx.setLineDash([2 * px, 3 * px]);
+      ctx.beginPath();
+      ctx.moveTo(p.pos.x, p.pos.y);
+      ctx.lineTo(p.track.x, p.track.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
   }
 

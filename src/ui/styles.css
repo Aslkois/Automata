@@ -2640,6 +2640,31 @@ select.nf {
   align-items: center;
   font-size: 13px;
 }
+.menu .volumes {
+  display: grid;
+  gap: 6px;
+  padding: 2px 0 4px 2px;
+  border-left: 1px solid var(--line-dark-strong);
+  margin-left: 6px;
+  padding-left: 10px;
+}
+.menu .volume-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 26px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ivory);
+}
+.menu .volume-row input[type='range'] {
+  width: 100%;
+  accent-color: var(--ivory);
+  min-height: 24px;
+}
+.menu .volume-row .mono {
+  text-align: right;
+  opacity: 0.7;
+}
 .menu select {
   background: var(--pitch);
   color: var(--ivory);
