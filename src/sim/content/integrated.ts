@@ -6,7 +6,7 @@
 import type { DroneDesign } from '../design';
 import { CHASSIS } from './chassis';
 import type { ComponentDef } from './components';
-import type { SectionClass } from './sections';
+import { SECTION_CLASSES, type SectionClass, type SectionPos } from './sections';
 
 const CLASS_DRIVE: Record<SectionClass, { force: number; power: number; electrical: number }> = {
   light: { force: 120000, power: 2600000, electrical: 16 },
@@ -20,10 +20,19 @@ export const CPU_BUDGET = 20000;
 
 export interface IntegratedPart {
   id: string;
+  section: SectionPos;
   def: ComponentDef;
+  /** position relative to the section centre */
   x: number;
   y: number;
+  /** mounted facing (radians, local) */
+  facing?: number;
+  /** stands on the hull surface (can be struck from outside) */
+  external?: boolean;
 }
+
+/** Range of the integrated distance sensors (u). */
+export const DISTANCE_RANGE = 500;
 
 export function integratedParts(d: Pick<DroneDesign, 'chassis' | 'sections'>): IntegratedPart[] {
   const ch = CHASSIS[d.chassis];
@@ -33,33 +42,55 @@ export function integratedParts(d: Pick<DroneDesign, 'chassis' | 'sections'>): I
   const electrical = classes.reduce((s, c) => s + CLASS_DRIVE[c].electrical, 0);
   const gen = 30 + classes.reduce((s, c) => s + CLASS_POWER[c], 0);
   const base = { slot: 'internal' as const, size: 'S' as const, armor: 4, profile: 0, integrated: true };
+  const front = SECTION_CLASSES[d.sections.front.class];
+  const mid = SECTION_CLASSES[d.sections.middle.class];
+  const rf = (side: 'front' | 'left' | 'right'): ComponentDef => ({
+    ...base,
+    id: `integrated_distance_${side}`,
+    name: `Distance sensor (${side})`,
+    kind: 'rangefinder',
+    mass: 0,
+    hp: 30,
+    armor: 2,
+    profile: 0.08,
+    description: `Measures the distance to the nearest surface ${side === 'front' ? 'straight ahead' : `to the ${side}`}, up to ${DISTANCE_RANGE} u.`,
+    rangefinder: { range: DISTANCE_RANGE, side },
+  });
   return [
+    { id: 'F.DIST', section: 'front', x: front.length / 2 - 1, y: 0, facing: 0, external: true, def: rf('front') },
+    { id: 'M.DISTL', section: 'middle', x: 0, y: -(mid.width / 2 - 1), facing: -Math.PI / 2, external: true, def: rf('left') },
+    { id: 'M.DISTR', section: 'middle', x: 0, y: mid.width / 2 - 1, facing: Math.PI / 2, external: true, def: rf('right') },
     {
       id: 'M.DRIVE',
+      section: 'middle',
       x: -3,
       y: 0,
       def: { ...base, id: `integrated_drive_${ch.id}`, name: ch.driveName, kind: 'motor', mass: 0, hp: 180, description: `Integrated ${ch.driveName.toLowerCase()}. Output falls with damage, power shortage and heat; heavier drones accelerate less.`, motor: { maxForce: Math.round(force), power: Math.round(power), electrical, heatAtFull: 4 } },
     },
     {
       id: 'M.CPU',
+      section: 'middle',
       x: 1,
       y: -2.5,
       def: { ...base, id: 'integrated_cpu', name: 'Autonomous CPU', kind: 'controller', mass: 0, hp: 340, armor: 24, description: 'Runs the drone’s brain. Fails only if its section is destroyed or the drone breaks apart.', controller: { opsBudget: CPU_BUDGET, power: 2 } },
     },
     {
       id: 'M.CORE',
+      section: 'middle',
       x: 1,
       y: 2.5,
       def: { ...base, id: 'integrated_core', name: 'Power core', kind: 'generator', mass: 0, hp: 160, description: `Baseline ${gen} PU/s with a 500 PU·s buffer. Add generators and batteries for demanding builds.`, power: { generation: gen, storage: 500, maxDischarge: 110, heatAtFull: 3 } },
     },
     {
       id: 'M.COOL',
+      section: 'middle',
       x: 4.5,
       y: 0,
       def: { ...base, id: 'integrated_coolant', name: 'Coolant loop', kind: 'cooler', mass: 0, hp: 120, description: 'Baseline cooling for the whole frame. Add cooling units for sustained heavy fire.', cooler: { cooling: 6, power: 2 } },
     },
     {
       id: 'M.PROX',
+      section: 'middle',
       x: -6,
       y: 0,
       def: { ...base, id: 'integrated_proximity', name: 'Proximity array', kind: 'sensor', mass: 0, hp: 100, description: 'Short-range all-round sensing so every drone can see what is near it. Cameras and radar see further.', sensor: { arcDeg: 360, range: 420, classifies: true, velocity: true, tracksProjectiles: false, power: 2 } },

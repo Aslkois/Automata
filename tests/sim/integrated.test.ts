@@ -60,7 +60,7 @@ describe('integrated chassis systems', () => {
       },
     };
     const d = parseDesign(v1);
-    expect(d.schema).toBe(2);
+    expect(d.schema).toBe(3);
     expect(d.sections.front.slots.H1?.component).toBe('mg');
     expect(d.sections.front.slots.I1).toBeUndefined();
     expect(d.sections.middle.slots.I1).toBeUndefined();

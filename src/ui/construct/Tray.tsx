@@ -28,7 +28,7 @@ function keyStat(def: ComponentDef): { k: string; v: number; unit: string } | nu
   if (def.motor) return { k: 'Force', v: Math.round(def.motor.maxForce / 1000), unit: 'kN·u' };
   if (def.controller) return { k: 'Budget', v: def.controller.opsBudget, unit: 'ops' };
   if (def.cooler) return { k: 'Cooling', v: def.cooler.cooling, unit: '/s' };
-  if (def.ammo) return { k: 'Rounds', v: def.ammo.rounds, unit: '' };
+  if (def.ammo) return { k: 'Rounds', v: def.ammo.payloads[0].rounds, unit: '' };
   return null;
 }
 

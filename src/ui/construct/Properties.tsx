@@ -1,5 +1,5 @@
 // The properties surface: appears for a selected slot or section only.
-import { COMPONENT_MAP, type ComponentDef } from '../../sim/content/components';
+import { AMMO_TYPES, COMPONENT_MAP, type ComponentDef } from '../../sim/content/components';
 import { SECTION_CLASSES, SECTION_LETTER, type SectionClass, type SectionPos } from '../../sim/content/sections';
 import { mountId, type DesignStats, type DroneDesign } from '../../sim/design';
 import { fmt, Glyph, Icon, Meter, Prop } from '../common';
@@ -49,7 +49,7 @@ export function capabilities(def: ComponentDef): [string, string][] {
   if (def.motor) rows.push(['Drive force', `${(def.motor.maxForce / 1000).toFixed(0)} kN·u`]);
   if (def.controller) rows.push(['Brain budget', `${def.controller.opsBudget} operations per decision`]);
   if (def.cooler) rows.push(['Cooling', `${def.cooler.cooling} /s`]);
-  if (def.ammo) rows.push(['Rounds', `${def.ammo.rounds} × ${def.ammo.caliber}`]);
+  if (def.ammo) rows.push(['Holds', def.ammo.payloads.map((p) => `${p.rounds} ${AMMO_TYPES[p.type].plural}`).join(' or ')]);
   return rows;
 }
 
@@ -157,7 +157,7 @@ function SectionProps({ design, stats, pos, update, onSelect }: Props & { pos: S
         const def = v ? COMPONENT_MAP[v.component] : null;
         if (v && nslot && def && fits(def, nslot)) slots[k] = v;
       }
-      d.sections[pos] = { class: c, armor: Math.min(s.armor, ncls.maxArmor), slots };
+      d.sections[pos] = { class: c, layout: s.layout ?? 'medium', armor: Math.min(s.armor, ncls.maxArmor), slots };
     });
   const removedOnChange = (c: SectionClass) => {
     const ncls = SECTION_CLASSES[c];

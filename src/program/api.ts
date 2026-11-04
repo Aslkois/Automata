@@ -4,8 +4,11 @@
 import type { SimContext } from '../sim/context';
 import { comWorld, functional, localToWorld } from '../sim/drone';
 import { DEG, wrapAngle, type Rng } from '../sim/math';
-import { ammoReserve, weaponObstruction } from '../sim/systems';
-import type { Contact, Drone, FailureEvent, RComponent } from '../sim/types';
+import { weaponRange } from '../sim/ammo';
+import type { AmmoType } from '../sim/content/components';
+import type { SectionPos } from '../sim/content/sections';
+import { activeBarrels, ammoReserve, effectiveCycle, requestReload, suppressRequests, weaponObstruction } from '../sim/systems';
+import type { BumperSide, Contact, Drone, FailureEvent, RangeReading, RComponent } from '../sim/types';
 import { HostFn, inspect, Interpreter, isObj, makeObj, ProgramError, toStr, toValue, type ObjVal, type Value } from './interpreter';
 
 export interface ApiHost {
@@ -73,16 +76,32 @@ export function weaponInfo(d: Drone, c: RComponent): Record<string, unknown> {
     health: c.hp / c.maxHp,
     ammo: ws.mag,
     magazine: w.magazine,
-    reserve: ammoReserve(d, w.caliber),
+    reserve: ammoReserve(d, w.ammo),
+    ammoTypes: w.ammo.slice(),
+    selectedAmmo: ws.selected,
+    loaded: { ...ws.loaded },
+    reserveByType: Object.fromEntries(w.ammo.map((t) => [t, ammoReserve(d, t)])),
     reloading: ws.reloading,
-    ready: ok && !ws.reloading && ws.mag > 0 && !ws.overheated && ws.cooldown <= 0,
+    reloadProgress: ws.reloading ? (w.charge ? ws.charge : Math.max(0, Math.min(1, 1 - ws.reloadLeft / Math.max(1e-6, w.reloadTime)))) : 1,
+    reloadTime: ws.reloadTotal,
+    charging: !!w.charge && ws.reloading,
+    charge: w.charge ? ws.charge : null,
+    spin: w.spinUp ? ws.spin : null,
+    barrels: w.barrels?.length ?? 1,
+    activeBarrels: activeBarrels(c),
+    fireMode: ws.fireMode,
+    fireModes: (w.fireModes ?? ['sequence']).slice(),
+    rpm: Math.round(60 / effectiveCycle(c)),
+    guided: w.ammo.includes('missile'),
+    designated: ws.designated,
+    ready: ok && !ws.reloading && ws.mag > 0 && !ws.overheated && ws.cooldown <= 0 && (!w.charge || ws.charge >= 1),
     overheated: ws.overheated,
     heat: c.heat,
     aim: wrapAngle(d.body.angle + ws.aim) / DEG,
     arcMin: wrapAngle(facingW - (w.arcDeg / 2) * DEG) / DEG,
     arcMax: wrapAngle(facingW + (w.arcDeg / 2) * DEG) / DEG,
     muzzleVelocity: w.muzzleVelocity,
-    range: w.muzzleVelocity * w.projectileLife * 0.85,
+    range: weaponRange(w),
     penetration: w.penetration,
     blocked: ws.blockReason,
   };
@@ -101,6 +120,15 @@ function aimCheck(d: Drone, c: RComponent, x: number, y: number) {
 export function createDroneApi(host: ApiHost): ObjVal {
   const { drone: d } = host;
   const fn = (name: string, f: (a: Value[], it: Interpreter) => Value) => new HostFn(`drone.${name}`, f);
+  const rangeReading = (side: Value, it: Interpreter): RangeReading => {
+    const s = toStr(side ?? 'front');
+    const r = d.ranges.find((x) => x.side === s);
+    if (!r) {
+      if (!['front', 'left', 'right'].includes(s)) throw new ProgramError('distance sensors are "front", "left" and "right"', it.loc);
+      return { side: s as RangeReading['side'], distance: null, status: 'destroyed', ox: 0, oy: 0, hx: null, hy: null, dir: 0 };
+    }
+    return r;
+  };
   const cmd = (it: Interpreter, text: string) => it.pushTrace('command', text);
   const read = (it: Interpreter, text: string) => it.pushTrace('call', text);
 
@@ -172,6 +200,73 @@ export function createDroneApi(host: ApiHost): ObjVal {
         ),
     ),
 
+    // ---------------------------------------------------------------- environment
+    distance: fn('distance', (a, it) => {
+      const r = rangeReading(a[0], it);
+      read(it, `distance(${r.side}) → ${r.status !== 'ok' ? `unavailable (${r.status})` : r.distance === null ? 'nothing in range' : r1(r.distance)}`);
+      return r.status === 'ok' ? r.distance : null;
+    }),
+    obstacleDetected: fn('obstacleDetected', (a, it) => {
+      const r = rangeReading(a[0], it);
+      const within = a[1] === undefined ? 150 : num(a[1], 'obstacleDetected distance', it);
+      const v = r.status === 'ok' && r.distance !== null && r.distance <= within;
+      read(it, `obstacleDetected(${r.side}, ${r1(within)}) → ${v}${r.status !== 'ok' ? ` (sensor ${r.status})` : ''}`);
+      return v;
+    }),
+    rangeStatus: fn('rangeStatus', (a, it) => rangeReading(a[0], it).status),
+    ranges: fn('ranges', () => toValue(d.ranges.map((r) => ({ side: r.side, distance: r.status === 'ok' ? r.distance : null, status: r.status })))),
+    bumper: fn('bumper', (a, it) => {
+      const side = toStr(a[0] ?? 'front');
+      if (!['front', 'rear', 'left', 'right'].includes(side)) throw new ProgramError('bumper: side must be "front", "rear", "left" or "right"', it.loc);
+      const sec = side === 'front' ? 'front' : side === 'rear' ? 'rear' : 'middle';
+      const b = d.bumps[side as BumperSide];
+      const v = d.sections[sec].attached && host.sim.time - b.time <= 0.15;
+      read(it, `bumper(${side}) → ${v}`);
+      return v;
+    }),
+    bumpers: fn('bumpers', () => {
+      const out: Record<string, Value> = {};
+      for (const side of ['front', 'rear', 'left', 'right'] as BumperSide[]) {
+        const b = d.bumps[side];
+        const on = host.sim.time - b.time <= 0.15;
+        out[side] = on;
+        out[side + 'Impulse'] = on ? Math.round(b.impulse) : 0;
+      }
+      return makeObj(out);
+    }),
+    lidar: fn('lidar', (a, it) => {
+      const l = a.length ? resolve(d, a[0], 'sensor', it) : d.components.find((c) => c.def?.lidar);
+      if (!l || !l.def?.lidar) {
+        read(it, 'lidar() → no LIDAR installed');
+        return [];
+      }
+      const rays = l.scan?.rays ?? [];
+      read(it, `lidar(${l.id}) → ${rays.length} rays${rays.length ? `, nearest ${r1(Math.min(...rays.map((r) => r.distance ?? Infinity)))}` : functional(d, l) ? '' : ' (not functional)'}`);
+      return toValue(rays);
+    }),
+    lidarAge: fn('lidarAge', () => {
+      const l = d.components.find((c) => c.def?.lidar);
+      return l?.scan && l.scan.time >= 0 ? host.sim.time - l.scan.time : null;
+    }),
+
+    // ---------------------------------------------------------------- fire
+    fires: fn('fires', () => toValue((['front', 'middle', 'rear'] as const).filter((p) => d.sections[p].fire > 0).map((p) => ({ section: p, intensity: d.sections[p].fire, burning: host.sim.time - d.sections[p].fireSince })))),
+    suppressFire: fn('suppressFire', (a, it) => {
+      const sec = toStr(a[0] ?? 'middle') as SectionPos;
+      if (!['front', 'middle', 'rear'].includes(sec)) throw new ProgramError('suppressFire: section must be "front", "middle" or "rear"', it.loc);
+      const set = suppressRequests.get(d) ?? new Set<SectionPos>();
+      set.add(sec);
+      suppressRequests.set(d, set);
+      cmd(it, `suppressFire(${sec})${d.sections[sec].fire > 0 ? '' : ' — no fire there'}`);
+      return undefined;
+    }),
+    setAutoSuppression: fn('setAutoSuppression', (a, it) => {
+      const on = a.length ? !!a[0] : true;
+      for (const c of d.components) if (c.suppression) c.suppression.auto = on;
+      cmd(it, `setAutoSuppression(${on})`);
+      return undefined;
+    }),
+
     // ---------------------------------------------------------------- movement
     drive: fn('drive', (a, it) => {
       d.throttle = Math.max(-1, Math.min(1, num(a[0] ?? 0, 'drive throttle', it)));
@@ -236,22 +331,65 @@ export function createDroneApi(host: ApiHost): ObjVal {
     }),
     reload: fn('reload', (a, it) => {
       const c = resolve(d, a[0], 'weapon', it);
-      const ws = c.weapon!;
-      const w = c.def!.weapon!;
-      if (functional(d, c) && !ws.reloading && ws.mag < w.magazine && ammoReserve(d, w.caliber) > 0) {
-        ws.reloading = true;
-        ws.reloadLeft = w.reloadTime;
-        cmd(it, `reload(${c.id}) started`);
-      } else cmd(it, `reload(${c.id}) ignored`);
-      return undefined;
+      const started = requestReload(host.sim, d, c);
+      cmd(it, `reload(${c.id}) ${started ? 'started' : `ignored${c.weapon!.reloading ? ' (already reloading)' : c.weapon!.mag >= c.def!.weapon!.magazine ? ' (magazine full)' : ammoReserve(d, c.def!.weapon!.ammo) <= 0 ? ' (no reserve ammunition)' : ''}`}`);
+      return started;
     }),
+    setFireMode: fn('setFireMode', (a, it) => {
+      const c = resolve(d, a[0], 'weapon', it);
+      const mode = toStr(a[1]);
+      const modes = c.def!.weapon!.fireModes ?? ['sequence'];
+      if (mode !== 'sequence' && mode !== 'sync') throw new ProgramError(`setFireMode: mode must be "sequence" or "sync"`, it.loc);
+      if (!modes.includes(mode)) {
+        cmd(it, `setFireMode(${c.id}, ${mode}) ignored — ${c.name} supports ${modes.join(', ')}`);
+        return false;
+      }
+      c.weapon!.fireMode = mode;
+      cmd(it, `setFireMode(${c.id}, ${mode})`);
+      return true;
+    }),
+    selectAmmo: fn('selectAmmo', (a, it) => {
+      const c = resolve(d, a[0], 'weapon', it);
+      const t = toStr(a[1]) as AmmoType;
+      if (!c.def!.weapon!.ammo.includes(t)) {
+        cmd(it, `selectAmmo(${c.id}, ${t}) ignored — accepts ${c.def!.weapon!.ammo.join(', ')}`);
+        return false;
+      }
+      c.weapon!.selected = t;
+      cmd(it, `selectAmmo(${c.id}, ${t}) · ${c.weapon!.loaded[t] ?? 0} loaded`);
+      return true;
+    }),
+    designate: fn('designate', (a, it) => {
+      const c = resolve(d, a[0], 'weapon', it);
+      const t = a[1];
+      const id = t === null || t === undefined ? null : isObj(t) ? Number(t.id) : Number(t);
+      if (id !== null && !d.perception.contacts.some((x) => x.id === id)) {
+        cmd(it, `designate(${c.id}, #${id}) ignored — not a current contact`);
+        return false;
+      }
+      c.weapon!.designated = id;
+      cmd(it, `designate(${c.id}, ${id === null ? 'none' : '#' + id})`);
+      return true;
+    }),
+    ammoStock: fn('ammoStock', () => {
+      const out: Record<string, number> = {};
+      for (const c of d.components) if (c.ammo && functional(d, c)) for (const [k, n] of Object.entries(c.ammo.stock)) out[k] = (out[k] ?? 0) + (n ?? 0);
+      return toValue(out);
+    }),
+    missiles: fn('missiles', () =>
+      toValue(
+        host.sim.projectiles
+          .filter((p) => p.alive && p.owner === d.id && p.guidance)
+          .map((p) => ({ id: p.id, kind: p.kind, x: p.pos.x, y: p.pos.y, target: p.target, tracking: p.track && host.sim.time - p.track.time <= (p.guidance!.memory + 0.12) ? p.track.source : 'lost', age: p.age })),
+      ),
+    ),
     canFire: fn('canFire', (a, it) => {
       const c = resolve(d, a[0], 'weapon', it);
       const x = num(a[1], 'canFire x', it);
       const y = num(a[2], 'canFire y', it);
       const chk = aimCheck(d, c, x, y);
       const ws = c.weapon!;
-      const ok = functional(d, c) && chk.inArc && !chk.obstructed && ws.mag > 0 && !ws.reloading && !ws.overheated;
+      const ok = functional(d, c) && chk.inArc && !chk.obstructed && ws.mag > 0 && !ws.reloading && !ws.overheated && (!c.def!.weapon!.charge || ws.charge >= 1);
       read(it, `canFire(${c.id}) → ${ok}${!chk.inArc ? ' (out of arc)' : ''}${chk.obstructed ? ` (blocked by ${chk.obstructed})` : ''}`);
       return ok;
     }),
@@ -274,7 +412,8 @@ export function createDroneApi(host: ApiHost): ObjVal {
       const tvx = typeof t.vx === 'number' ? t.vx : 0;
       const tvy = typeof t.vy === 'number' ? t.vy : 0;
       const m = localToWorld(d.body, c);
-      const s = c.def!.weapon!.muzzleVelocity;
+      const w0 = c.def!.weapon!;
+      const s = w0.ammo.includes('rocket') || w0.ammo.includes('missile') ? 600 : w0.muzzleVelocity;
       const rx = tx - m.x;
       const ry = ty - m.y;
       // Solve |r + v t| = s t
@@ -413,7 +552,9 @@ export const API_NAMES = [
   'id', 'team', 'time', 'x', 'y', 'position', 'heading', 'speed', 'velocity', 'angleTo', 'distanceTo', 'arena', 'random', 'log',
   'contacts', 'enemies', 'nearestEnemy', 'threats', 'sensors',
   'drive', 'stop', 'turnToward',
-  'weapons', 'weapon', 'aim', 'aimAt', 'fire', 'ceaseFire', 'reload', 'canFire', 'inArc', 'aimError', 'lead',
+  'distance', 'obstacleDetected', 'rangeStatus', 'ranges', 'bumper', 'bumpers', 'lidar', 'lidarAge',
+  'weapons', 'weapon', 'aim', 'aimAt', 'fire', 'ceaseFire', 'reload', 'setFireMode', 'selectAmmo', 'designate', 'ammoStock', 'missiles', 'canFire', 'inArc', 'aimError', 'lead',
+  'fires', 'suppressFire', 'setAutoSuppression',
   'shields', 'raiseShield', 'shieldFace', 'shieldFaceToward',
   'power', 'setPower', 'maxHeat',
   'components', 'component', 'sections', 'count', 'status', 'failures',

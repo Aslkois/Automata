@@ -17,16 +17,19 @@ export const ASSAULT_PLATFORM: DroneDesign = {
   sections: {
     front: {
       class: 'heavy',
+      layout: 'medium',
       armor: 70,
       slots: { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('camera'), I1: m('cooler'), I2: m('shell_rack'), I3: m('battery'), I4: m('reactor') },
     },
     middle: {
       class: 'medium',
+      layout: 'medium',
       armor: 30,
       slots: { H1: m('mg', -60), H2: m('mg', 60), H3: m('radar'), I1: m('cooler'), I2: m('ammo_small') },
     },
     rear: {
       class: 'light',
+      layout: 'medium',
       armor: 10,
       slots: { H1: m('point_defense', 180), H2: m('point_defense', 180), I1: m('battery'), I2: m('cooler') },
     },
@@ -41,18 +44,21 @@ export const AA_DESTROYER: DroneDesign = {
   sections: {
     front: {
       class: 'light',
+      layout: 'medium',
       armor: 12,
-      slots: { H1: m('aa_gun'), H2: m('aa_gun'), I1: m('ammo_medium'), I2: m('cooler') },
+      slots: { H1: m('autocannon'), H2: m('autocannon'), I1: m('ammo_medium'), I2: m('cooler') },
     },
     middle: {
       class: 'heavy',
+      layout: 'medium',
       armor: 66,
       slots: { H1: m('radar'), H2: m('shield_dir'), H3: m('camera'), I1: m('cooler'), I3: m('battery'), I4: m('reactor') },
     },
     rear: {
       class: 'light',
+      layout: 'medium',
       armor: 10,
-      slots: { H1: m('aa_gun', 180), H2: m('aa_gun', 180), I1: m('ammo_medium'), I2: m('cooler') },
+      slots: { H1: m('autocannon', 180), H2: m('autocannon', 180), I1: m('ammo_medium'), I2: m('cooler') },
     },
   },
 };
@@ -63,9 +69,9 @@ export const SKIRMISHER: DroneDesign = {
   name: 'Skirmisher',
   chassis: 'wheeled',
   sections: {
-    front: { class: 'light', armor: 15, slots: { H1: m('camera'), H2: m('mg'), I1: m('ammo_small'), I2: m('cooler') } },
-    middle: { class: 'medium', armor: 25, slots: { H1: m('rotary_cannon'), H2: m('shield_dir'), H3: m('camera', 180), I2: m('ammo_medium') } },
-    rear: { class: 'light', armor: 8, slots: { H1: m('mg', 180), I1: m('generator_s'), I2: m('generator_s') } },
+    front: { class: 'light', layout: 'medium', armor: 15, slots: { H1: m('camera'), H2: m('mg'), I1: m('ammo_small'), I2: m('cooler') } },
+    middle: { class: 'medium', layout: 'medium', armor: 25, slots: { H1: m('rotary_cannon'), H2: m('shield_dir'), H3: m('camera', 180), I2: m('ammo_medium') } },
+    rear: { class: 'light', layout: 'medium', armor: 8, slots: { H1: m('mg', 180), I1: m('generator_s'), I2: m('generator_s') } },
   },
 };
 
@@ -75,9 +81,9 @@ export const STRIDER: DroneDesign = {
   name: 'Strider',
   chassis: 'walking',
   sections: {
-    front: { class: 'medium', armor: 30, slots: { H1: m('rotary_cannon'), H3: m('camera'), I2: m('ammo_medium') } },
-    middle: { class: 'medium', armor: 25, slots: { H1: m('mg', -90), H2: m('mg', 90), I1: m('ammo_small') } },
-    rear: { class: 'light', armor: 10, slots: { H1: m('point_defense', 180) } },
+    front: { class: 'medium', layout: 'medium', armor: 30, slots: { H1: m('rotary_cannon'), H3: m('camera'), I2: m('ammo_medium') } },
+    middle: { class: 'medium', layout: 'medium', armor: 25, slots: { H1: m('mg', -90), H2: m('mg', 90), I1: m('ammo_small') } },
+    rear: { class: 'light', layout: 'medium', armor: 10, slots: { H1: m('point_defense', 180) } },
   },
 };
 
@@ -87,9 +93,9 @@ export const WISP: DroneDesign = {
   name: 'Wisp',
   chassis: 'flying',
   sections: {
-    front: { class: 'light', armor: 8, slots: { H1: m('mg'), H2: m('mg'), I1: m('ammo_small') } },
-    middle: { class: 'light', armor: 6, slots: { H1: m('camera'), H2: m('camera', 180) } },
-    rear: { class: 'light', armor: 4, slots: {} },
+    front: { class: 'light', layout: 'medium', armor: 8, slots: { H1: m('mg'), H2: m('mg'), I1: m('ammo_small') } },
+    middle: { class: 'light', layout: 'medium', armor: 6, slots: { H1: m('camera'), H2: m('camera', 180) } },
+    rear: { class: 'light', layout: 'medium', armor: 4, slots: {} },
   },
 };
 

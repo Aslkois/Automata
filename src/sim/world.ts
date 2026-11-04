@@ -2,15 +2,16 @@
 // Rendering, UI and audio only observe this state — they never mutate it.
 import { DroneController } from '../program/runtime';
 import type { ProgramSource } from '../program/types';
-import { spawnProjectile, stepProjectiles } from './combat';
+import { stepProjectiles } from './combat';
 import type { SimContext } from './context';
 import { combatIneffective, computeStatus, processJoints } from './damage';
 import type { DroneDesign } from './design';
-import { buildDrone, comWorld } from './drone';
+import { buildDrone, comWorld, dirToLocal } from './drone';
 import { Rng } from './math';
 import { boxPoly, integrate, resolveContact, satCollide, sectionPoly, stepDebrisFriction, stepGroundForces } from './physics';
-import { stepHeat, stepPower, stepShields, stepWeapons } from './systems';
-import type { Arena, Debris, Drone, Projectile, SimEvent } from './types';
+import { readRanges, scanLidars } from './sensors';
+import { stepFires, stepHeat, stepPower, stepShields, stepWeapons } from './systems';
+import type { Arena, BumperSide, Debris, Drone, Projectile, SimEvent } from './types';
 
 export const SIM_HZ = 60;
 export const SIM_DT = 1 / SIM_HZ;
@@ -116,7 +117,7 @@ export class Simulation implements SimContext {
   emit(e: SimEvent): void {
     this.events.push(e);
     if (this.events.length > 6000) this.events.splice(0, this.events.length - 6000);
-    if (e.type !== 'shot' && e.type !== 'collision' && !(e.type === 'impact' && (e.result === 'wall' || e.result === 'debris')) && e.type !== 'component-damaged') {
+    if (e.type !== 'shot' && e.type !== 'collision' && e.type !== 'reload' && e.type !== 'spin' && e.type !== 'charge' && e.type !== 'shield-raise' && !(e.type === 'impact' && (e.result === 'wall' || e.result === 'debris')) && e.type !== 'component-damaged') {
       this.log.push(e);
       if (this.log.length > 3000) this.log.splice(0, this.log.length - 3000);
     }
@@ -132,17 +133,22 @@ export class Simulation implements SimContext {
   step(): void {
     const dt = SIM_DT;
     // 1) Decisions at the decision frequency (stable id order).
+    for (const d of this.drones) scanLidars(this, d);
     if (this.tick % this.ticksPerDecision === 0) {
-      for (const d of this.drones) this.controllers.get(d.id)!.decide(this);
+      for (const d of this.drones) {
+        d.ranges = readRanges(this, d);
+        this.controllers.get(d.id)!.decide(this);
+      }
     }
     // 2) Systems
     for (const d of this.drones) {
       const active = !d.status.disabled;
       stepPower(this, d, dt);
       const load = stepGroundForces(d, dt, active);
-      stepWeapons(this, d, dt, (c, ang) => spawnProjectile(this, d, c, ang));
-      stepShields(d, dt);
+      stepWeapons(this, d, dt);
+      stepShields(this, d, dt);
       stepHeat(this, d, dt, load);
+      stepFires(this, d, dt);
     }
     // 3) Integrate bodies
     for (const d of this.drones) integrate(d.body, dt);
@@ -170,10 +176,23 @@ export class Simulation implements SimContext {
   }
 
   private bodies() {
-    const out: { body: Drone['body']; polys: ReturnType<typeof sectionPoly>[]; radius: number; id: number }[] = [];
-    for (const d of this.drones) out.push({ body: d.body, polys: Object.values(d.sections).filter((s) => s.attached).map((s) => sectionPoly(d.body, s)), radius: d.radius, id: d.id });
+    const out: { body: Drone['body']; polys: ReturnType<typeof sectionPoly>[]; radius: number; id: number; drone?: Drone }[] = [];
+    for (const d of this.drones) out.push({ body: d.body, polys: Object.values(d.sections).filter((s) => s.attached).map((s) => sectionPoly(d.body, s)), radius: d.radius, id: d.id, drone: d });
     for (const b of this.debris) out.push({ body: b.body, polys: b.sections.map((s) => sectionPoly(b.body, s)), radius: b.radius, id: b.id });
     return out;
+  }
+
+  /** Bumpers: record which side of a drone's hull is in physical contact (normal points away from the drone). */
+  private bump(d: Drone | undefined, nx: number, ny: number, impulse: number) {
+    if (!d) return;
+    const l = dirToLocal(d.body, { x: nx, y: ny });
+    const side: BumperSide = Math.abs(l.x) >= Math.abs(l.y) ? (l.x > 0 ? 'front' : 'rear') : l.y > 0 ? 'right' : 'left';
+    const b = d.bumps[side];
+    if (b.time === this.time) b.impulse += impulse;
+    else {
+      b.time = this.time;
+      b.impulse = impulse;
+    }
   }
 
   private collide(): void {
@@ -192,6 +211,8 @@ export class Simulation implements SimContext {
             const mf = satCollide(pa, pb);
             if (!mf) continue;
             const imp = resolveContact(A.body, B.body, mf);
+            this.bump(A.drone, mf.n.x, mf.n.y, imp);
+            this.bump(B.drone, -mf.n.x, -mf.n.y, imp);
             if (imp > 400) this.emit({ t: this.time, type: 'collision', a: A.id, b: B.id, x: mf.point.x, y: mf.point.y, impulse: imp });
           }
       }
@@ -204,7 +225,11 @@ export class Simulation implements SimContext {
         const op = boxPoly(o.x, o.y, o.hw, o.hh);
         for (const pa of A.polys) {
           const mf = satCollide(pa, op);
-          if (mf) resolveContact(A.body, null, mf, 0.1, 0.5);
+          if (mf) {
+            const imp = resolveContact(A.body, null, mf, 0.1, 0.5);
+            this.bump(A.drone, mf.n.x, mf.n.y, imp);
+            if (imp > 2500) this.emit({ t: this.time, type: 'collision', a: A.id, b: -1, x: mf.point.x, y: mf.point.y, impulse: imp });
+          }
         }
       }
     }
@@ -235,9 +260,10 @@ export class Simulation implements SimContext {
     for (const d of this.drones) {
       parts.push(d.id, d.body.pos.x, d.body.pos.y, d.body.angle, d.body.vel.x, d.body.vel.y, d.body.angVel, d.throttle, d.steer);
       for (const s of Object.values(d.sections)) parts.push(s.hp, s.armor, s.attached ? 1 : 0);
-      for (const c of d.components) parts.push(c.hp, c.heat, c.weapon?.mag ?? -1, c.weapon?.aim ?? 0, c.shield?.charge ?? -1, c.battery?.charge ?? -1, c.ammo?.rounds ?? -1);
+      for (const s of Object.values(d.sections)) parts.push(s.fire);
+      for (const c of d.components) parts.push(c.hp, c.heat, c.weapon?.mag ?? -1, c.weapon?.aim ?? 0, c.weapon?.charge ?? -1, c.shield?.charge ?? -1, c.battery?.charge ?? -1, c.ammo ? JSON.stringify(c.ammo.stock) : -1);
     }
-    for (const p of this.projectiles) parts.push(p.id, p.pos.x, p.pos.y);
+    for (const p of this.projectiles) parts.push(p.id, p.pos.x, p.pos.y, p.vel.x, p.vel.y);
     for (const b of this.debris) parts.push(b.id, b.body.pos.x, b.body.pos.y);
     return parts.join('|');
   }

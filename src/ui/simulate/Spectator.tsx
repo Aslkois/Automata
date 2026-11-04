@@ -146,7 +146,7 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
                       <td className="name">{c.def!.name}</td>
                       <td className="num r">
                         {ws.mag}/{c.def!.weapon!.magazine}
-                        <span className="muted"> +{ammoReserve(d, c.def!.weapon!.caliber)}</span>
+                        <span className="muted"> +{ammoReserve(d, c.def!.weapon!.ammo)}</span>
                       </td>
                       <td className={`st ${state === 'firing' ? 'on' : state === 'ready' ? 'ok' : state === 'reloading' ? '' : 'fault'}`}>{state}</td>
                     </tr>
