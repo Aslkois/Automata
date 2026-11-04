@@ -268,8 +268,8 @@ export function Simulate({ active }: { active: boolean }) {
           <Icon name="deploy" size={16} />
           {cfg ? (
             <span>
-              {cfg.mode === 'duel' ? 'Duel' : 'Sandbox'}
-              <em> · {cfg.drones.map((d) => d.design.name).join(' vs ')}</em>
+              {cfg.arena.name.startsWith('Training: ') ? cfg.arena.name.slice(10).replace(/^./, (c) => c.toUpperCase()) : cfg.mode === 'duel' ? 'Duel' : 'Sandbox'}
+              <em> · {cfg.drones.filter((d) => !cfg.arena.name.startsWith('Training: ') || d.team === 0).map((d) => d.design.name).join(' vs ')}</em>
             </span>
           ) : (
             'Deploy'

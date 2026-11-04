@@ -168,12 +168,13 @@ export const TRAININGS: Training[] = [
     teaches: 'Radar threats, point defense, interceptor rockets, shields facing the danger. Interception is never guaranteed.',
     objective: 'survive',
     timeLimit: 60,
-    arena: () => openArena('Training: interception', [{ x: 1350, y: 550, hw: 18, hh: 70 }]),
+    // the battery starts within radar range of the spawn, with cover beside its line of fire
+    arena: () => openArena('Training: interception', [{ x: 960, y: 430, hw: 18, hh: 70 }]),
     targets: () => [
       {
         design: design('battery', 'Launcher battery', 'tracked', { class: 'heavy', layout: 'medium', armor: 70, slots: { H1: m('missile_launcher', 180), H3: m('camera', 180), I4: m('missile_reserve'), I1: m('cooler') } }, { class: 'medium', layout: 'medium', armor: 35, slots: { H1: m('rocket_pod', 180), H3: m('radar'), I1: m('rocket_cassette'), I2: m('battery') } }, sec('light', 10)),
         program: brain('battery', BATTERY),
-        x: 1560,
+        x: 1040,
         y: 550,
         angle: 0,
       },
