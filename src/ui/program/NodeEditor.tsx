@@ -22,6 +22,7 @@ import { CALL_MAP, calleeCategory, ENUM_OPTIONS, PICK_KINDS, type ParamKind } fr
 import { inlineText, isValueNode, nodeSize, parseInline, portsOf, snippetToGraph, type GEdge, type GNode, type GraphDoc } from '../../program/brain/graph';
 import { ARITH_OPS, ASSIGN_OPS, COMPARE_OPS, LOGIC_OPS, newId, type Expr } from '../../program/brain/ir';
 import { CAT } from '../theme';
+import { Icon, useStoredState } from '../common';
 import type { EditorHandle } from './BlockEditor';
 
 interface Props {
@@ -519,12 +520,18 @@ const Inner = forwardRef<EditorHandle, Props>(function Inner({ doc, onChange, hi
     },
   }));
 
+  // touch screens start with the layout locked: dragging a finger pans instead of moving nodes
+  const [locked, setLocked] = useStoredState<boolean>('nodes-locked', typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches);
   const ctx = useMemo<Ctx>(() => ({ connected, onData, onInline, highlight, errors, ids }), [connected, onData, onInline, highlight, errors, ids]);
 
   return (
     <NodeCtx.Provider value={ctx}>
-      <div ref={host} className="flow-host">
+      <div ref={host} className={`flow-host ${locked ? 'locked' : ''}`}>
+        <button className={`chip-btn flow-lock ${locked ? 'on' : ''}`} aria-pressed={locked} onClick={() => setLocked(!locked)} title={locked ? 'Layout locked: nodes cannot be moved by accident. Panning, editing and wiring still work.' : 'Lock the layout so touches cannot move nodes'} data-testid="node-lock">
+          <Icon name={locked ? 'lock' : 'unlock'} size={15} /> {locked ? 'Layout locked' : 'Lock layout'}
+        </button>
         <ReactFlow
+          nodesDraggable={!locked}
           nodes={flowNodes}
           edges={flowEdges}
           nodeTypes={nodeTypes}

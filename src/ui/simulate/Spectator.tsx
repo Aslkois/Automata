@@ -23,7 +23,9 @@ function recentFailures(d: Drone, now: number): Set<string> {
   return s;
 }
 
-export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: Drone; onClose: () => void }) {
+export type SheetState = 'peek' | 'half' | 'full';
+
+export function Spectator({ sim, drone: d, onClose, onSelect, sheet = 'half', setSheet }: { sim: Simulation; drone: Drone; onClose: () => void; onSelect?: (id: number) => void; sheet?: SheetState; setSheet?: (s: SheetState) => void }) {
   const { openBrainAt, go, setDesignId } = useShell();
   const ctrl = sim.controllers.get(d.id)!;
   const [open, setOpen] = useStoredState<Record<string, boolean>>('spectator-sections', { weapons: true, power: true, sensors: false, components: false, trace: true });
@@ -58,7 +60,10 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
   const tone = d.status.disabled || d.status.destroyed ? 'fault' : d.status.label === 'Operational' ? 'ok' : 'warn';
 
   return (
-    <aside className={`spectator card ${glitch ? 'breakup' : ''}`} data-testid="inspector" aria-label="Drone diagnostics">
+    <aside className={`spectator card ${glitch ? 'breakup' : ''}`} data-testid="inspector" aria-label="Drone diagnostics" data-sheet={sheet}>
+      {setSheet && (
+        <button className="sp-grab" aria-label={`Sheet size: ${sheet}. Tap to change`} data-testid="sheet-grab" onClick={() => setSheet(sheet === 'peek' ? 'half' : sheet === 'half' ? 'full' : 'peek')} />
+      )}
       <header className="sp-head" style={{ ['--team' as string]: team.color }}>
         <span className="swatch" />
         <div className="grow">
@@ -70,6 +75,16 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
         <span className={`state-pill ${tone}`} data-testid="inspected-status">
           {d.status.label}
         </span>
+        {onSelect && sim.drones.length > 1 && (
+          <span className="sp-cycle">
+            <button className="tool" aria-label="Previous drone" title="Previous drone ([)" onClick={() => onSelect(cycle(sim, d.id, -1))}>
+              <Icon name="chevronLeft" />
+            </button>
+            <button className="tool" aria-label="Next drone" title="Next drone (])" onClick={() => onSelect(cycle(sim, d.id, 1))}>
+              <Icon name="chevronRight" />
+            </button>
+          </span>
+        )}
         <button className="tool" onClick={onClose} aria-label="Close diagnostics" title="Return to freecam (Esc)">
           <Icon name="close" />
         </button>
@@ -356,6 +371,13 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
       </div>
     </aside>
   );
+}
+
+/** The next drone to follow in either direction (wraps around). */
+export function cycle(sim: Simulation, id: number, dir: 1 | -1): number {
+  const ids = sim.drones.map((x) => x.id);
+  const i = ids.indexOf(id);
+  return ids[(i + dir + ids.length) % ids.length] ?? id;
 }
 
 function firstMapped(designId: string, entries: TraceEntry[]): string | null {

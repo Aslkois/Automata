@@ -14,7 +14,7 @@ import { TEAMS } from '../theme';
 import { describeEvent, eventDrone, severity } from './events';
 import { SPEEDS } from './runner';
 import { useSession, type Scenario } from './session';
-import { Spectator } from './Spectator';
+import { cycle, Spectator, type SheetState } from './Spectator';
 
 export const integrity = (d: Drone) => (['rear', 'middle', 'front'] as const).map((p) => (d.sections[p].attached ? d.sections[p].hp / d.sections[p].maxHp : 0)) as [number, number, number];
 
@@ -23,6 +23,7 @@ export function Simulate({ active }: { active: boolean }) {
   const { test } = useShell();
   const { runner, session } = useSession();
   const [selected, setSelected] = useState<number | null>(null);
+  const [spSheet, setSpSheet] = useStoredState<SheetState>('spectator-sheet', 'half');
   const [follow, setFollow] = useState(true);
   const [sensorView, setSensorView] = useState(false);
   const [showArcs, setShowArcs] = useStoredState('sim-arcs', true);
@@ -173,6 +174,7 @@ export function Simulate({ active }: { active: boolean }) {
         e.preventDefault();
       } else if (key === '.') runner.stepTick();
       else if (key === ',') runner.stepDecision();
+      else if ((key === '[' || key === ']') && runner.sim && selected !== null) setSelected(cycle(runner.sim, selected, key === ']' ? 1 : -1));
       else if (key === 'escape') {
         if (sheet) setSheet(false);
         else setSelected(null);
@@ -186,7 +188,7 @@ export function Simulate({ active }: { active: boolean }) {
       window.removeEventListener('keyup', up);
       keys.current.clear();
     };
-  }, [active, runner, sheet]);
+  }, [active, runner, sheet, selected]);
 
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -256,7 +258,7 @@ export function Simulate({ active }: { active: boolean }) {
   const nameOf = (id: number) => sim?.drones.find((d) => d.id === id)?.name ?? `#${id}`;
 
   return (
-    <div className={`simulate ${selDrone ? 'spectating' : ''}`} data-testid="battle">
+    <div className={`simulate ${selDrone ? 'spectating' : ''} sheet-${spSheet}`} data-testid="battle">
       <div className="field">
         <canvas ref={canvasRef} data-testid="battle-canvas" aria-label="Battlefield" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel} />
       </div>
@@ -361,7 +363,7 @@ export function Simulate({ active }: { active: boolean }) {
 
       {sheet && <DeploySheet onClose={() => setSheet(false)} onDeployed={() => ((fitRequest.current = true), setSelected(null), setSheet(false))} />}
 
-      {sim && selDrone && <Spectator sim={sim} drone={selDrone} onClose={() => setSelected(null)} />}
+      {sim && selDrone && <Spectator sim={sim} drone={selDrone} onClose={() => setSelected(null)} onSelect={setSelected} sheet={spSheet} setSheet={setSpSheet} />}
     </div>
   );
 }

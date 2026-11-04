@@ -70,6 +70,26 @@ export function App() {
   );
   const value = useMemo<ShellState>(() => ({ ws, go, designId, setDesignId: setStoredDesign, focus, openBrainAt, test, testDrone }), [ws, go, designId, setStoredDesign, focus, openBrainAt, test, testDrone]);
 
+  // On-screen keyboards cover the layout viewport on phones: track the visual viewport so the
+  // app (editor, symbol bar, sheets) shrinks to the space above the keyboard instead.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const update = () => {
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      root.style.setProperty('--kb', `${kb > 80 ? Math.round(kb) : 0}px`);
+      root.classList.toggle('kb-open', kb > 80);
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+
   // Keyboard: Alt+1/2/3 switch activities.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

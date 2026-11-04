@@ -17,6 +17,7 @@ interface Props {
   onSelect: (s: Selection) => void;
   onClose: () => void;
   onBrowse: () => void;
+  onMove?: (pos: SectionPos, slotId: string) => void;
 }
 
 export function Properties(p: Props) {
@@ -185,7 +186,7 @@ function MountConfig({ def, mount, pos, set }: { def: ComponentDef; mount: Mount
   );
 }
 
-function SlotProps({ design, stats, pos, slotId, update, install, onBrowse }: Props & { pos: SectionPos; slotId: string }) {
+function SlotProps({ design, stats, pos, slotId, update, install, onBrowse, onMove }: Props & { pos: SectionPos; slotId: string }) {
   const sd = design.sections[pos];
   const slot = slotOf(sd, slotId);
   if (!slot) return <p className="muted">This slot does not exist on the section’s current layout.</p>;
@@ -278,6 +279,11 @@ function SlotProps({ design, stats, pos, slotId, update, install, onBrowse }: Pr
             <button className="btn" onClick={onBrowse}>
               Replace…
             </button>
+            {onMove && (
+              <button className="btn" onClick={() => onMove(pos, slotId)} data-testid="move-part">
+                Move…
+              </button>
+            )}
             <button className="btn danger" onClick={() => install(pos, slotId, null)}>
               <Icon name="trash" /> Remove
             </button>

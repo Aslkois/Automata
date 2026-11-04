@@ -20,6 +20,8 @@ export function Construct({ active }: { active: boolean }) {
   const [sel, setSel] = useState<Selection>(null);
   const [layer, setLayer] = useState<SlotKind>('hardpoint');
   const [armed, setArmed] = useState<string | null>(null);
+  /** a mounted part being moved to another slot */
+  const [moving, setMoving] = useState<{ pos: SectionPos; id: string } | null>(null);
   const [trayOpen, setTrayOpen] = useStoredState('tray-open', true);
   const [showArcs, setShowArcs] = useStoredState('arcs', true);
   const [issuesOpen, setIssuesOpen] = useState(false);
@@ -34,11 +36,14 @@ export function Construct({ active }: { active: boolean }) {
   useEffect(() => {
     setSel(null);
     setArmed(null);
+    setMoving(null);
   }, [designId]);
 
   const stats = useMemo(() => (design ? computeStats(design) : null), [design]);
   const issues = useMemo(() => (design && stats ? validateDesign(design, stats) : []), [design, stats]);
-  const armedDef = armed ? COMPONENT_MAP[armed] : null;
+  const movingMount = moving && design ? design.sections[moving.pos].slots[moving.id] : null;
+  const movingDef = movingMount ? COMPONENT_MAP[movingMount.component] : null;
+  const armedDef = armed ? COMPONENT_MAP[armed] : movingDef;
   const selSlot = sel?.type === 'slot' && design ? slotOf(design.sections[sel.pos], sel.id) ?? null : null;
 
   // Undo: every edit keeps the previous version of this drone (per session, newest last).
@@ -89,7 +94,8 @@ export function Construct({ active }: { active: boolean }) {
       const t = e.target as HTMLElement;
       if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable) return;
       if (e.key === 'Escape') {
-        if (armed) setArmed(null);
+        if (moving) setMoving(null);
+        else if (armed) setArmed(null);
         else setSel(null);
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
@@ -126,7 +132,39 @@ export function Construct({ active }: { active: boolean }) {
     setArmed((a) => (a === def.id ? null : def.id));
     setLayer(def.slot);
   };
+  /** Move a mounted part to another slot; swap when the other part fits back. Nothing is dropped. */
+  const moveTo = (from: { pos: SectionPos; id: string }, to: { pos: SectionPos; id: string }) => {
+    const src = design.sections[from.pos].slots[from.id];
+    const dst = design.sections[to.pos].slots[to.id] ?? null;
+    const srcSlot = slotOf(design.sections[from.pos], from.id);
+    const dstSlot = slotOf(design.sections[to.pos], to.id);
+    if (!src || !srcSlot || !dstSlot) return;
+    const def = COMPONENT_MAP[src.component];
+    if (!fits(def, dstSlot)) {
+      setNotice(`${def.name} does not fit ${SECTION_LETTER[to.pos]}.${to.id}`);
+      return;
+    }
+    if (dst && !fits(COMPONENT_MAP[dst.component], srcSlot)) {
+      setNotice(`${COMPONENT_MAP[dst.component].name} in ${SECTION_LETTER[to.pos]}.${to.id} would not fit back into ${SECTION_LETTER[from.pos]}.${from.id} — move it first`);
+      return;
+    }
+    const facing = (m: typeof src, p: SectionPos, q: SectionPos) => (p === q ? m.rotation : DEFAULT_MOUNT_FACING[q]);
+    update(
+      (d) => {
+        d.sections[to.pos].slots[to.id] = { ...src, rotation: facing(src, from.pos, to.pos) };
+        d.sections[from.pos].slots[from.id] = dst ? { ...dst, rotation: facing(dst, to.pos, from.pos) } : null;
+      },
+      `Move ${def.name}`,
+    );
+    setNotice(dst ? `Swapped ${def.name} and ${COMPONENT_MAP[dst.component].name}` : `Moved ${def.name} to ${SECTION_LETTER[to.pos]}.${to.id}`);
+  };
   const onSelect = (s: Selection) => {
+    if (s?.type === 'slot' && moving) {
+      if (s.pos !== moving.pos || s.id !== moving.id) moveTo(moving, s);
+      setMoving(null);
+      setSel(s);
+      return;
+    }
     if (s?.type === 'slot' && armedDef && design) {
       const slot = slotOf(design.sections[s.pos], s.id);
       if (slot && fits(armedDef, slot)) {
@@ -159,7 +197,9 @@ export function Construct({ active }: { active: boolean }) {
 
   const errors = issues.filter((i) => i.severity === 'error');
   const cautions = issues.filter((i) => i.severity === 'warning');
-  const trayH = trayOpen ? (phone ? 238 : 248) : 52;
+  // while moving a part on a phone the tray folds away: the choice is on the drone
+  const trayShown = trayOpen && !(moving && stacked);
+  const trayH = trayShown ? (phone ? 238 : 248) : 52;
   const propsOpen = !!sel && !phone;
 
   return (
@@ -253,8 +293,9 @@ export function Construct({ active }: { active: boolean }) {
 
       {armedDef && (
         <div className="hint" role="status">
-          Placing <b>{armedDef.name}</b>: choose a highlighted {armedDef.slot === 'hardpoint' ? 'hardpoint' : 'bay'} or drag it onto the drone.{' '}
-          <button className="link" onClick={() => setArmed(null)}>
+          {moving ? 'Moving' : 'Placing'} <b>{armedDef.name}</b>: choose a highlighted {armedDef.slot === 'hardpoint' ? 'hardpoint' : 'bay'}
+          {moving ? ' (an occupied one swaps)' : ' or drag it onto the drone'}.{' '}
+          <button className="link" onClick={() => (setArmed(null), setMoving(null))}>
             Cancel (Esc)
           </button>
         </div>
@@ -271,9 +312,9 @@ export function Construct({ active }: { active: boolean }) {
         </div>
       )}
 
-      {sel && <Properties design={design} stats={stats} sel={sel} update={update} install={install} onSelect={onSelect} onClose={() => setSel(null)} onBrowse={() => setTrayOpen(true)} />}
+      {sel && !moving && <Properties design={design} stats={stats} sel={sel} update={update} install={install} onSelect={onSelect} onClose={() => setSel(null)} onBrowse={() => setTrayOpen(true)} onMove={(pos, id) => (setArmed(null), setMoving({ pos, id }))} />}
 
-      <Tray open={trayOpen} setOpen={setTrayOpen} design={design} sel={sel} selSlot={selSlot} armed={armed} onPick={pickPart} />
+      <Tray open={trayShown} setOpen={setTrayOpen} design={design} sel={sel} selSlot={selSlot} armed={armed} onPick={pickPart} />
     </div>
   );
 }
