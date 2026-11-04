@@ -5,6 +5,7 @@ import type { SimContext } from './context';
 import { damageComponent, damageSection } from './damage';
 import { applyImpulse, comWorld, dirToLocal, dirToWorld, functional, localToWorld, worldToLocal } from './drone';
 import { clamp, DEG, segmentBox, segmentCircleCrossings, wrapAngle, type Vec2 } from './math';
+import { debrisSolid, droneSolid } from './debris';
 import { lineOfSight } from './sensors';
 import type { Blast, Debris, Drone, Projectile, RComponent, RSection } from './types';
 
@@ -82,8 +83,8 @@ function findHit(sim: SimContext, p: Projectile, a: Vec2, b: Vec2): Hit | null {
 
   // Drone sections (in body-local frames).
   const bodies: { d?: Drone; deb?: Debris; secs: RSection[]; body: Drone['body']; radius: number }[] = [];
-  for (const d of sim.drones) bodies.push({ d, secs: Object.values(d.sections).filter((s) => s.attached), body: d.body, radius: d.radius });
-  for (const deb of sim.debris) bodies.push({ deb, secs: deb.sections, body: deb.body, radius: deb.radius });
+  for (const d of sim.drones) if (droneSolid(d)) bodies.push({ d, secs: Object.values(d.sections).filter((s) => s.attached), body: d.body, radius: d.radius });
+  for (const deb of sim.debris) if (debrisSolid(deb)) bodies.push({ deb, secs: deb.sections, body: deb.body, radius: deb.radius });
   for (const e of bodies) {
     // A drone's own rounds never strike its own hull (weapons cannot fire across taller own sections).
     if (e.d && e.d.id === p.owner) continue;
@@ -437,6 +438,7 @@ export function explode(sim: SimContext, at: Vec2, ex: ExplosiveStats, owner: nu
     }
   }
   for (const d of sim.drones) {
+    if (!droneSolid(d)) continue;
     const cw = comWorld(d.body);
     if (Math.hypot(cw.x - at.x, cw.y - at.y) > d.radius + R) continue;
     const l = worldToLocal(d.body, at);
@@ -478,6 +480,7 @@ export function explode(sim: SimContext, at: Vec2, ex: ExplosiveStats, owner: nu
     applyImpulse(d.body, { x: (dx / dl) * push, y: (dy / dl) * push }, at);
   }
   for (const b of sim.debris) {
+    if (!debrisSolid(b)) continue;
     const c = comWorld(b.body);
     const dl = Math.hypot(c.x - at.x, c.y - at.y);
     if (dl > b.radius + R) continue;

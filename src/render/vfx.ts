@@ -2,6 +2,7 @@
 // oriented by that event's contact point, surface normal and incoming direction.
 // Effects are purely visual: nothing here feeds back into the simulation.
 import { localToWorld } from '../sim/drone';
+import { DEBRIS_FADE_S, DEBRIS_PHYSICAL_S } from '../sim/debris';
 import type { Simulation } from '../sim/world';
 import type { SimEvent } from '../sim/types';
 
@@ -264,6 +265,11 @@ export class Vfx {
         this.emitter(sim, e.drone, e.x, e.y, 'fire', 14, 14);
         this.decal(e.x, e.y, 10);
         break;
+      case 'debris-cleared':
+        // the wreck is gone; a scorch mark stays (decals are never physical)
+        this.decal(e.x, e.y, Math.max(6, e.radius * 0.5));
+        this.smoke(e.x, e.y, 3, 6, true);
+        break;
       case 'collision':
         this.sparks(e.x, e.y, 1, 0, Math.PI, Math.min(10, 2 + e.impulse / 3000), 100, '#bdb3a0');
         break;
@@ -317,7 +323,8 @@ export class Vfx {
         else this.arcs(w.x, w.y, 1, 6);
       }
     }
-    this.emitters = this.emitters.filter((e) => e.life > 0);
+    // emitters die with the body they were bound to (debris and faded wrecks are removed)
+    this.emitters = this.emitters.filter((e) => e.life > 0 && (e.body.kind === 'drone' ? (sim.drones.find((d) => d.id === e.body.id)?.wreckAge ?? 0) < DEBRIS_PHYSICAL_S + DEBRIS_FADE_S : sim.debris.some((d) => d.id === e.body.id)));
     let w = 0;
     for (const p of this.particles) {
       p.life -= dt;

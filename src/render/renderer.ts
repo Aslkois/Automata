@@ -4,6 +4,7 @@ import { activeSensors } from '../sim/sensors';
 import type { Simulation } from '../sim/world';
 import type { Debris, Drone, Projectile, RComponent, RSection } from '../sim/types';
 import { DISTANCE_RANGE } from '../sim/content/integrated';
+import { droneAlpha, fadeAlpha } from '../sim/debris';
 import type { Vfx } from './vfx';
 import { TEAM_LIGHT } from '../ui/theme';
 
@@ -61,6 +62,7 @@ export function pickDrone(sim: Simulation, x: number, y: number): Drone | null {
     const s = Math.sin(d.body.angle);
     const lx = dx * c + dy * s;
     const ly = -dx * s + dy * c;
+    if (droneAlpha(d) <= 0) continue;
     for (const sec of Object.values(d.sections)) {
       if (!sec.attached) continue;
       if (Math.abs(lx - sec.cx) <= sec.length / 2 + 4 && Math.abs(ly) <= sec.width / 2 + 4) return d;
@@ -263,7 +265,7 @@ export class Renderer {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.textAlign = 'left';
       for (const d of sim.drones) {
-        if (!visible.has(d.id)) continue;
+        if (!visible.has(d.id) || droneAlpha(d) <= 0) continue;
         const c = comWorld(d.body);
         const s = worldToScreen(cam, w, h, c.x + d.radius * 0.7, c.y - d.radius * 0.9);
         const dead = d.status.disabled || d.status.destroyed;
@@ -509,7 +511,10 @@ export class Renderer {
     const team = TEAM_COLORS[d.team % TEAM_COLORS.length];
     const dead = d.status.disabled || d.status.destroyed;
     const secs = Object.values(d.sections).filter((s) => s.attached);
+    const alpha = droneAlpha(d);
+    if (alpha <= 0) return;
     ctx.save();
+    ctx.globalAlpha = alpha;
     ctx.translate(b.pos.x, b.pos.y);
     ctx.rotate(b.angle);
     for (const s of secs) this.drawGear(d, s, px, d.treadPhase);
@@ -561,7 +566,10 @@ export class Renderer {
 
   private drawDebris(b: Debris, px: number) {
     const ctx = this.ctx;
+    const a = fadeAlpha(b.age);
+    if (a <= 0) return;
     ctx.save();
+    ctx.globalAlpha = a;
     ctx.translate(b.body.pos.x, b.body.pos.y);
     ctx.rotate(b.body.angle);
     for (const s of b.sections) this.drawGear(b, s, px, null);

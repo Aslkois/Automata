@@ -10,6 +10,7 @@ import { buildDrone, comWorld, dirToLocal } from './drone';
 import { Rng } from './math';
 import { boxPoly, integrate, resolveContact, satCollide, sectionPoly, stepDebrisFriction, stepGroundForces } from './physics';
 import { readRanges, scanLidars } from './sensors';
+import { debrisSolid, droneSolid, stepDebris } from './debris';
 import { stepFires, stepHeat, stepPower, stepShields, stepWeapons } from './systems';
 import type { Arena, BumperSide, Debris, Drone, Projectile, SimEvent } from './types';
 
@@ -119,7 +120,7 @@ export class Simulation implements SimContext {
   emit(e: SimEvent): void {
     this.events.push(e);
     if (this.events.length > 6000) this.events.splice(0, this.events.length - 6000);
-    const noise = e.type === 'shot' || e.type === 'collision' || e.type === 'reload' || e.type === 'spin' || e.type === 'shield-raise' || e.type === 'component-damaged' || (e.type === 'charge' && e.phase !== 'interrupted') || (e.type === 'impact' && (e.result === 'wall' || e.result === 'debris')) || (e.type === 'intercept' && !e.kill) || (e.type === 'explosion' && e.kind === 'interceptor');
+    const noise = e.type === 'shot' || e.type === 'collision' || e.type === 'reload' || e.type === 'spin' || e.type === 'shield-raise' || e.type === 'component-damaged' || (e.type === 'charge' && e.phase !== 'interrupted') || (e.type === 'impact' && (e.result === 'wall' || e.result === 'debris')) || (e.type === 'intercept' && !e.kill) || (e.type === 'explosion' && e.kind === 'interceptor') || e.type === 'debris-cleared';
     if (!noise) {
       this.log.push(e);
       if (this.log.length > 3000) this.log.splice(0, this.log.length - 3000);
@@ -155,6 +156,7 @@ export class Simulation implements SimContext {
     }
     // 3) Integrate bodies
     for (const d of this.drones) integrate(d.body, dt);
+    stepDebris(this, dt);
     for (const b of this.debris) {
       stepDebrisFriction(b.body, b.chassis.muLong * 0.8, dt);
       integrate(b.body, dt);
@@ -180,8 +182,9 @@ export class Simulation implements SimContext {
 
   private bodies() {
     const out: { body: Drone['body']; polys: ReturnType<typeof sectionPoly>[]; radius: number; id: number; drone?: Drone }[] = [];
-    for (const d of this.drones) out.push({ body: d.body, polys: Object.values(d.sections).filter((s) => s.attached).map((s) => sectionPoly(d.body, s)), radius: d.radius, id: d.id, drone: d });
-    for (const b of this.debris) out.push({ body: b.body, polys: b.sections.map((s) => sectionPoly(b.body, s)), radius: b.radius, id: b.id });
+    for (const d of this.drones) if (droneSolid(d)) out.push({ body: d.body, polys: Object.values(d.sections).filter((s) => s.attached).map((s) => sectionPoly(d.body, s)), radius: d.radius, id: d.id, drone: d });
+    // only debris still in its physical phase collides
+    for (const b of this.debris) if (debrisSolid(b)) out.push({ body: b.body, polys: b.sections.map((s) => sectionPoly(b.body, s)), radius: b.radius, id: b.id });
     return out;
   }
 

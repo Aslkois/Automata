@@ -263,6 +263,8 @@ export interface Drone {
   bumps: Record<BumperSide, { time: number; impulse: number }>;
   /** recent hull disturbance from recoil (angular kick), decays */
   shake: number;
+  /** seconds since the drone was structurally destroyed (its wreck fades like debris) */
+  wreckAge: number;
 }
 
 export interface Debris {
@@ -274,6 +276,8 @@ export interface Debris {
   components: RComponent[];
   radius: number;
   chassis: ChassisDef;
+  /** seconds since it broke away: physical for DEBRIS_PHYSICAL_S, then fades and is removed */
+  age: number;
 }
 
 export interface Projectile {
@@ -346,6 +350,7 @@ export type SimEvent =
   | { t: number; type: 'charge'; drone: number; mount: string; phase: 'start' | 'ready' | 'interrupted'; x: number; y: number }
   | { t: number; type: 'spin'; drone: number; mount: string; phase: 'up' | 'down'; x: number; y: number }
   | { t: number; type: 'explosion'; x: number; y: number; radius: number; kind: Blast['kind']; by: number }
+  | { t: number; type: 'debris-cleared'; debris: number | null; drone: number | null; x: number; y: number; radius: number }
   | { t: number; type: 'joint-failed'; drone: number; a: SectionPos; b: SectionPos; x: number; y: number }
   | { t: number; type: 'fire'; drone: number; section: SectionPos; phase: 'start' | 'out' | 'suppressed'; x: number; y: number }
   | { t: number; type: 'shield-raise'; drone: number; component: string; raised: boolean; x: number; y: number }

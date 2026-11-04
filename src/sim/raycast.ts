@@ -3,6 +3,7 @@
 import { worldToLocal } from './drone';
 import { segmentBox, type Vec2 } from './math';
 import type { Debris, Drone } from './types';
+import { debrisSolid, droneSolid } from './debris';
 
 export interface RayWorld {
   arena: { obstacles: { x: number; y: number; hw: number; hh: number }[] };
@@ -43,13 +44,14 @@ export function castRay(w: RayWorld, o: Vec2, ang: number, range: number, ignore
     }
   };
   for (const d of w.drones) {
-    if (d.id === ignoreDrone) continue;
+    if (d.id === ignoreDrone || !droneSolid(d)) continue;
     const dx = d.body.pos.x - o.x;
     const dy = d.body.pos.y - o.y;
     if (Math.hypot(dx, dy) > range + d.radius + 2) continue;
     hulls(d.body, Object.values(d.sections), 'drone');
   }
   for (const deb of w.debris) {
+    if (!debrisSolid(deb)) continue;
     const dx = deb.body.pos.x - o.x;
     const dy = deb.body.pos.y - o.y;
     if (Math.hypot(dx, dy) > range + deb.radius + 2) continue;

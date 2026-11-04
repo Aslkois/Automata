@@ -4,6 +4,7 @@ import type { SimContext } from './context';
 import { comWorld, functional, localToWorld } from './drone';
 import { DEG, segmentBox, wrapAngle, type Vec2 } from './math';
 import { castRay } from './raycast';
+import { droneSolid } from './debris';
 import type { Contact, Drone, Perception, RangeReading, Threat } from './types';
 
 export function lineOfSight(sim: SimContext, a: Vec2, b: Vec2): boolean {
@@ -51,7 +52,8 @@ export function perceive(sim: SimContext, d: Drone): Perception {
   const self = comWorld(d.body);
   const contacts: Contact[] = [];
   for (const o of sim.drones) {
-    if (o.id === d.id) continue;
+    // a wreck that has faded is gone from the world
+    if (o.id === d.id || !droneSolid(o)) continue;
     const pts: Vec2[] = [comWorld(o.body)];
     for (const s of Object.values(o.sections)) if (s.attached) pts.push(localToWorld(o.body, { x: s.cx, y: 0 }));
     let seen: string[] = [];

@@ -189,6 +189,7 @@ function detachGroup(sim: SimContext, d: Drone, group: SectionPos[]): void {
     components: debrisComps,
     radius: boundingRadius(debrisSecs),
     chassis: d.chassis,
+    age: 0,
   };
   sim.debris.push(debris);
   for (const s of secs) s.attached = false;

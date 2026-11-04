@@ -288,6 +288,7 @@ export function buildDrone(design: DroneDesign, id: number, team: number, x: num
     ranges: [],
     bumps: { front: { time: -1, impulse: 0 }, rear: { time: -1, impulse: 0 }, left: { time: -1, impulse: 0 }, right: { time: -1, impulse: 0 } },
     shake: 0,
+    wreckAge: 0,
   };
   return drone;
 }

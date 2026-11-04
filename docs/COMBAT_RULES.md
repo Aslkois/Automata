@@ -25,7 +25,13 @@ For a hit on a section face at angle θ from the surface normal:
 ## Components & structure
 - Components have their own integrity. A destroyed component stops working: weapons stop firing, motors lose force, sensors lose contacts, generators stop supplying, shields drop. Below 50% integrity, turrets traverse at half speed, spread worsens and outputs fall.
 - A section at 0 structure is destroyed. All its components are destroyed and its joints fail.
-- When a joint fails, the drone splits into connected groups. The group with the working integrated CPU (normally the middle section) stays the drone. Every other group becomes **debris**: a separate rigid body that keeps the same motion, mass and collision shape. Detached equipment loses power, control and ammunition feed. The drone's mass, centre of mass and inertia are recomputed.
+- When a joint fails, the drone splits into connected groups. The group with the working integrated CPU (normally the middle section) stays the drone. Every other group becomes **debris**: a separate rigid body that keeps the same motion, mass and collision shape, plus a small separation push and spin. Detached equipment loses power, control and ammunition feed. The drone's mass, centre of mass and inertia are recomputed.
+- **Debris is temporary.**
+  - For 2 s after separation a piece is fully physical: it tumbles, slides and collides, rounds strike it, and distance sensors and LIDAR see it.
+  - It then loses its collider. Drones, projectiles, blasts and sensors pass through it.
+  - It fades out over 1.2 s and is removed from the simulation, leaving only a scorch mark that is never physical.
+  - A drone that is structurally destroyed follows the same timeline from the moment of destruction.
+  - All timings are counted in simulation ticks, so they are deterministic.
 - A destroyed ammunition module **cooks off**, damaging its section and the components inside it.
 
 ## Damage states (derived, never a health bar)
