@@ -26,7 +26,12 @@
 - **Debugging** has no breakpoints. It uses the per-decision trace, history scrubbing, errors with locations, `drone.log`, and single-tick or single-decision stepping.
 - **Replay and timeline scrubbing** are not implemented. Restart re-simulates from the recorded configuration.
 - **Modes**: Duel, Sandbox and seven training courses exist. Team Battle, Fleet Battle, Challenges, Tournament and Replay Laboratory are not implemented. Sandbox already allows multi-drone, multi-team battles.
-- **Balance**: there is no points or weight budget. In straight duels the heavy starters beat the light ones most of the time, and about 40% of starter duels end in a draw at 120 s (see [BALANCE.md](BALANCE.md)).
+- **Balance**: there is no points or weight budget. In straight duels the heavy starters beat the light ones most of the time, and about a quarter of starter duels end in a draw at 120 s (see [BALANCE.md](BALANCE.md)).
+- **Component models** are flat top-down drawings: there is no height, shading by light direction or 3D occlusion between parts.
+  - The rotary cluster's depth is suggested by drawing order and tone.
+  - Recoil is drawn as travel along the barrel; mounts and hulls do not shake.
+  - Detached debris shows its parts at rest, with whatever rounds its launcher still held.
+  - At the battlefield's overview zoom, small sensors (camera, LIDAR) read as small shapes; zoom in to tell them apart.
 - **Audio** is synthesised in WebAudio and was checked for errors and routing in a headless browser only. How it sounds on real speakers and phones has not been judged by a person in this environment.
 - **Physical devices**: phone and tablet layouts were tested with Playwright's device emulation (iPhone 13, and the touch-phone end-to-end test). No physical phone or tablet was available. Keyboard behaviour that depends on `visualViewport` (the bottom bar hiding while typing) was implemented against the standard API but not observed on a real on-screen keyboard.
 - **Friendly communication API**: not implemented yet. Electronic warfare is excluded by design.

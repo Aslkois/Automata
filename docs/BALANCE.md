@@ -17,9 +17,9 @@ Stationary platform (weapon on F.H1, matching ammunition store, camera), station
 | Rotary Cannon | 800 rpm | 800 rpm | 7.0 s | 6.5 s | 3.4 s | — | — | 4.9 s | — | — | 31.6 s | — | — |
 | Dual Autocannon | 420 rpm | 420 rpm | 14.4 s | 7.3 s | 3.0 s | 3.3 s | — | 3.7 s | 4.0 s | — | 6.2 s | 4.8 s | — |
 | Rocket Pod | 0.400 s interval | 0.4 s interval | none in 45 s | 33.3 s | 2.3 s | 8.4 s | — | 2.6 s | 9.1 s | — | 7.7 s | 15.0 s | — |
-| Heavy Cannon | 1 / 3.23 s | 1 / 3.2 s | none in 45 s | 57.1 s | 10.0 s | 13.2 s | 13.2 s | 10.2 s | 16.7 s | 16.7 s | 14.0 s | 20.5 s | 23.7 s |
-| Coilgun | 1 / 5.03 s | 1 / 5 s | none in 45 s | 142.9 s | 20.3 s | 25.3 s | 30.3 s | 20.3 s | 30.4 s | 35.4 s | 20.5 s | 30.6 s | 35.6 s |
-| Heavy Missile Launcher | 0.800 s interval | 0.8 s interval | none in 45 s | 200.0 s | 1.9 s | 17.5 s | 35.5 s | 3.1 s | 18.7 s | 35.9 s | 3.0 s | 19.4 s | — |
+| Heavy Cannon | 1 / 3.23 s | 1 / 3.2 s | none in 45 s | 57.1 s | 6.7 s | 13.2 s | 13.2 s | 7.0 s | 13.4 s | 16.7 s | 14.0 s | 20.5 s | 23.7 s |
+| Coilgun | 1 / 5.03 s | 1 / 5 s | none in 45 s | 142.9 s | 15.3 s | 25.3 s | 30.3 s | 20.3 s | 30.4 s | 35.4 s | 20.5 s | 30.6 s | 35.6 s |
+| Heavy Missile Launcher | 0.800 s interval | 0.8 s interval | none in 45 s | 200.0 s | 1.9 s | 17.5 s | 35.5 s | 3.1 s | 17.9 s | 35.9 s | 3.0 s | 19.4 s | — |
 
 ## 2. Interception
 
@@ -27,10 +27,10 @@ A heavy missile launcher (and, separately, a rocket pod or a heavy cannon) fires
 
 | Attack | Defense | Fired | Shot down | Hits that did not kill | Arrived | Shot down % | Defensive rounds fired | Seeds |
 |---|---|---|---|---|---|---|---|---|
-| Heavy Missile Launcher | Point defense gun | 32 | 5 | 73 | 27 | 16% | 182 | 8 |
+| Heavy Missile Launcher | Point defense gun | 32 | 4 | 65 | 28 | 13% | 168 | 8 |
 | Heavy Missile Launcher | Rocket pod, interceptors | 32 | 30 | 0 | 2 | 94% | 45 | 8 |
 | Rocket Pod | Point defense gun | 48 | 21 | 76 | 27 | 44% | 260 | 8 |
-| Heavy Cannon | Point defense gun | 32 | 7 | 15 | 25 | 22% | 177 | 8 |
+| Heavy Cannon | Point defense gun | 32 | 7 | 21 | 25 | 22% | 183 | 8 |
 
 ## 3. Starter duels
 
@@ -38,31 +38,31 @@ Every starter against every other starter with its own brain, Foundry Yard, 120 
 
 | vs | Assa Plat | AA Dest | Skir | Stri | Wisp | Path | Need | Aegi | Mant | Harr | Bast |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| **Assault Platform** | · | 6 | 1 | 0 | 4 | 6 | 4 | 0 | 3 | 6 | 0 |
-| **AA Destroyer** | 0 | · | 1 | 0 | 0 | 6 | 3 | 0 | 1 | 6 | 0 |
+| **Assault Platform** | · | 6 | 6 | 6 | 6 | 6 | 6 | 0 | 6 | 6 | 3 |
+| **AA Destroyer** | 0 | · | 2 | 3 | 0 | 6 | 3 | 1 | 6 | 5 | 0 |
 | **Skirmisher** | 0 | 0 | · | 0 | 0 | 6 | 0 | 0 | 2 | 6 | 0 |
-| **Strider** | 0 | 0 | 0 | · | 0 | 6 | 1 | 0 | 3 | 6 | 0 |
-| **Wisp** | 0 | 0 | 0 | 0 | · | 2 | 0 | 0 | 0 | 0 | 0 |
-| **Pathfinder** | 0 | 0 | 0 | 0 | 3 | · | 0 | 0 | 0 | 1 | 0 |
-| **Needle** | 0 | 0 | 0 | 0 | 2 | 0 | · | 0 | 6 | 2 | 0 |
-| **Aegis** | 3 | 4 | 6 | 0 | 2 | 6 | 6 | · | 6 | 6 | 0 |
-| **Mantis** | 0 | 3 | 2 | 0 | 0 | 6 | 0 | 0 | · | 6 | 0 |
-| **Harrier** | 0 | 0 | 0 | 0 | 4 | 4 | 0 | 0 | 0 | · | 0 |
-| **Bastion** | 0 | 5 | 4 | 6 | 6 | 6 | 6 | 0 | 3 | 5 | · |
+| **Strider** | 0 | 0 | 0 | · | 0 | 6 | 2 | 0 | 1 | 6 | 0 |
+| **Wisp** | 0 | 0 | 0 | 0 | · | 1 | 0 | 0 | 0 | 0 | 0 |
+| **Pathfinder** | 0 | 0 | 0 | 0 | 1 | · | 0 | 0 | 0 | 4 | 0 |
+| **Needle** | 0 | 0 | 0 | 1 | 4 | 6 | · | 0 | 6 | 2 | 0 |
+| **Aegis** | 4 | 1 | 0 | 6 | 6 | 6 | 6 | · | 6 | 6 | 0 |
+| **Mantis** | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | · | 6 | 0 |
+| **Harrier** | 0 | 0 | 0 | 0 | 4 | 1 | 0 | 0 | 0 | · | 0 |
+| **Bastion** | 3 | 3 | 6 | 6 | 6 | 6 | 6 | 0 | 6 | 6 | · |
 
 | Starter | Wins | Losses | Draws | Win % | Brain runtime errors |
 |---|---|---|---|---|---|
-| Bastion | 41 | 0 | 19 | 68% | 0 |
-| Aegis | 39 | 0 | 21 | 65% | 0 |
-| Assault Platform | 30 | 3 | 27 | 50% | 0 |
-| AA Destroyer | 17 | 18 | 25 | 28% | 0 |
-| Mantis | 17 | 24 | 19 | 28% | 0 |
-| Strider | 16 | 6 | 38 | 27% | 0 |
-| Skirmisher | 14 | 14 | 32 | 23% | 0 |
-| Needle | 10 | 20 | 30 | 17% | 0 |
-| Harrier | 8 | 44 | 8 | 13% | 0 |
-| Pathfinder | 4 | 48 | 8 | 7% | 0 |
-| Wisp | 2 | 21 | 37 | 3% | 0 |
+| Assault Platform | 51 | 7 | 2 | 85% | 0 |
+| Bastion | 48 | 3 | 9 | 80% | 0 |
+| Aegis | 41 | 1 | 18 | 68% | 0 |
+| AA Destroyer | 26 | 10 | 24 | 43% | 0 |
+| Mantis | 20 | 33 | 7 | 33% | 0 |
+| Needle | 19 | 23 | 18 | 32% | 0 |
+| Strider | 15 | 22 | 23 | 25% | 0 |
+| Skirmisher | 14 | 16 | 30 | 23% | 0 |
+| Pathfinder | 5 | 50 | 5 | 8% | 0 |
+| Harrier | 5 | 47 | 8 | 8% | 0 |
+| Wisp | 1 | 33 | 26 | 2% | 0 |
 
 ## 4. Starters on the training courses
 
@@ -70,19 +70,19 @@ Each starter alone (seed 1) with its own brain. Time = when the objective was me
 
 | Starter | Basic maze | Obstacle course | Weapon range | Armor test | Interception test | Missile test | Cooling and power stress |
 |---|---|---|---|---|---|---|---|
-| Assault Platform | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (2 of 4 targets knocked out in 150 s) | — (1 of 3 targets knocked out in 180 s) | 59.9 s | 35.1 s | 13.7 s |
-| AA Destroyer | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 37.0 s | — (1 of 3 targets knocked out in 180 s) | 50.2 s | 79.7 s | — (0 of 1 targets knocked out in 120 s) |
-| Skirmisher | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 36.7 s | — (0 of 3 targets knocked out in 180 s) | 60.0 s | 72.6 s | — (0 of 1 targets knocked out in 120 s) |
-| Strider | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (2 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | 49.5 s | — (1 of 2 targets knocked out in 180 s) | — (0 of 1 targets knocked out in 120 s) |
-| Wisp | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (2 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Wisp: Disabled) | — (1 of 2 targets knocked out in 180 s) | — (0 of 1 targets knocked out in 120 s) |
-| Pathfinder | 134.8 s | 124.3 s | — (3 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Pathfinder: Disarmed) | 56.4 s | — (0 of 1 targets knocked out in 120 s) |
-| Needle | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (2 of 4 targets knocked out in 150 s) | — (1 of 3 targets knocked out in 180 s) | 60.0 s | — (1 of 2 targets knocked out in 180 s) | 51.3 s |
-| Aegis | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (2 of 4 targets knocked out in 150 s) | — (1 of 3 targets knocked out in 180 s) | 50.8 s | 87.2 s | 12.0 s |
-| Mantis | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (3 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Mantis: Disarmed) | 65.4 s | — (0 of 1 targets knocked out in 120 s) |
-| Harrier | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (1 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Harrier: Disarmed) | — (1 of 2 targets knocked out in 180 s) | — (0 of 1 targets knocked out in 120 s) |
-| Bastion | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (2 of 4 targets knocked out in 150 s) | — (1 of 3 targets knocked out in 180 s) | 60.0 s | — (0 of 2 targets knocked out in 180 s) | 10.9 s |
+| Assault Platform | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (2 of 4 targets knocked out in 150 s) | — (2 of 3 targets knocked out in 180 s) | 16.9 s | — (1 of 2 targets knocked out in 180 s) | 13.7 s |
+| AA Destroyer | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 39.1 s | — (1 of 3 targets knocked out in 180 s) | 37.3 s | — (1 of 2 targets knocked out in 180 s) | — (0 of 1 targets knocked out in 120 s) |
+| Skirmisher | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (3 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | 35.4 s | 72.6 s | — (0 of 1 targets knocked out in 120 s) |
+| Strider | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 51.3 s | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Strider: Disarmed) | 65.7 s | — (0 of 1 targets knocked out in 120 s) |
+| Wisp | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (1 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Wisp: Disarmed) | — (1 of 2 targets knocked out in 180 s) | — (0 of 1 targets knocked out in 120 s) |
+| Pathfinder | 136.3 s | 128.2 s | — (3 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Pathfinder: Disarmed) | 60.5 s | — (0 of 1 targets knocked out in 120 s) |
+| Needle | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (3 of 4 targets knocked out in 150 s) | — (1 of 3 targets knocked out in 180 s) | — (Did not survive: Needle: Disarmed) | — (1 of 2 targets knocked out in 180 s) | 51.3 s |
+| Aegis | — (Goal not reached within 240 s) | 72.1 s | 72.5 s | — (2 of 3 targets knocked out in 180 s) | 14.1 s | 66.9 s | 12.0 s |
+| Mantis | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 81.7 s | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Mantis: Disarmed) | 65.4 s | — (0 of 1 targets knocked out in 120 s) |
+| Harrier | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (2 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Harrier: Disarmed) | — (1 of 2 targets knocked out in 180 s) | — (0 of 1 targets knocked out in 120 s) |
+| Bastion | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (2 of 4 targets knocked out in 150 s) | — (1 of 3 targets knocked out in 180 s) | — (Did not survive: Bastion: Disarmed) | — (1 of 2 targets knocked out in 180 s) | 10.9 s |
 
-_Generated by `npx vite-node scripts/balance.ts` in 150 s._
+_Generated by `npx vite-node scripts/balance.ts` in 148 s._
 <!-- measurements:end -->
 
 ## Findings
@@ -102,20 +102,56 @@ These were written after reading the tables above. The "before" numbers come fro
 - **The overheat warning is conservative.** The Construct estimate assumes the trigger never stops. Measured first-lockout times, with reload pauses, are about twice as long for magazine-fed guns (MG 15.4 s estimated, 30.2 s measured).
   - The Rotary Cannon is the exception: it overheats in 7 s, before its 9 s magazine is empty. Sustained rotary fire needs a Cooling Unit or Thermal Reservoir, as its description says.
 - **Interception is real and never certain.**
-  - A single point-defense gun stopped 44% of offensive rockets, 22% of heavy-cannon shells and 16% of heavy missiles.
+  - A single point-defense gun stopped 44% of offensive rockets, 22% of heavy-cannon shells and 13% of heavy missiles.
   - A rocket pod firing interceptor rockets stopped 94% of missiles, spending 45 interceptors on 32 missiles.
   - Interceptors are the hard counter to missiles but use up a medium hardpoint and storage. Point defense is a partial counter to everything.
 - **Starters: heavy designs win straight duels.**
-  - Bastion (68%), Aegis (65%) and the Assault Platform (50%) are never or almost never beaten.
-  - Wisp (3%), Pathfinder (7%) and Harrier (13%) lose most of their games.
-  - About 40% of games are draws at the 120 s limit.
+  - The Assault Platform (85%), Bastion (80%) and Aegis (68%) are rarely beaten.
+  - Wisp (2%), Pathfinder (8%) and Harrier (8%) lose most of their games.
+  - About a quarter of games (85 of 330) are draws at the 120 s limit.
+  - Aegis is the only design the Assault Platform cannot beat (0 of 6).
+  - Bastion and the Assault Platform split their games 3–3.
   - Read this as "a 1-on-1 between unequal masses favours mass and armor", not as a ladder. Nothing equalises cost or weight. The light starters are built to teach: navigation (Pathfinder), flying (Wisp), hit-and-run (Harrier).
 - **Training.**
-  - Pathfinder is the only starter whose brain navigates: maze in 134.8 s, obstacle course in 124.3 s. The others have no navigation logic and never reach a goal, which is the point of the course.
+  - Pathfinder is the only starter whose brain navigates: maze in 136.3 s, obstacle course in 128.2 s. The others have no navigation logic and never reach a goal, which is the point of the course.
   - No starter knocks out all three armor-test plates within 180 s. The brains target the nearest contact and keep firing at plates that are already knocked out but not disabled. That is a programming lesson, not a bug.
   - The heavy, cannon-armed starters (Bastion 10.9 s, Aegis 12.0 s, Assault Platform 13.7 s) finish the stress course. Designs built around sustained small-calibre fire do not.
 
+### What changed since the previous recording, and why
+
+The tables were re-run after three changes: temporary debris, the new layout table with the load model, and the engineering physics. To find which change moved which number, I ran the same measurements on each commit:
+- `34c9a45`, before debris;
+- `46c7620`, debris;
+- `54a067e`, layouts and load;
+- the current head.
+
+- **Duels resolve instead of timing out. Cause: debris cleanup.**
+  - Evidence: Assault Platform vs Skirmisher, Strider, Mantis and Bastion, seeds 1–3, both sides:
+
+    | Opponent | Before debris (`34c9a45`) | After debris (`46c7620`) |
+    | --- | --- | --- |
+    | Skirmisher | 1 win, 5 draws | 5 wins, 1 draw |
+    | Strider | 6 draws | 6 wins |
+    | Mantis | 3 wins, 3 draws | 6 wins |
+    | Bastion | 6 draws | 2 wins, 4 losses |
+
+  - In the old Assault Platform vs Strider game (seed 1), Strider's detached section stayed in the arena for good. Strider's own rounds struck that debris 1,382 times and the Assault Platform's shells 16 times, and the game ended in a draw at 120 s.
+  - With wrecks losing their colliders after 2 s, the same game ends at 19.5 s with Strider disabled.
+  - The layout and physics commits changed these duels by at most one game per pairing.
+- **Heavy cannon and coilgun knock out light plate sooner. Cause: `54a067e`.**
+  - Heavy cannon: light plate at 150 u in 10.0 → 6.7 s; medium plate at 400 u in 16.7 → 13.4 s.
+  - Coilgun: light plate at 150 u in 20.3 → 15.3 s.
+  - Rates, heat and every other cell are unchanged.
+  - That commit moved the test platform's large mount (heavy Medium layout, H1: (2, −7) → (3, −7.5)) and added the load model's ground resistance. I did not separate the two effects. Either way it is one fewer hit needed on some seeds, not a change to the weapons.
+- **Point defense against missiles: 16% → 13%** (5 → 4 of 32). This also came with `54a067e`, the defender's mount moving with the new layout coordinates. Rockets and shells are unchanged.
+- **Engineering physics (`8a6fcb9`) changed no starter's mobility.**
+  - Ground starters' top speeds and accelerations from `computeStats` match the earlier build to within 2%. The +140 kg Maximum-layout frame shows on the Assault Platform and Bastion.
+  - The flyers changed with the shared-thrust retune: Wisp 181 → 191 u/s, Harrier 180 → 178 u/s.
+  - The heaviest starter section load is the Harrier's front at 1.19 of rated.
+
 ### Changes made because of these measurements
+
+_"After" is the value at the time of the change; current values are in the tables above._
 
 | Change | Evidence before | After |
 | --- | --- | --- |
@@ -137,4 +173,4 @@ None of the numbers fixed in the brief changed. Unchanged values include:
 ### Not resolved
 
 - Light starters lose most straight duels against heavy ones. There is no points or weight budget to make unequal builds fair; that would be a game-mode decision.
-- Many duels end in a draw at 120 s, because the defensive heavy brains (Aegis, Bastion) hold position rather than hunt.
+- About a quarter of duels still end in a draw at 120 s, mostly against Aegis and Bastion, whose brains hold position rather than hunt.
