@@ -30,6 +30,8 @@ export function Construct({ active }: { active: boolean }) {
   const phone = useMedia(PHONE);
   const stacked = useMedia('(max-width: 1100px), (max-height: 560px)');
   const short = useMedia('(max-height: 560px)');
+  // phones with a short viewport (most, once browser chrome is shown): a lower tray keeps the drone in view
+  const shortPhone = useMedia('(max-width: 720px) and (max-height: 760px)');
   // on short (landscape phone) screens the tray starts collapsed so the drone keeps the space
   useEffect(() => {
     if (short) setTrayOpen(false);
@@ -201,7 +203,7 @@ export function Construct({ active }: { active: boolean }) {
   const cautions = issues.filter((i) => i.severity === 'warning');
   // while moving a part on a phone the tray folds away: the choice is on the drone
   const trayShown = trayOpen && !(moving && stacked);
-  const trayH = trayShown ? (phone ? 238 : 248) : 52;
+  const trayH = trayShown ? (phone ? (shortPhone ? 194 : 238) : 248) : 52;
   const propsOpen = !!sel && !phone;
 
   return (
@@ -264,8 +266,8 @@ export function Construct({ active }: { active: boolean }) {
           )}
         </div>
         <div className="issues-anchor">
-          <button className="chip-btn" aria-expanded={diagOpen} onClick={() => (setDiagOpen((o) => !o), setIssuesOpen(false))} data-testid="diagnostics-toggle" title="Mass, load, mobility, power, heat, ammunition and recoil from the design data">
-            <Icon name="gauge" size={16} /> Diagnostics
+          <button className="chip-btn diag-btn" aria-expanded={diagOpen} aria-label="Diagnostics" onClick={() => (setDiagOpen((o) => !o), setIssuesOpen(false))} data-testid="diagnostics-toggle" title="Mass, load, mobility, power, heat, ammunition and recoil from the design data">
+            <Icon name="gauge" size={16} /> <span className="chip-lbl">Diagnostics</span>
           </button>
           {diagOpen && <Diagnostics design={design} stats={stats} />}
         </div>

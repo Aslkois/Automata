@@ -1698,6 +1698,51 @@ input[type='range'] {
 .dg-row .fault {
   color: var(--fault);
 }
+.part-model {
+  pointer-events: none;
+}
+.ghost-model {
+  opacity: 0.28;
+  pointer-events: none;
+}
+.slot .mount-ring {
+  /* the whole footprint is the touch target, under the model */
+  fill: rgba(255, 252, 244, 0.001);
+  pointer-events: all;
+  stroke-dasharray: 0.6 0.5;
+  stroke: var(--iron);
+  stroke-width: 0.16;
+}
+.slot.sel .mount-ring {
+  stroke: var(--signal);
+  stroke-width: 0.45;
+  stroke-dasharray: none;
+}
+.slot.target .mount-ring {
+  fill: rgba(61, 110, 125, 0.18);
+}
+.tray .part .pmodel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 34px;
+  margin: 2px 0 4px;
+  border-radius: var(--r);
+  background: rgba(42, 39, 35, 0.06);
+}
+.model-plate {
+  display: flex;
+  justify-content: center;
+  padding: 10px 8px;
+  margin: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: repeating-linear-gradient(0deg, transparent 0 9px, rgba(42, 39, 35, 0.05) 9px 10px), repeating-linear-gradient(90deg, transparent 0 9px, rgba(42, 39, 35, 0.05) 9px 10px), var(--vellum);
+}
+.part-preview {
+  display: block;
+  overflow: visible;
+}
 .slot-list {
   list-style: none;
   margin: 0;
@@ -3826,6 +3871,14 @@ select.nf {
     height: 186px;
     padding: 4px 12px 12px;
   }
+  /* the diagnostics chip is an icon on phones, so the header keeps to one row of actions */
+  .diag-btn .chip-lbl {
+    display: none;
+  }
+  .diag-btn {
+    min-width: 40px;
+    justify-content: center;
+  }
   .hint {
     border-radius: var(--r-card);
     font-size: 13px;
@@ -4039,6 +4092,15 @@ select.nf {
     height: 70px;
   }
 }
+@media (max-width: 720px) and (max-height: 760px) {
+  .tray-grid {
+    height: 142px;
+  }
+  .tray .part .pmodel {
+    height: 28px;
+    margin: 0 0 2px;
+  }
+}
 @media (max-width: 380px) {
   .speed button {
     padding: 0 6px;
@@ -4112,4 +4174,44 @@ select.nf {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ------------------------------------------------------------------ component specimen sheet */
+.parts-sheet {
+  padding: 24px;
+  overflow: auto;
+  height: 100%;
+}
+.parts-sheet h2 {
+  font: 600 12px var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.sheet-icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.sheet-icons figure {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.sheet-icons figcaption {
+  width: 100%;
+  font-size: 12px;
+}
+.sheet-models td.sheet-field {
+  background: #191816;
+  padding: 2px;
+}
+.sheet-models th {
+  font-size: 12px;
+  text-align: left;
+  padding: 0 8px;
 }

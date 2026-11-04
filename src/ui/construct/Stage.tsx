@@ -5,7 +5,10 @@ import { COMPONENT_MAP, FOOTPRINT, type ComponentDef } from '../../sim/content/c
 import { SECTION_CLASSES, SECTION_LETTER, SECTION_POSITIONS, SLOT_SIZE_RANK, type SectionPos, type SlotDef, type SlotKind } from '../../sim/content/sections';
 import { layoutSections, listMounts, slotOf, slotsOf, type DesignStats, type DroneDesign } from '../../sim/design';
 import { Icon } from '../common';
-import { GLYPH, KIND, T } from '../theme';
+import { GLYPH, T } from '../theme';
+import { MODELS, restVisual } from '../../render/parts/models';
+import { ICONS } from '../../render/parts/icons';
+import { PartModelG } from '../parts';
 
 export type Selection = { type: 'slot'; pos: SectionPos; id: string } | { type: 'section'; pos: SectionPos } | null;
 export const fits = (def: ComponentDef, slot: SlotDef) => def.slot === slot.kind && SLOT_SIZE_RANK[def.size] <= SLOT_SIZE_RANK[slot.size];
@@ -342,6 +345,7 @@ function SlotMark({ pos, slot, design, cx, visible, selected, dimmed, armed, onS
   const mount = design.sections[pos].slots[slot.id];
   const def = mount ? COMPONENT_MAP[mount.component] : null;
   const half = def ? FOOTPRINT[def.size] : FOOTPRINT[slot.size];
+  const slotHalf = FOOTPRINT[slot.size];
   const x = cx + slot.x;
   const y = slot.y;
   const facing = ((mount?.rotation ?? 0) * Math.PI) / 180;
@@ -349,6 +353,12 @@ function SlotMark({ pos, slot, design, cx, visible, selected, dimmed, armed, onS
   const label = `Slot ${SECTION_LETTER[pos]}.${slot.id}`;
   if (!visible) {
     // the other layer is shown as a faint footprint so the whole machine stays legible
+    if (def && MODELS[def.id])
+      return (
+        <g transform={`translate(${x} ${y})`} className="ghost-model">
+          <PartModelG id={def.id} v={restVisual({ aim: facing, facing })} />
+        </g>
+      );
     return def ? <rect x={x - half} y={y - half} width={half * 2} height={half * 2} rx={slot.kind === 'hardpoint' ? half : 0.6} className="ghost-slot" /> : null;
   }
   const onDrop = (e: DragEvent) => {
@@ -387,17 +397,26 @@ function SlotMark({ pos, slot, design, cx, visible, selected, dimmed, armed, onS
       aria-pressed={selected}
     >
       {(target || over) && <rect x={x - half - 1.3} y={y - half - 1.3} width={half * 2 + 2.6} height={half * 2 + 2.6} rx={round ? half + 1.3 : 0.8} className={`drop ${over ? 'over' : ''}`} />}
-      {def && round && def.kind === 'weapon' && <line x1={x + Math.cos(facing) * half * 0.6} y1={y + Math.sin(facing) * half * 0.6} x2={x + Math.cos(facing) * (half + 5)} y2={y + Math.sin(facing) * (half + 5)} className="barrel" strokeWidth={def.size === 'L' ? 1.6 : def.size === 'M' ? 1.1 : 0.8} />}
-      {def && round && def.kind !== 'weapon' && <line x1={x + Math.cos(facing) * half} y1={y + Math.sin(facing) * half} x2={x + Math.cos(facing) * (half + 2.2)} y2={y + Math.sin(facing) * (half + 2.2)} className="facing" />}
-      <rect x={x - half} y={y - half} width={half * 2} height={half * 2} rx={round ? half : 0.7} className="body" fill={def ? 'url(#module)' : undefined} />
-      {def ? (
-        <path d={GLYPH[def.kind]} transform={`translate(${x - g / 2} ${y - g / 2}) scale(${g / 24})`} className="mglyph" strokeWidth={(1.5 * 24) / (g * 12)} />
+      {def && MODELS[def.id] ? (
+        <>
+          {/* the mount footprint, then the part itself: the same model the battlefield draws */}
+          <rect x={x - slotHalf} y={y - slotHalf} width={slotHalf * 2} height={slotHalf * 2} rx={slotHalf} className="mount-ring" />
+          <g transform={`translate(${x} ${y})`}>
+            <PartModelG id={def.id} v={restVisual({ aim: facing, facing, seed: slot.x * 31 + slot.y * 7 })} />
+          </g>
+        </>
       ) : (
-        <text x={x} y={y + 0.75} className="slot-size" textAnchor="middle">
-          {slot.size}
-        </text>
+        <>
+          <rect x={x - half} y={y - half} width={half * 2} height={half * 2} rx={round ? half : 0.7} className="body" fill={def ? 'url(#module)' : undefined} />
+          {def ? (
+            <path d={ICONS[def.id] ?? GLYPH[def.kind]} transform={`translate(${x - g / 2} ${y - g / 2}) scale(${g / 24})`} className="mglyph" strokeWidth={(1.5 * 24) / (g * 12)} />
+          ) : (
+            <text x={x} y={y + 0.75} className="slot-size" textAnchor="middle">
+              {slot.size}
+            </text>
+          )}
+        </>
       )}
-      {def && <circle cx={x + half * (round ? 0.62 : 0.68)} cy={y - half * (round ? 0.62 : 0.68)} r={Math.max(0.55, half * 0.16)} fill={KIND[def.kind]?.tint} className="lamp" />}
     </g>
   );
 }

@@ -4,7 +4,8 @@ import { AMMO_TYPES, COMPONENT_MAP, type AmmoType, type ComponentDef } from '../
 import { LAYOUT_IDS, LAYOUTS, SECTION_CLASSES, SECTION_LETTER, SLOT_HALF, type LayoutId, type SectionClass, type SectionPos } from '../../sim/content/sections';
 import { moduleStock, mountId, mountRating, mountRecoil, relocateSection, secondsToOverheat, slotOf, slotsOf, type DesignStats, type DroneDesign, type LayoutChange, type MountDesign } from '../../sim/design';
 import { weaponRange } from '../../sim/ammo';
-import { fmt, Glyph, Icon, Meter, Prop } from '../common';
+import { fmt, Icon, Meter, Prop } from '../common';
+import { PartIcon, PartPreview } from '../parts';
 import { KIND } from '../theme';
 import type { Selection } from './Stage';
 
@@ -212,13 +213,18 @@ function SlotProps({ design, stats, pos, slotId, update, install, onBrowse, onMo
         <>
           <div className="obj-title">
             <span className="glyph-tile" style={{ ['--tint' as string]: KIND[def.kind]?.tint }}>
-              <Glyph kind={def.kind} size={26} tint={false} />
+              <PartIcon id={def.id} kind={def.kind} size={26} tint={false} />
             </span>
             <div>
               <h2>{def.name}</h2>
               <p className="muted">{KIND[def.kind]?.label}</p>
             </div>
           </div>
+          {def.slot === 'hardpoint' && (
+            <div className="model-plate" aria-label={`${def.name}, top view`}>
+              <PartPreview id={def.id} height={74} label={`${def.name}, top view`} />
+            </div>
+          )}
           <p className="desc">{def.description}</p>
           {def.notes && <p className="desc muted small">{def.notes}</p>}
           <dl className="props-list">
@@ -453,7 +459,7 @@ function SectionProps({ design, stats, pos, update, onSelect }: Props & { pos: S
           return (
             <li key={slot.id}>
               <button onClick={() => onSelect({ type: 'slot', pos, id: slot.id })}>
-                {def ? <Glyph kind={def.kind} size={18} /> : <span className="slot-size-mark">{slot.size}</span>}
+                {def ? <PartIcon id={def.id} kind={def.kind} size={18} /> : <span className="slot-size-mark">{slot.size}</span>}
                 <span className="name">{def ? def.name : <span className="muted">Empty {slot.kind === 'hardpoint' ? 'hardpoint' : 'bay'}</span>}</span>
                 <code>{mountId(pos, slot.id)}</code>
               </button>

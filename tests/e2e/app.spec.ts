@@ -241,6 +241,27 @@ test('simulate: a training course deploys with its targets, objective and goal',
   await expect(page.getByTestId('drone-list')).toContainText('Target 4');
 });
 
+test('component artwork: own icons in the tray, models on the stage and in the specimen sheet', async ({ page }) => {
+  await go(page, 'Construct');
+  // the tray: every card carries its component's own icon and a model preview for hardpoints
+  const cards = page.getByRole('list', { name: 'Equipment library' }).getByRole('listitem');
+  const n = await cards.count();
+  expect(n).toBeGreaterThan(10);
+  const icons = await page.locator('.tray-grid .part-icon').evaluateAll((els) => els.map((e) => e.getAttribute('data-icon')));
+  expect(icons.every((x) => x && !x.startsWith('kind:'))).toBe(true);
+  expect(new Set(icons).size).toBe(icons.length);
+  await expect(page.locator('.tray-grid .pmodel svg').first()).toBeVisible();
+  // the stage draws the hardpoint models (not placeholder glyphs)
+  await expect(page.getByTestId('slot-F.H1').locator('.part-model > *').first()).toBeAttached();
+  // the specimen sheet: 32 icons, 16 models in six states, all drawn
+  await page.goto('/?parts-sheet');
+  await expect(page.getByTestId('parts-sheet')).toBeVisible();
+  await expect(page.locator('[data-testid^="icon-"]')).toHaveCount(32);
+  await expect(page.locator('[data-testid^="model-"]')).toHaveCount(16);
+  const empty = await page.locator('.sheet-model').evaluateAll((els) => els.filter((e) => e.querySelectorAll('rect,circle,polygon,line,path').length < 4).length);
+  expect(empty).toBe(0);
+});
+
 test.describe('touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   test('every workspace is usable by touch', async ({ page }) => {

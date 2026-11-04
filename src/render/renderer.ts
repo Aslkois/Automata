@@ -5,6 +5,10 @@ import type { Simulation } from '../sim/world';
 import type { Debris, Drone, Projectile, RComponent, RSection } from '../sim/types';
 import { DISTANCE_RANGE } from '../sim/content/integrated';
 import { droneAlpha, fadeAlpha } from '../sim/debris';
+import { damageLevel, loadedTubes, type PartAnimator } from './parts/animator';
+import { CanvasPen } from './parts/canvasPen';
+import { MODELS, restVisual } from './parts/models';
+import { palette, wreckPalette, type Palette } from './parts/palette';
 import type { Vfx } from './vfx';
 import { TEAM_LIGHT } from '../ui/theme';
 
@@ -75,8 +79,11 @@ export class Renderer {
   private off: HTMLCanvasElement | null = null;
   constructor(private ctx: CanvasRenderingContext2D) {}
 
+  private parts: PartAnimator | null = null;
+
   draw(sim: Simulation, cam: Camera, vfx: Vfx, opts: ViewOptions, w: number, h: number, dpr: number) {
     const ctx = this.ctx;
+    this.parts = vfx.parts;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#191816';
     ctx.fillRect(0, 0, w * dpr, h * dpr);
@@ -360,6 +367,35 @@ export class Renderer {
     void px;
   }
 
+  /** Hardpoints draw their own model; anything without one falls back to a simple mark. */
+  private drawPart(d: Drone | null, c: RComponent, teamColor: string, px: number, parts: PartAnimator | null) {
+    if (!c.external || c.kind === 'gear') return;
+    const model = c.def ? MODELS[c.def.id] : undefined;
+    if (!model) return this.drawComponent(c, teamColor, px, c.weapon ? c.weapon.aim : null);
+    // debris: a still part, with whatever rounds its magazine still held when it came off
+    const v = d && parts ? parts.visual(d, c) : { ...restVisual({ aim: c.weapon?.aim ?? c.shield?.facing ?? c.facing, facing: c.facing, seed: c.uid, active: false, loaded: loadedTubes(c) }), damage: c.destroyed ? (3 as const) : damageLevel(c) };
+    const pal = this.fieldPalette(teamColor, v.damage === 3);
+    const pen = (this.pen ??= new CanvasPen(this.ctx, pal, px));
+    pen.setPalette(pal);
+    pen.setScale(px);
+    this.ctx.save();
+    this.ctx.translate(c.x, c.y);
+    model.draw(pen, v);
+    this.ctx.restore();
+  }
+
+  private pen: CanvasPen | null = null;
+  private palettes = new Map<string, Palette>();
+  private fieldPalette(team: string, wreck = false): Palette {
+    const k = wreck ? `${team}|wreck` : team;
+    let p = this.palettes.get(k);
+    if (!p) {
+      p = wreck ? wreckPalette(this.fieldPalette(team)) : palette('field', team);
+      this.palettes.set(k, p);
+    }
+    return p;
+  }
+
   private drawComponent(c: RComponent, teamColor: string, px: number, aimLocal: number | null) {
     const ctx = this.ctx;
     if (!c.external || c.kind === 'gear') return;
@@ -530,7 +566,7 @@ export class Renderer {
       ctx.lineTo(j.x, 6);
       ctx.stroke();
     }
-    for (const c of d.components) if (d.sections[c.section].attached) this.drawComponent(c, dead ? '#6b6357' : BONE, px, c.weapon ? c.weapon.aim : null);
+    for (const c of d.components) if (d.sections[c.section].attached) this.drawPart(d, c, dead ? '#6b6357' : team, px, this.parts);
     if (selected) {
       // tracking reticle: corner brackets and centre ticks around the hull
       ctx.strokeStyle = BONE;
@@ -574,7 +610,7 @@ export class Renderer {
     ctx.rotate(b.body.angle);
     for (const s of b.sections) this.drawGear(b, s, px, null);
     this.drawHull(b.sections, '#1d1c1a', '#55524c', px);
-    for (const c of b.components) this.drawComponent({ ...c, destroyed: true }, '#55524c', px, null);
+    for (const c of b.components) this.drawPart(null, { ...c, destroyed: true }, '#55524c', px, null);
     ctx.restore();
   }
 

@@ -4,7 +4,8 @@ import { useMemo, useState } from 'react';
 import { COMPONENT_MAP, COMPONENTS, type ComponentDef } from '../../sim/content/components';
 import type { SlotDef } from '../../sim/content/sections';
 import type { DroneDesign } from '../../sim/design';
-import { fmt, Glyph, Icon } from '../common';
+import { fmt, Icon } from '../common';
+import { PartIcon, PartPreview } from '../parts';
 import { KIND } from '../theme';
 import { powerOf } from './Properties';
 import { DND, fits, type Selection } from './Stage';
@@ -142,9 +143,14 @@ export function Tray({ open, setOpen, design, sel, selSlot, armed, onPick }: { o
                 style={{ ['--tint' as string]: KIND[d.kind]?.tint }}
               >
                 <span className="part-head">
-                  <Glyph kind={d.kind} size={22} />
+                  <PartIcon id={d.id} kind={d.kind} size={22} />
                   <span className="pname">{d.name}</span>
                 </span>
+                {d.slot === 'hardpoint' && (
+                  <span className="pmodel">
+                    <PartPreview id={d.id} height={30} />
+                  </span>
+                )}
                 <span className="pmeta">
                   <span>{d.slot === 'hardpoint' ? 'Hardpoint' : 'Bay'}</span>
                   <span className="num">{d.size}</span>

@@ -3,6 +3,7 @@
 // Effects are purely visual: nothing here feeds back into the simulation.
 import { localToWorld } from '../sim/drone';
 import { DEBRIS_FADE_S, DEBRIS_PHYSICAL_S } from '../sim/debris';
+import { PartAnimator } from './parts/animator';
 import type { Simulation } from '../sim/world';
 import type { SimEvent } from '../sim/types';
 
@@ -47,6 +48,8 @@ interface Decal {
 const rnd = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
 export class Vfx {
+  /** mechanical animation of hardpoints (recoil, spin, charge, tubes, sensor sweeps) */
+  readonly parts = new PartAnimator();
   particles: P[] = [];
   emitters: Emitter[] = [];
   decals: Decal[] = [];
@@ -124,6 +127,7 @@ export class Vfx {
   }
 
   onEvent(sim: Simulation, e: SimEvent): void {
+    this.parts.onEvent(e);
     const big = (c: string) => (c === 'large' ? 1 : c === 'medium' ? 0.45 : 0.22);
     switch (e.type) {
       case 'shot': {
@@ -285,6 +289,7 @@ export class Vfx {
   private fireAcc = 0;
 
   update(sim: Simulation, dt: number): void {
+    this.parts.update(sim, dt);
     // state-driven effects: motor smoke behind powered rounds, flames on burning sections
     this.trailAcc += dt * 40 * MUL[this.quality];
     while (this.trailAcc >= 1) {
@@ -433,6 +438,7 @@ export class Vfx {
   }
 
   clear() {
+    this.parts.clear();
     this.particles = [];
     this.emitters = [];
     this.decals = [];
