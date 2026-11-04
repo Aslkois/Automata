@@ -137,7 +137,26 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
                 .map((c) => {
                   const ws = c.weapon!;
                   const ok = functional(d, c);
-                  const state = !ok ? (c.destroyed ? 'destroyed' : 'detached') : ws.reloading ? 'reloading' : ws.overheated ? 'overheated' : ws.blockReason && ws.trigger ? 'blocked' : ws.trigger ? 'firing' : ws.mag > 0 ? 'ready' : 'empty';
+                  const w = c.def!.weapon!;
+                  const prog = ws.reloading ? (w.charge ? ws.charge : Math.max(0, Math.min(1, 1 - ws.reloadLeft / Math.max(1e-6, ws.reloadTotal || w.reloadTime)))) : 1;
+                  const state = !ok
+                    ? c.destroyed
+                      ? 'destroyed'
+                      : 'detached'
+                    : ws.reloading
+                      ? `${w.charge ? (ws.reloadLeft === -1 ? 'charge held' : 'charging') : 'reloading'} ${pct(prog)}`
+                      : ws.overheated
+                        ? 'overheated'
+                        : w.spinUp && ws.trigger && ws.spin < 0.9
+                          ? `spinning ${pct(ws.spin)}`
+                          : ws.blockReason && ws.trigger
+                            ? 'blocked'
+                            : ws.trigger
+                              ? 'firing'
+                              : ws.mag > 0
+                                ? 'ready'
+                                : 'empty';
+                  const mixed = w.ammo.length > 1;
                   return (
                     <tr key={c.id} className={`${!ok ? 'dead' : ''} ${recent.has(c.id) ? 'static' : ''}`} title={ws.blockReason ?? ''}>
                       <td>
@@ -145,10 +164,17 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
                       </td>
                       <td className="name">{c.def!.name}</td>
                       <td className="num r">
-                        {ws.mag}/{c.def!.weapon!.magazine}
-                        <span className="muted"> +{ammoReserve(d, c.def!.weapon!.ammo)}</span>
+                        {ws.mag}/{w.magazine}
+                        <span className="muted"> +{ammoReserve(d, w.ammo)}</span>
+                        {mixed && (
+                          <span className="muted small" title="Loaded by type; the selected type fires next">
+                            {' '}
+                            · {w.ammo.map((t) => `${t === ws.selected ? '▸' : ''}${ws.loaded[t] ?? 0} ${t.slice(0, 4)}`).join(' ')}
+                          </span>
+                        )}
+                        {w.fireModes && w.fireModes.length > 1 && <span className="muted small"> · {ws.fireMode}</span>}
                       </td>
-                      <td className={`st ${state === 'firing' ? 'on' : state === 'ready' ? 'ok' : state === 'reloading' ? '' : 'fault'}`}>{state}</td>
+                      <td className={`st ${state === 'firing' ? 'on' : state === 'ready' ? 'ok' : /^(reloading|charging|spinning)/.test(state) ? '' : 'fault'}`}>{state}</td>
                     </tr>
                   );
                 })}
@@ -223,7 +249,54 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
                 <span className={c.team === 'enemy' ? 'fault' : ''}>{c.team}</span> #{c.id} · {c.distance.toFixed(0)} u · bearing {c.bearing.toFixed(0)}°
               </div>
             ))}
-            {d.perception.threats.length > 0 && <p className="num warn">{d.perception.threats.length} incoming shell(s) tracked</p>}
+            {d.perception.threats.length > 0 && (
+              <p className="num warn">
+                {d.perception.threats.length} incoming · nearest {d.perception.threats[0].distance.toFixed(0)} u, {d.perception.threats[0].closingTime.toFixed(1)} s
+              </p>
+            )}
+            <h4 className="sub-h">Surroundings</h4>
+            <table className="table" data-testid="ranges">
+              <tbody>
+                {d.ranges.map((r) => (
+                  <tr key={r.side} className={r.status !== 'ok' ? 'dead' : ''}>
+                    <td className="name">Distance {r.side}</td>
+                    <td className="num r">{r.status !== 'ok' ? '—' : r.distance === null ? 'clear (>500)' : `${r.distance.toFixed(0)} u`}</td>
+                    <td className={`st ${r.status === 'ok' ? 'ok' : 'fault'}`}>{r.status}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td className="name">Bumpers</td>
+                  <td className="num r" colSpan={2}>
+                    {(['front', 'rear', 'left', 'right'] as const).filter((b) => sim.time - d.bumps[b].time <= 0.15).join(', ') || 'no contact'}
+                  </td>
+                </tr>
+                {d.components
+                  .filter((c) => c.def?.lidar)
+                  .map((c) => {
+                    const rays = c.scan?.rays ?? [];
+                    const hits = rays.filter((r) => r.distance !== null);
+                    return (
+                      <tr key={c.id} className={!functional(d, c) ? 'dead' : ''}>
+                        <td className="name">
+                          LIDAR <code>{c.id}</code>
+                        </td>
+                        <td className="num r">{rays.length ? `${hits.length}/${rays.length} returns · nearest ${hits.length ? Math.min(...hits.map((r) => r.distance!)).toFixed(0) : '—'} u` : '—'}</td>
+                        <td className={`st ${rays.length ? 'ok' : 'fault'}`}>{rays.length ? `${((sim.time - (c.scan?.time ?? 0)) * 1000).toFixed(0)} ms` : 'no scan'}</td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+            {(() => {
+              const mine = sim.projectiles.filter((q) => q.alive && q.owner === d.id && q.guidance && q.guidance.targets === 'drones');
+              if (!mine.length) return null;
+              return (
+                <p className="num muted">
+                  {mine.length} missile{mine.length > 1 ? 's' : ''} in flight ·{' '}
+                  {mine.map((q) => (q.track && sim.time - q.track.time <= q.guidance!.memory + 0.12 ? q.track.source : 'lost')).join(', ')}
+                </p>
+              );
+            })()}
           </div>
         </Section>
 
@@ -246,6 +319,22 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
               ))}
             </tbody>
           </table>
+          {(['front', 'middle', 'rear'] as const).some((pos) => d.sections[pos].fire > 0) && (
+            <p className="num fault" data-testid="fires">
+              Burning:{' '}
+              {(['front', 'middle', 'rear'] as const)
+                .filter((pos) => d.sections[pos].fire > 0)
+                .map((pos) => `${pos} ${(sim.time - d.sections[pos].fireSince).toFixed(1)} s`)
+                .join(', ')}
+            </p>
+          )}
+          {d.components
+            .filter((c) => c.suppression)
+            .map((c) => (
+              <p key={c.id} className="num muted">
+                Suppression <code>{c.id}</code>: {c.suppression!.charges} charge{c.suppression!.charges === 1 ? '' : 's'} · {c.suppression!.auto ? 'automatic' : 'on command'}
+              </p>
+            ))}
           {d.failures.length > 0 && (
             <>
               <h4 className="sub-h">Failures</h4>

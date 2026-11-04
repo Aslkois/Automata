@@ -2,7 +2,7 @@
 //
 // Block ids are IR ids. Anything blocks cannot express natively becomes a code module
 // block carrying its exact source (and the original IR, reused verbatim when unchanged).
-import { argKind } from './catalog';
+import { argKind, PICK_KINDS, type ParamKind } from './catalog';
 import { ARITH_OPS, COMPARE_OPS, dottedExpr, dottedName, freshIds, isDottedPath, isIdentifier, newId, type AssignOp, type BinaryOp, type BrainIR, type DeclKind, type Expr, type Stmt, type UnaryOp } from './ir';
 import { parseExpression, parseStatements } from './parse';
 import { printExpr, printStmts } from './print';
@@ -146,7 +146,7 @@ function exprBlock(e: Expr, hint?: string): BJ {
     case 'num':
       return { type: 'math_number', id: e.id, fields: { NUM: e.v } };
     case 'str':
-      if (hint === 'weapon' || hint === 'shield' || hint === 'component') return { type: 'id_pick', id: e.id, fields: { ID: e.v }, extraState: { kind: hint } };
+      if (hint && PICK_KINDS.has(hint as ParamKind)) return { type: 'id_pick', id: e.id, fields: { ID: e.v }, extraState: { kind: hint } };
       return { type: 'text', id: e.id, fields: { TEXT: e.v } };
     case 'bool':
       return { type: 'logic_boolean', id: e.id, fields: { BOOL: e.v ? 'TRUE' : 'FALSE' } };

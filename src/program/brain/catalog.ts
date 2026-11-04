@@ -21,7 +21,19 @@ export const CATEGORY_LABEL: Record<Category, string> = {
 };
 
 /** What a string argument names; drives pickers in the visual editors. */
-export type ParamKind = 'weapon' | 'shield' | 'component' | 'kind' | 'timer' | 'number' | 'boolean' | 'contact' | 'any';
+export type ParamKind = 'weapon' | 'shield' | 'component' | 'kind' | 'timer' | 'number' | 'boolean' | 'contact' | 'side' | 'bumper' | 'ammo' | 'mode' | 'section' | 'any';
+
+/** Fixed choices for text arguments; the visual editors offer them as dropdowns. */
+export const ENUM_OPTIONS: Partial<Record<ParamKind, string[]>> = {
+  side: ['front', 'left', 'right'],
+  bumper: ['front', 'rear', 'left', 'right'],
+  ammo: ['small', 'medium', 'scatter', 'shell', 'penetrator', 'rocket', 'interceptor', 'missile'],
+  mode: ['sequence', 'sync'],
+  section: ['front', 'middle', 'rear'],
+};
+
+/** Argument kinds shown as a picker instead of free text. */
+export const PICK_KINDS = new Set<ParamKind>(['weapon', 'shield', 'component', 'side', 'bumper', 'ammo', 'mode', 'section']);
 
 export interface Param {
   name: string;
@@ -42,6 +54,7 @@ export interface CallInfo {
 const GROUP_CATEGORY: Record<string, Category> = {
   Self: 'sensor',
   Sensors: 'sensor',
+  Environment: 'sensor',
   Movement: 'move',
   Weapons: 'weapon',
   Shields: 'system',
@@ -74,6 +87,18 @@ const LABELS: Record<string, string> = {
   engageAll: 'engage with all weapons',
   shieldFaceContact: 'shield face contact',
   itemAt: 'item at',
+  obstacleDetected: 'obstacle detected',
+  rangeStatus: 'range status',
+  lidarAge: 'lidar age',
+  setFireMode: 'set fire mode',
+  selectAmmo: 'select ammo',
+  ammoStock: 'ammo stock',
+  suppressFire: 'suppress fire',
+  setAutoSuppression: 'auto suppression',
+  openDistance: 'open distance',
+  steerClear: 'steer clear',
+  widestGap: 'widest gap',
+  interceptThreat: 'intercept threat',
 };
 
 function paramKind(group: string, fn: string, name: string): ParamKind {
@@ -82,6 +107,11 @@ function paramKind(group: string, fn: string, name: string): ParamKind {
   if (name === 'kind') return 'kind';
   if (name === 'name' && group === 'Timers') return 'timer';
   if (name === 'contact' || name === 'c') return 'contact';
+  if (name === 'side') return fn === 'bumper' ? 'bumper' : 'side';
+  if (name === 'ammo') return 'ammo';
+  if (name === 'mode') return 'mode';
+  if (name === 'section') return 'section';
+  if (name === 'within') return 'number';
   if (name === 'on' || name === 'lead') return 'boolean';
   if (/^(x|y|angle|throttle|steer|propulsion|weapons|shields|from|to|lo|hi|deg|rad|position)$/.test(name)) return 'number';
   return fn === 'log' ? 'any' : 'any';
@@ -135,8 +165,8 @@ export const CALLS: CallInfo[] = [
     return { callee, label: LABELS[d.name] ?? d.name, params, variadic, returns: d.returns, category: GROUP_CATEGORY[d.group], doc: d.doc };
   }),
   ...HELPERS.map((h) => {
-    const { params } = parseSig(h.sig, h.name === 'shieldFaceContact' ? 'Shields' : 'Weapons', h.name);
-    return { callee: h.name, label: LABELS[h.name] ?? h.name, params, returns: h.name === 'canFireAt' ? 'boolean' : h.name === 'itemAt' ? 'value' : '', category: (h.name === 'turnTowardContact' ? 'move' : h.name === 'itemAt' ? 'value' : 'weapon') as Category, doc: h.doc };
+    const { params } = parseSig(h.sig, h.name === 'shieldFaceContact' ? 'Shields' : h.category === 'move' || h.category === 'sensor' ? 'Environment' : 'Weapons', h.name);
+    return { callee: h.name, label: LABELS[h.name] ?? h.name, params, returns: h.returns ?? '', category: h.category as Category, doc: h.doc };
   }),
   ...MATH.map(([n, ps, doc]) => ({ callee: `Math.${n}`, label: n, params: ps.map((p) => ({ name: p, kind: 'number' as ParamKind, optional: false })), variadic: n === 'min' || n === 'max' || n === 'hypot', returns: 'number', category: 'math' as Category, doc })),
 ];
@@ -208,6 +238,15 @@ function callSnippet(c: CallInfo): Snippet {
             return 'true';
           case 'contact':
             return 'drone.nearestEnemy()';
+          case 'side':
+          case 'bumper':
+            return '"front"';
+          case 'ammo':
+            return '"interceptor"';
+          case 'mode':
+            return '"sync"';
+          case 'section':
+            return '"middle"';
           case 'number':
             return p.name === 'throttle' ? '1' : '0';
           default:
@@ -252,6 +291,13 @@ export const SNIPPETS: Snippet[] = [
   { key: 'get', label: 'variable', category: 'value', kind: 'expr', code: () => 'memory', doc: 'Read a variable.' },
   { key: 'prop', label: 'property', category: 'value', kind: 'expr', code: () => 'drone.nearestEnemy().distance', doc: 'Read a property such as distance, bearing, x, y.' },
   { key: 'list', label: 'list', category: 'value', kind: 'expr', code: () => '[1, 2]', doc: 'A list of values.' },
+  { key: 'env:avoid', label: 'avoid what is ahead', category: 'move', kind: 'stmt', code: () => 'if (drone.obstacleDetected("front", 140)) {\n  drone.drive(0.2, openDistance("left") > openDistance("right") ? -1 : 1);\n} else {\n  drone.drive(1, 0);\n}', doc: 'Reactive navigation with the built-in distance sensors: slow and turn toward the more open side when something is close ahead.' },
+  { key: 'env:wall', label: 'follow the right wall', category: 'move', kind: 'stmt', code: () => 'const right = openDistance("right");\nif (drone.obstacleDetected("front", 120)) drone.drive(0.2, -1);\nelse drone.drive(0.8, clamp((right - 80) / 60, -1, 1));', doc: 'Keep a wall about 80 u to the right: a classic maze strategy.' },
+  { key: 'env:unstick', label: 'back off when stuck', category: 'move', kind: 'stmt', code: () => 'if (drone.bumper("front")) {\n  drone.drive(-0.6, 0.8);\n}', doc: 'Reverse and turn while the front bumper touches something.' },
+  { key: 'env:gap', label: 'turn toward the widest gap', category: 'move', kind: 'stmt', code: () => 'const gap = widestGap();\nif (gap != null) drone.drive(1, clamp(gap / 45, -1, 1));', doc: 'Steer toward the longest clear LIDAR ray (needs a LIDAR).' },
+  { key: 'wpn:intercept', label: 'shoot down incoming', category: 'weapon', kind: 'stmt', code: (ids) => `interceptThreat(${W(ids)});`, doc: 'Aim at the soonest radar-tracked threat and fire inside 350 u; cease fire otherwise.' },
+  { key: 'wpn:rockets', label: 'switch to interceptors', category: 'weapon', kind: 'stmt', code: (ids) => `drone.selectAmmo(${W(ids)}, drone.threats().length ? "interceptor" : "rocket");`, doc: 'Rocket pods: fire interceptors while threats are inbound, offensive rockets otherwise.' },
+  { key: 'sys:fire', label: 'put out fires', category: 'system', kind: 'stmt', code: () => 'for (const f of drone.fires()) {\n  drone.suppressFire(f.section);\n}', doc: 'Spend suppression charges on every burning section now.' },
   { key: 'note', label: 'note', category: 'code', kind: 'stmt', code: () => '// note', doc: 'A comment for people; it does not run.' },
   { key: 'module', label: 'code module', category: 'code', kind: 'stmt', code: () => 'switch (drone.count("weapon")) {\n  case 0:\n    drone.log("disarmed");\n    break;\n}', doc: 'Any AutoScript, kept exactly as written.' },
   ...CALLS.map(callSnippet),

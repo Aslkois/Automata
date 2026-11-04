@@ -117,7 +117,8 @@ export class Simulation implements SimContext {
   emit(e: SimEvent): void {
     this.events.push(e);
     if (this.events.length > 6000) this.events.splice(0, this.events.length - 6000);
-    if (e.type !== 'shot' && e.type !== 'collision' && e.type !== 'reload' && e.type !== 'spin' && e.type !== 'charge' && e.type !== 'shield-raise' && !(e.type === 'impact' && (e.result === 'wall' || e.result === 'debris')) && e.type !== 'component-damaged') {
+    const noise = e.type === 'shot' || e.type === 'collision' || e.type === 'reload' || e.type === 'spin' || e.type === 'shield-raise' || e.type === 'component-damaged' || (e.type === 'charge' && e.phase !== 'interrupted') || (e.type === 'impact' && (e.result === 'wall' || e.result === 'debris')) || (e.type === 'intercept' && !e.kill) || (e.type === 'explosion' && e.kind === 'interceptor');
+    if (!noise) {
       this.log.push(e);
       if (this.log.length > 3000) this.log.splice(0, this.log.length - 3000);
     }

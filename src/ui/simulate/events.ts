@@ -14,7 +14,17 @@ export function describeEvent(e: SimEvent, name: (id: number) => string): string
     case 'shield-overload':
       return `${name(e.drone)}: shield ${e.component} overloaded`;
     case 'intercept':
-      return `${name(e.by)} point defence intercepted a shell`;
+      return `${name(e.by)} ${e.kill ? 'shot down' : 'hit'} an incoming ${e.what === 'bullet' ? 'shell' : e.what}${e.kill ? '' : ' (still flying)'}`;
+    case 'explosion':
+      return `${name(e.by)}: ${e.kind === 'intercepted' ? 'warhead broke up' : `${e.kind} detonation`} (${e.radius.toFixed(0)} u blast)`;
+    case 'fire':
+      return `${name(e.drone)}: ${e.section} section ${e.phase === 'start' ? 'caught fire' : e.phase === 'suppressed' ? 'fire suppressed' : 'fire burned out'}`;
+    case 'joint-failed':
+      return `${name(e.drone)}: ${e.a}–${e.b} joint failed`;
+    case 'charge':
+      return `${name(e.drone)}: ${e.mount} charge ${e.phase}`;
+    case 'reload':
+      return `${name(e.drone)}: ${e.mount} reload ${e.phase}`;
     case 'cookoff':
       return `${name(e.drone)}: ammunition cook-off in ${e.component}`;
     case 'status':
@@ -39,7 +49,14 @@ export function severity(e: SimEvent): Severity {
     case 'detached':
     case 'program-error':
     case 'shield-overload':
+    case 'joint-failed':
       return 'fault';
+    case 'fire':
+      return e.phase === 'start' ? 'fault' : 'info';
+    case 'explosion':
+      return e.kind === 'intercepted' || e.kind === 'interceptor' ? 'minor' : 'hit';
+    case 'intercept':
+      return e.kill ? 'info' : 'minor';
     case 'battle-end':
       return 'end';
     default:
