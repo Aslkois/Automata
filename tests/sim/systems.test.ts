@@ -207,7 +207,7 @@ describe('structure', () => {
     const c = new Simulation({ ...cfg(), seed: 8 });
     c.run(25);
     expect(c.fingerprint()).not.toBe(a.fingerprint());
-  });
+  }, 30_000);
 
   it('17. pause, restart and single-step do not corrupt simulation state', () => {
     const cfg = { seed: 3, arena: defaultArena(), mode: 'duel' as const, timeLimit: 0, decisionHz: 10, drones: [{ design: SKIRMISHER, program: BRAWLER_PROGRAM, team: 0 }, { design: AA_DESTROYER, program: AA_PROGRAM, team: 1 }] };

@@ -60,6 +60,8 @@ export const KIND: Record<string, { label: string; code: string; tint: string }>
   controller: { label: 'Controller', code: 'CTL', tint: CAT.function.color },
   cooler: { label: 'Cooler', code: 'CLR', tint: CAT.loop.color },
   ammo: { label: 'Ammunition', code: 'AMM', tint: CAT.value.color },
+  support: { label: 'Support system', code: 'SYS', tint: CAT.system.color },
+  rangefinder: { label: 'Distance sensor', code: 'RNG', tint: CAT.sensor.color },
   gear: { label: 'Running gear', code: 'GR', tint: CAT.value.color },
 };
 
@@ -74,6 +76,8 @@ export const GLYPH: Record<string, string> = {
   controller: 'M6 6h12v12H6z M10 10h4v4h-4z M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3',
   cooler: 'M4 8c2.7-2 5.3 2 8 0s5.3-2 8 0M4 12c2.7-2 5.3 2 8 0s5.3-2 8 0M4 16c2.7-2 5.3 2 8 0s5.3-2 8 0',
   ammo: 'M5 6h14M5 10h14M5 14h14M5 18h14M8 4v16',
+  support: 'M12 4l2 2.5l3-.6l.6 3l2.5 2l-2.5 2l-.6 3l-3-.6L12 20l-2-2.5l-3 .6l-.6-3L3.9 13l2.5-2l.6-3l3 .6z M12 9.5a2.5 2.5 0 1 1 0 5a2.5 2.5 0 1 1 0-5',
+  rangefinder: 'M4 12h10M14 8v8M17 12h3M9 9l-3 3l3 3',
   gear: 'M4 9h16v6H4z M7 9v6M10 9v6M13 9v6M16 9v6',
 };
 
@@ -93,6 +97,10 @@ export const ICON: Record<string, string> = {
   chevronUp: 'M6 15l6-6l6 6',
   chevronDown: 'M6 9l6 6l6-6',
   chevronRight: 'M9 6l6 6l-6 6',
+  chevronLeft: 'M15 6l-6 6l6 6',
+  lock: 'M6 11h12v9H6z M8.5 11V8a3.5 3.5 0 0 1 7 0v3',
+  gauge: 'M4 16a8 8 0 1 1 16 0 M12 16l4-5 M7 16h1M16 16h1M12 8v1',
+  unlock: 'M6 11h12v9H6z M8.5 11V8a3.5 3.5 0 0 1 6.8-1.2',
   fit: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
   zoomIn: 'M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13M15.5 15.5L20 20M10.5 7.5v6M7.5 10.5h6',
   zoomOut: 'M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13M15.5 15.5L20 20M7.5 10.5h6',

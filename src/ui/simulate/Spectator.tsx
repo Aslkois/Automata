@@ -5,10 +5,13 @@ import { irHash } from '../../program/brain/ir';
 import type { TraceEntry } from '../../program/interpreter';
 import { functional } from '../../sim/drone';
 import { ammoReserve } from '../../sim/systems';
-import type { Drone } from '../../sim/types';
+import type { Drone, RComponent } from '../../sim/types';
+import { PartAnimator } from '../../render/parts/animator';
+import { MODELS } from '../../render/parts/models';
 import type { Simulation } from '../../sim/world';
 import { useShell } from '../App';
-import { Glyph, Icon, Meter, Segments, useStoredState } from '../common';
+import { Icon, Meter, Segments, useStoredState } from '../common';
+import { PartIcon, PartModelG } from '../parts';
 import { library } from '../store';
 import { TEAMS, T } from '../theme';
 import { deployed } from './session';
@@ -23,7 +26,9 @@ function recentFailures(d: Drone, now: number): Set<string> {
   return s;
 }
 
-export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: Drone; onClose: () => void }) {
+export type SheetState = 'peek' | 'half' | 'full';
+
+export function Spectator({ sim, drone: d, onClose, onSelect, sheet = 'half', setSheet }: { sim: Simulation; drone: Drone; onClose: () => void; onSelect?: (id: number) => void; sheet?: SheetState; setSheet?: (s: SheetState) => void }) {
   const { openBrainAt, go, setDesignId } = useShell();
   const ctrl = sim.controllers.get(d.id)!;
   const [open, setOpen] = useStoredState<Record<string, boolean>>('spectator-sections', { weapons: true, power: true, sensors: false, components: false, trace: true });
@@ -58,7 +63,10 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
   const tone = d.status.disabled || d.status.destroyed ? 'fault' : d.status.label === 'Operational' ? 'ok' : 'warn';
 
   return (
-    <aside className={`spectator card ${glitch ? 'breakup' : ''}`} data-testid="inspector" aria-label="Drone diagnostics">
+    <aside className={`spectator card ${glitch ? 'breakup' : ''}`} data-testid="inspector" aria-label="Drone diagnostics" data-sheet={sheet}>
+      {setSheet && (
+        <button className="sp-grab" aria-label={`Sheet size: ${sheet}. Tap to change`} data-testid="sheet-grab" onClick={() => setSheet(sheet === 'peek' ? 'half' : sheet === 'half' ? 'full' : 'peek')} />
+      )}
       <header className="sp-head" style={{ ['--team' as string]: team.color }}>
         <span className="swatch" />
         <div className="grow">
@@ -70,6 +78,16 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
         <span className={`state-pill ${tone}`} data-testid="inspected-status">
           {d.status.label}
         </span>
+        {onSelect && sim.drones.length > 1 && (
+          <span className="sp-cycle">
+            <button className="tool" aria-label="Previous drone" title="Previous drone ([)" onClick={() => onSelect(cycle(sim, d.id, -1))}>
+              <Icon name="chevronLeft" />
+            </button>
+            <button className="tool" aria-label="Next drone" title="Next drone (])" onClick={() => onSelect(cycle(sim, d.id, 1))}>
+              <Icon name="chevronRight" />
+            </button>
+          </span>
+        )}
         <button className="tool" onClick={onClose} aria-label="Close diagnostics" title="Return to freecam (Esc)">
           <Icon name="close" />
         </button>
@@ -137,7 +155,26 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
                 .map((c) => {
                   const ws = c.weapon!;
                   const ok = functional(d, c);
-                  const state = !ok ? (c.destroyed ? 'destroyed' : 'detached') : ws.reloading ? 'reloading' : ws.overheated ? 'overheated' : ws.blockReason && ws.trigger ? 'blocked' : ws.trigger ? 'firing' : ws.mag > 0 ? 'ready' : 'empty';
+                  const w = c.def!.weapon!;
+                  const prog = ws.reloading ? (w.charge ? ws.charge : Math.max(0, Math.min(1, 1 - ws.reloadLeft / Math.max(1e-6, ws.reloadTotal || w.reloadTime)))) : 1;
+                  const state = !ok
+                    ? c.destroyed
+                      ? 'destroyed'
+                      : 'detached'
+                    : ws.reloading
+                      ? `${w.charge ? (ws.reloadLeft === -1 ? 'charge held' : 'charging') : 'reloading'} ${pct(prog)}`
+                      : ws.overheated
+                        ? 'overheated'
+                        : w.spinUp && ws.trigger && ws.spin < 0.9
+                          ? `spinning ${pct(ws.spin)}`
+                          : ws.blockReason && ws.trigger
+                            ? 'blocked'
+                            : ws.trigger
+                              ? 'firing'
+                              : ws.mag > 0
+                                ? 'ready'
+                                : 'empty';
+                  const mixed = w.ammo.length > 1;
                   return (
                     <tr key={c.id} className={`${!ok ? 'dead' : ''} ${recent.has(c.id) ? 'static' : ''}`} title={ws.blockReason ?? ''}>
                       <td>
@@ -145,10 +182,17 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
                       </td>
                       <td className="name">{c.def!.name}</td>
                       <td className="num r">
-                        {ws.mag}/{c.def!.weapon!.magazine}
-                        <span className="muted"> +{ammoReserve(d, c.def!.weapon!.caliber)}</span>
+                        {ws.mag}/{w.magazine}
+                        <span className="muted"> +{ammoReserve(d, w.ammo)}</span>
+                        {mixed && (
+                          <span className="muted small" title="Loaded by type; the selected type fires next">
+                            {' '}
+                            · {w.ammo.map((t) => `${t === ws.selected ? '▸' : ''}${ws.loaded[t] ?? 0} ${t.slice(0, 4)}`).join(' ')}
+                          </span>
+                        )}
+                        {w.fireModes && w.fireModes.length > 1 && <span className="muted small"> · {ws.fireMode}</span>}
                       </td>
-                      <td className={`st ${state === 'firing' ? 'on' : state === 'ready' ? 'ok' : state === 'reloading' ? '' : 'fault'}`}>{state}</td>
+                      <td className={`st ${state === 'firing' ? 'on' : state === 'ready' ? 'ok' : /^(reloading|charging|spinning)/.test(state) ? '' : 'fault'}`}>{state}</td>
                     </tr>
                   );
                 })}
@@ -223,7 +267,54 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
                 <span className={c.team === 'enemy' ? 'fault' : ''}>{c.team}</span> #{c.id} · {c.distance.toFixed(0)} u · bearing {c.bearing.toFixed(0)}°
               </div>
             ))}
-            {d.perception.threats.length > 0 && <p className="num warn">{d.perception.threats.length} incoming shell(s) tracked</p>}
+            {d.perception.threats.length > 0 && (
+              <p className="num warn">
+                {d.perception.threats.length} incoming · nearest {d.perception.threats[0].distance.toFixed(0)} u, {d.perception.threats[0].closingTime.toFixed(1)} s
+              </p>
+            )}
+            <h4 className="sub-h">Surroundings</h4>
+            <table className="table" data-testid="ranges">
+              <tbody>
+                {d.ranges.map((r) => (
+                  <tr key={r.side} className={r.status !== 'ok' ? 'dead' : ''}>
+                    <td className="name">Distance {r.side}</td>
+                    <td className="num r">{r.status !== 'ok' ? '—' : r.distance === null ? 'clear (>500)' : `${r.distance.toFixed(0)} u`}</td>
+                    <td className={`st ${r.status === 'ok' ? 'ok' : 'fault'}`}>{r.status}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td className="name">Bumpers</td>
+                  <td className="num r" colSpan={2}>
+                    {(['front', 'rear', 'left', 'right'] as const).filter((b) => sim.time - d.bumps[b].time <= 0.15).join(', ') || 'no contact'}
+                  </td>
+                </tr>
+                {d.components
+                  .filter((c) => c.def?.lidar)
+                  .map((c) => {
+                    const rays = c.scan?.rays ?? [];
+                    const hits = rays.filter((r) => r.distance !== null);
+                    return (
+                      <tr key={c.id} className={!functional(d, c) ? 'dead' : ''}>
+                        <td className="name">
+                          LIDAR <code>{c.id}</code>
+                        </td>
+                        <td className="num r">{rays.length ? `${hits.length}/${rays.length} returns · nearest ${hits.length ? Math.min(...hits.map((r) => r.distance!)).toFixed(0) : '—'} u` : '—'}</td>
+                        <td className={`st ${rays.length ? 'ok' : 'fault'}`}>{rays.length ? `${((sim.time - (c.scan?.time ?? 0)) * 1000).toFixed(0)} ms` : 'no scan'}</td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+            {(() => {
+              const mine = sim.projectiles.filter((q) => q.alive && q.owner === d.id && q.guidance && q.guidance.targets === 'drones');
+              if (!mine.length) return null;
+              return (
+                <p className="num muted">
+                  {mine.length} missile{mine.length > 1 ? 's' : ''} in flight ·{' '}
+                  {mine.map((q) => (q.track && sim.time - q.track.time <= q.guidance!.memory + 0.12 ? q.track.source : 'lost')).join(', ')}
+                </p>
+              );
+            })()}
           </div>
         </Section>
 
@@ -233,7 +324,7 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
               {d.components.map((c) => (
                 <tr key={c.uid} className={`${!functional(d, c) ? 'dead' : ''} ${recent.has(c.id) ? 'static' : ''}`}>
                   <td>
-                    <Glyph kind={c.kind} size={14} />
+                    <PartIcon id={c.def?.id} kind={c.kind} size={14} />
                   </td>
                   <td>
                     <code>{c.id}</code>
@@ -246,6 +337,22 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
               ))}
             </tbody>
           </table>
+          {(['front', 'middle', 'rear'] as const).some((pos) => d.sections[pos].fire > 0) && (
+            <p className="num fault" data-testid="fires">
+              Burning:{' '}
+              {(['front', 'middle', 'rear'] as const)
+                .filter((pos) => d.sections[pos].fire > 0)
+                .map((pos) => `${pos} ${(sim.time - d.sections[pos].fireSince).toFixed(1)} s`)
+                .join(', ')}
+            </p>
+          )}
+          {d.components
+            .filter((c) => c.suppression)
+            .map((c) => (
+              <p key={c.id} className="num muted">
+                Suppression <code>{c.id}</code>: {c.suppression!.charges} charge{c.suppression!.charges === 1 ? '' : 's'} · {c.suppression!.auto ? 'automatic' : 'on command'}
+              </p>
+            ))}
           {d.failures.length > 0 && (
             <>
               <h4 className="sub-h">Failures</h4>
@@ -267,6 +374,13 @@ export function Spectator({ sim, drone: d, onClose }: { sim: Simulation; drone: 
       </div>
     </aside>
   );
+}
+
+/** The next drone to follow in either direction (wraps around). */
+export function cycle(sim: Simulation, id: number, dir: 1 | -1): number {
+  const ids = sim.drones.map((x) => x.id);
+  const i = ids.indexOf(id);
+  return ids[(i + dir + ids.length) % ids.length] ?? id;
 }
 
 function firstMapped(designId: string, entries: TraceEntry[]): string | null {
@@ -370,6 +484,24 @@ function Trace({ designId, d, sim }: { designId: string; d: Drone; sim: Simulati
 }
 
 /** The machine as it is now: sections shaded by remaining integrity, failed parts marked. */
+const uiParts = new PartAnimator();
+
+/** Live state of an internal component worth showing as a fill (stock, charge, saturation, charges). */
+function internalLevel(c: RComponent): { v: number; label: string; tone: string } | null {
+  const def = c.def;
+  if (!def) return null;
+  if (c.ammo && def.ammo) {
+    const cap = def.ammo.payloads.reduce((n, p) => Math.max(n, p.rounds), 0);
+    const left = Object.values(c.ammo.stock).reduce((n: number, x) => n + (x ?? 0), 0);
+    return { v: Math.max(0, Math.min(1, left / Math.max(1, cap))), label: `${left} rounds left`, tone: '#b9b2a3' };
+  }
+  if (c.battery && def.power?.storage) return { v: c.battery.charge / def.power.storage, label: `${Math.round(c.battery.charge)} / ${def.power.storage} PU·s`, tone: '#8cc4b1' };
+  if (c.heatStore !== undefined && def.support?.heatBuffer) return { v: c.heatStore / def.support.heatBuffer.capacity, label: `${Math.round(c.heatStore)} / ${def.support.heatBuffer.capacity} heat stored`, tone: '#e3a46a' };
+  if (c.suppression && def.support?.suppression) return { v: c.suppression.charges / def.support.suppression.charges, label: `${c.suppression.charges} charges`, tone: '#d9d4c8' };
+  if (def.power?.generation) return { v: Math.min(1, 1 - Math.max(0, c.heat - 50) / 100), label: c.heat > 100 ? 'overheated: half output' : 'generating', tone: c.heat > 100 ? '#c9735e' : '#e2b46e' };
+  return null;
+}
+
 function Silhouette({ d, recent }: { d: Drone; recent: Set<string> }) {
   const secs = (['rear', 'middle', 'front'] as const).map((p) => d.sections[p]);
   const minX = Math.min(...secs.map((s) => s.cx - s.length / 2)) - 5;
@@ -398,17 +530,28 @@ function Silhouette({ d, recent }: { d: Drone; recent: Set<string> }) {
       {d.joints.map((j) => (
         <line key={j.a + j.b} x1={j.x} y1={-5} x2={j.x} y2={5} stroke={j.intact ? '#cfcac0' : T.faultLight} strokeWidth={j.intact ? 0.5 : 0.3} strokeDasharray={j.intact ? undefined : '0.8 0.6'} />
       ))}
+      {/* internals first: their real state, as a fill */}
       {d.components.map((c) => {
-        if (c.kind === 'gear') return null;
+        if (c.kind === 'gear' || c.external || c.def?.integrated) return null;
         const r = c.half * 0.7;
         const dead = c.destroyed;
-        const flick = recent.has(c.id);
-        const fill = dead ? '#6b3428' : c.hp < c.maxHp * 0.5 ? '#8a7a55' : '#d8d3c8';
+        const level = internalLevel(c);
         return (
-          <g key={c.uid} className={flick ? 'static' : undefined}>
-            {c.external ? <circle cx={c.x} cy={c.y} r={r} fill={fill} /> : <rect x={c.x - r} y={c.y - r} width={r * 2} height={r * 2} fill={fill} opacity={0.75} />}
+          <g key={c.uid} className={recent.has(c.id) ? 'static' : undefined}>
+            <title>{`${c.name} (${c.id})${level ? ` · ${level.label}` : ''}`}</title>
+            <rect x={c.x - r} y={c.y - r} width={r * 2} height={r * 2} fill="#2a2926" stroke={dead ? T.faultLight : '#8f8c84'} strokeWidth={0.3} />
+            {!dead && level && <rect x={c.x - r} y={c.y + r - r * 2 * level.v} width={r * 2} height={r * 2 * level.v} fill={level.tone} opacity={0.85} />}
             {dead && <path d={`M${c.x - r * 0.7} ${c.y - r * 0.7}L${c.x + r * 0.7} ${c.y + r * 0.7}M${c.x + r * 0.7} ${c.y - r * 0.7}L${c.x - r * 0.7} ${c.y + r * 0.7}`} stroke={T.faultLight} strokeWidth={0.45} />}
-            {c.weapon && !dead && <line x1={c.x} y1={c.y} x2={c.x + Math.cos(c.weapon.aim) * (r + 3)} y2={c.y + Math.sin(c.weapon.aim) * (r + 3)} stroke="#e8e3d8" strokeWidth={0.55} />}
+          </g>
+        );
+      })}
+      {/* hardpoints: the same models as the battlefield, in their live state */}
+      {d.components.map((c) => {
+        if (c.kind === 'gear' || !c.external || !c.def) return null;
+        if (!MODELS[c.def.id]) return null;
+        return (
+          <g key={c.uid} transform={`translate(${c.x} ${c.y})`} className={recent.has(c.id) ? 'static' : undefined}>
+            <PartModelG id={c.def.id} v={uiParts.visual(d, c)} context="field" strokeWidth={0.18} />
           </g>
         );
       })}

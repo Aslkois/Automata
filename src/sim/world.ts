@@ -2,15 +2,18 @@
 // Rendering, UI and audio only observe this state — they never mutate it.
 import { DroneController } from '../program/runtime';
 import type { ProgramSource } from '../program/types';
-import { spawnProjectile, stepProjectiles } from './combat';
+import { stepProjectiles } from './combat';
 import type { SimContext } from './context';
 import { combatIneffective, computeStatus, processJoints } from './damage';
 import type { DroneDesign } from './design';
-import { buildDrone, comWorld } from './drone';
+import { buildDrone, comWorld, dirToLocal } from './drone';
 import { Rng } from './math';
 import { boxPoly, integrate, resolveContact, satCollide, sectionPoly, stepDebrisFriction, stepGroundForces } from './physics';
-import { stepHeat, stepPower, stepShields, stepWeapons } from './systems';
-import type { Arena, Debris, Drone, Projectile, SimEvent } from './types';
+import { readRanges, scanLidars } from './sensors';
+import { debrisSolid, droneSolid, stepDebris } from './debris';
+import { droneLoad, jointShock, stepLoadFatigue } from './load';
+import { stepFires, stepHeat, stepPower, stepShields, stepWeapons } from './systems';
+import type { Arena, BumperSide, Debris, Drone, Projectile, SimEvent } from './types';
 
 export const SIM_HZ = 60;
 export const SIM_DT = 1 / SIM_HZ;
@@ -33,6 +36,8 @@ export interface ScenarioConfig {
   /** seconds; 0 = unlimited */
   timeLimit: number;
   decisionHz: number;
+  /** what ends the scenario: defeat the other side (default), reach the arena goal, or survive the time limit */
+  objective?: 'destroy' | 'goal' | 'survive' | 'targets';
 }
 
 export interface BattleResult {
@@ -116,7 +121,8 @@ export class Simulation implements SimContext {
   emit(e: SimEvent): void {
     this.events.push(e);
     if (this.events.length > 6000) this.events.splice(0, this.events.length - 6000);
-    if (e.type !== 'shot' && e.type !== 'collision' && !(e.type === 'impact' && (e.result === 'wall' || e.result === 'debris')) && e.type !== 'component-damaged') {
+    const noise = e.type === 'shot' || e.type === 'collision' || e.type === 'reload' || e.type === 'spin' || e.type === 'shield-raise' || e.type === 'component-damaged' || (e.type === 'charge' && e.phase !== 'interrupted') || (e.type === 'impact' && (e.result === 'wall' || e.result === 'debris')) || (e.type === 'intercept' && !e.kill) || (e.type === 'explosion' && e.kind === 'interceptor') || e.type === 'debris-cleared';
+    if (!noise) {
       this.log.push(e);
       if (this.log.length > 3000) this.log.splice(0, this.log.length - 3000);
     }
@@ -132,20 +138,28 @@ export class Simulation implements SimContext {
   step(): void {
     const dt = SIM_DT;
     // 1) Decisions at the decision frequency (stable id order).
+    for (const d of this.drones) scanLidars(this, d);
     if (this.tick % this.ticksPerDecision === 0) {
-      for (const d of this.drones) this.controllers.get(d.id)!.decide(this);
+      for (const d of this.drones) {
+        d.ranges = readRanges(this, d);
+        this.controllers.get(d.id)!.decide(this);
+      }
     }
     // 2) Systems
     for (const d of this.drones) {
       const active = !d.status.disabled;
+      d.load = droneLoad(d);
       stepPower(this, d, dt);
       const load = stepGroundForces(d, dt, active);
-      stepWeapons(this, d, dt, (c, ang) => spawnProjectile(this, d, c, ang));
-      stepShields(d, dt);
+      stepWeapons(this, d, dt);
+      stepShields(this, d, dt);
       stepHeat(this, d, dt, load);
+      stepFires(this, d, dt);
+      stepLoadFatigue(this, d, dt);
     }
     // 3) Integrate bodies
     for (const d of this.drones) integrate(d.body, dt);
+    stepDebris(this, dt);
     for (const b of this.debris) {
       stepDebrisFriction(b.body, b.chassis.muLong * 0.8, dt);
       integrate(b.body, dt);
@@ -170,10 +184,24 @@ export class Simulation implements SimContext {
   }
 
   private bodies() {
-    const out: { body: Drone['body']; polys: ReturnType<typeof sectionPoly>[]; radius: number; id: number }[] = [];
-    for (const d of this.drones) out.push({ body: d.body, polys: Object.values(d.sections).filter((s) => s.attached).map((s) => sectionPoly(d.body, s)), radius: d.radius, id: d.id });
-    for (const b of this.debris) out.push({ body: b.body, polys: b.sections.map((s) => sectionPoly(b.body, s)), radius: b.radius, id: b.id });
+    const out: { body: Drone['body']; polys: ReturnType<typeof sectionPoly>[]; radius: number; id: number; drone?: Drone }[] = [];
+    for (const d of this.drones) if (droneSolid(d)) out.push({ body: d.body, polys: Object.values(d.sections).filter((s) => s.attached).map((s) => sectionPoly(d.body, s)), radius: d.radius, id: d.id, drone: d });
+    // only debris still in its physical phase collides
+    for (const b of this.debris) if (debrisSolid(b)) out.push({ body: b.body, polys: b.sections.map((s) => sectionPoly(b.body, s)), radius: b.radius, id: b.id });
     return out;
+  }
+
+  /** Bumpers: record which side of a drone's hull is in physical contact (normal points away from the drone). */
+  private bump(d: Drone | undefined, nx: number, ny: number, impulse: number) {
+    if (!d) return;
+    const l = dirToLocal(d.body, { x: nx, y: ny });
+    const side: BumperSide = Math.abs(l.x) >= Math.abs(l.y) ? (l.x > 0 ? 'front' : 'rear') : l.y > 0 ? 'right' : 'left';
+    const b = d.bumps[side];
+    if (b.time === this.time) b.impulse += impulse;
+    else {
+      b.time = this.time;
+      b.impulse = impulse;
+    }
   }
 
   private collide(): void {
@@ -192,6 +220,10 @@ export class Simulation implements SimContext {
             const mf = satCollide(pa, pb);
             if (!mf) continue;
             const imp = resolveContact(A.body, B.body, mf);
+            this.bump(A.drone, mf.n.x, mf.n.y, imp);
+            this.bump(B.drone, -mf.n.x, -mf.n.y, imp);
+            if (A.drone) jointShock(this, A.drone, imp);
+            if (B.drone) jointShock(this, B.drone, imp);
             if (imp > 400) this.emit({ t: this.time, type: 'collision', a: A.id, b: B.id, x: mf.point.x, y: mf.point.y, impulse: imp });
           }
       }
@@ -204,14 +236,59 @@ export class Simulation implements SimContext {
         const op = boxPoly(o.x, o.y, o.hw, o.hh);
         for (const pa of A.polys) {
           const mf = satCollide(pa, op);
-          if (mf) resolveContact(A.body, null, mf, 0.1, 0.5);
+          if (mf) {
+            const imp = resolveContact(A.body, null, mf, 0.1, 0.5);
+            this.bump(A.drone, mf.n.x, mf.n.y, imp);
+            if (A.drone) jointShock(this, A.drone, imp);
+            if (imp > 2500) this.emit({ t: this.time, type: 'collision', a: A.id, b: -1, x: mf.point.x, y: mf.point.y, impulse: imp });
+          }
         }
       }
     }
   }
 
+  private finish(winner: number | null, reason: string): void {
+    this.result = { winner, reason, time: this.time };
+    this.emit({ t: this.time, type: 'battle-end', winner, reason });
+  }
+
   private checkResult(): void {
-    if (this.result || this.tick < SIM_HZ) return;
+    if (this.result) return;
+    const objective = this.config.objective ?? 'destroy';
+    const limit = this.config.timeLimit > 0 && this.time >= this.config.timeLimit;
+    if (objective === 'goal') {
+      const g = this.arena.goal;
+      const runners = this.drones.filter((d) => d.team === 0);
+      if (g)
+        for (const d of runners) {
+          if (d.status.disabled || d.status.destroyed) continue;
+          const c = comWorld(d.body);
+          if (Math.hypot(c.x - g.x, c.y - g.y) <= g.r) return this.finish(0, `${d.name} reached the goal in ${this.time.toFixed(1)} s`);
+        }
+      if (runners.length && runners.every((d) => d.status.disabled || d.status.destroyed)) return this.finish(null, 'No drone can reach the goal any more');
+      if (limit) this.finish(null, `Goal not reached within ${this.config.timeLimit} s`);
+      return;
+    }
+    if (objective === 'targets') {
+      // training targets: knocked out once disabled, destroyed or missing a section
+      const down = (d: Drone) => d.status.disabled || d.status.destroyed || Object.values(d.sections).some((x) => x.destroyed || !x.attached);
+      const own = this.drones.filter((d) => d.team === 0);
+      const targets = this.drones.filter((d) => d.team !== 0);
+      const hit = targets.filter(down).length;
+      if (targets.length && hit === targets.length) return this.finish(0, `All ${targets.length} target${targets.length > 1 ? 's' : ''} knocked out in ${this.time.toFixed(1)} s`);
+      if (this.tick >= SIM_HZ && own.length && own.every((d) => d.status.disabled || d.status.destroyed)) return this.finish(targets[0]?.team ?? null, 'Your drones were knocked out');
+      if (limit) this.finish(null, `${hit} of ${targets.length} targets knocked out in ${this.config.timeLimit} s`);
+      return;
+    }
+    if (objective === 'survive') {
+      const own = this.drones.filter((d) => d.team === 0);
+      const others = this.drones.filter((d) => d.team !== 0);
+      if (this.tick >= SIM_HZ && own.length && own.every((d) => combatIneffective(d.status))) return this.finish(others.length ? others[0].team : null, `Did not survive: ${own.map((d) => `${d.name}: ${d.status.label}`).join('; ')}`);
+      if (this.tick >= SIM_HZ && others.length && others.every((d) => combatIneffective(d.status))) return this.finish(0, 'The opposition was knocked out');
+      if (limit) this.finish(0, `Survived ${this.config.timeLimit} s`);
+      return;
+    }
+    if (this.tick < SIM_HZ) return;
     const teams = new Set(this.drones.map((d) => d.team));
     if (teams.size < 2) return;
     const effective = new Set(this.drones.filter((d) => !combatIneffective(d.status)).map((d) => d.team));
@@ -235,9 +312,10 @@ export class Simulation implements SimContext {
     for (const d of this.drones) {
       parts.push(d.id, d.body.pos.x, d.body.pos.y, d.body.angle, d.body.vel.x, d.body.vel.y, d.body.angVel, d.throttle, d.steer);
       for (const s of Object.values(d.sections)) parts.push(s.hp, s.armor, s.attached ? 1 : 0);
-      for (const c of d.components) parts.push(c.hp, c.heat, c.weapon?.mag ?? -1, c.weapon?.aim ?? 0, c.shield?.charge ?? -1, c.battery?.charge ?? -1, c.ammo?.rounds ?? -1);
+      for (const s of Object.values(d.sections)) parts.push(s.fire);
+      for (const c of d.components) parts.push(c.hp, c.heat, c.weapon?.mag ?? -1, c.weapon?.aim ?? 0, c.weapon?.charge ?? -1, c.shield?.charge ?? -1, c.battery?.charge ?? -1, c.ammo ? JSON.stringify(c.ammo.stock) : -1);
     }
-    for (const p of this.projectiles) parts.push(p.id, p.pos.x, p.pos.y);
+    for (const p of this.projectiles) parts.push(p.id, p.pos.x, p.pos.y, p.vel.x, p.vel.y);
     for (const b of this.debris) parts.push(b.id, b.body.pos.x, b.body.pos.y);
     return parts.join('|');
   }

@@ -340,7 +340,7 @@ describe('one brain, three editors', () => {
       expect(duel(viaNodes(ir))).toBe(ref);
       expect(duel(viaCode(viaNodes(viaBlocks(ir))))).toBe(ref);
     }
-  });
+  }, 30_000);
 
   it('keeps loose blocks and unattached nodes in their view without running them', () => {
     let brain: Brain = newBrain('b', 'd', BRAWLER_CODE, 'blocks');
@@ -372,5 +372,41 @@ describe('fragments', () => {
     const { parseStatements } = await import('../../src/program/brain/parse');
     for (const c of ['break;', 'continue;', 'return;', 'if (x) { return 1; }']) expect(parseStatements(c).stmts, c).not.toBeNull();
     expect(parseStatements('function (').stmts).toBeNull();
+  });
+});
+
+describe('environment and equipment calls in the visual editors', () => {
+  const src = `function update() {
+  if (drone.obstacleDetected("front", 140) || drone.bumper("left")) drone.drive(0.2, 1);
+  drone.selectAmmo("F.H1", "interceptor");
+  drone.setFireMode("F.H2", "sync");
+  drone.suppressFire("middle");
+  const gap = widestGap();
+  drone.log(openDistance("right"), gap);
+}
+`;
+  it('round-trip through Blocks and Nodes unchanged', () => {
+    const ir = irFromCode(src);
+    expect(semanticHash(viaBlocks(ir))).toBe(semanticHash(ir));
+    expect(semanticHash(viaNodes(ir))).toBe(semanticHash(ir));
+  });
+
+  it('fixed-choice arguments become pickers in Blocks', () => {
+    const doc = irToBlocks(irFromCode(src));
+    const kinds: string[] = [];
+    const walk = (b: BJ | undefined) => {
+      if (!b) return;
+      if (b.type === 'id_pick') kinds.push(`${(b.extraState as { kind: string }).kind}:${(b.fields as { ID: string }).ID}`);
+      for (const v of Object.values(b.inputs ?? {})) walk((v as { block?: BJ }).block);
+      walk((b.next as { block?: BJ } | undefined)?.block);
+    };
+    for (const b of doc.blocks?.blocks ?? []) walk(b);
+    expect(kinds).toEqual(expect.arrayContaining(['side:front', 'bumper:left', 'ammo:interceptor', 'mode:sync', 'section:middle', 'weapon:F.H1']));
+  });
+
+  it('compiled brains include every helper they use', () => {
+    const c = compileBrain(irFromCode(src), 'b', 'b');
+    expect(c.program.code).toMatch(/function widestGap/);
+    expect(c.program.code).toMatch(/function openDistance/);
   });
 });

@@ -3,7 +3,7 @@
 import * as Blockly from 'blockly/core';
 import 'blockly/blocks';
 import * as En from 'blockly/msg/en';
-import { argKind, argLabel, CALL_MAP, calleeCategory } from '../../program/brain/catalog';
+import { argKind, argLabel, CALL_MAP, calleeCategory, ENUM_OPTIONS } from '../../program/brain/catalog';
 import { ARITH_OPS, ASSIGN_OPS, COMPARE_OPS, LOGIC_OPS } from '../../program/brain/ir';
 import { CAT } from '../theme';
 
@@ -110,14 +110,14 @@ export function registerBlocks() {
       this.kind = 'weapon';
       const opts = (): [string, string][] => {
         const cur = String(this.getFieldValue?.('ID') ?? '');
-        const list = (designIds as Record<string, string[]>)[this.kind] ?? [];
+        const list = (designIds as Record<string, string[]>)[this.kind] ?? ENUM_OPTIONS[this.kind as keyof typeof ENUM_OPTIONS] ?? [];
         const all = [...new Set([...(cur ? [cur] : []), ...list])];
         return all.length ? all.map((x) => [x, x]) : [['F.H1', 'F.H1']];
       };
       this.appendDummyInput().appendField(new Blockly.FieldDropdown(opts as Blockly.MenuGenerator), 'ID');
       this.setOutput(true, null);
       this.setStyle('cat_value');
-      this.setTooltip('One of this drone’s parts, by mount id (text).');
+      this.setTooltip('A choice: one of this drone’s parts by mount id, or a fixed option such as a side or ammunition type (text).');
     },
     saveExtraState(this: Blockly.Block & { kind: string }) {
       return { kind: this.kind };

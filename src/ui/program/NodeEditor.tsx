@@ -18,10 +18,11 @@ import {
   type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { CALL_MAP, calleeCategory } from '../../program/brain/catalog';
+import { CALL_MAP, calleeCategory, ENUM_OPTIONS, PICK_KINDS, type ParamKind } from '../../program/brain/catalog';
 import { inlineText, isValueNode, nodeSize, parseInline, portsOf, snippetToGraph, type GEdge, type GNode, type GraphDoc } from '../../program/brain/graph';
 import { ARITH_OPS, ASSIGN_OPS, COMPARE_OPS, LOGIC_OPS, newId, type Expr } from '../../program/brain/ir';
 import { CAT } from '../theme';
+import { Icon, useStoredState } from '../common';
 import type { EditorHandle } from './BlockEditor';
 
 interface Props {
@@ -229,7 +230,7 @@ function InlineField({ n, port, hint }: { n: GNode; port: string; hint?: string 
   const text = cur ? inlineText(cur) : '';
   const [v, setV] = useState(text);
   useEffect(() => setV(text), [text]);
-  const list = hint === 'weapon' || hint === 'shield' || hint === 'component' ? `ids-${hint}` : undefined;
+  const list = hint && PICK_KINDS.has(hint as ParamKind) ? `ids-${hint}` : undefined;
   return (
     <input
       className={`inl nodrag mono ${cur ? '' : 'empty'}`}
@@ -519,12 +520,18 @@ const Inner = forwardRef<EditorHandle, Props>(function Inner({ doc, onChange, hi
     },
   }));
 
+  // touch screens start with the layout locked: dragging a finger pans instead of moving nodes
+  const [locked, setLocked] = useStoredState<boolean>('nodes-locked', typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches);
   const ctx = useMemo<Ctx>(() => ({ connected, onData, onInline, highlight, errors, ids }), [connected, onData, onInline, highlight, errors, ids]);
 
   return (
     <NodeCtx.Provider value={ctx}>
-      <div ref={host} className="flow-host">
+      <div ref={host} className={`flow-host ${locked ? 'locked' : ''}`}>
+        <button className={`chip-btn flow-lock ${locked ? 'on' : ''}`} aria-pressed={locked} onClick={() => setLocked(!locked)} title={locked ? 'Layout locked: nodes cannot be moved by accident. Panning, editing and wiring still work.' : 'Lock the layout so touches cannot move nodes'} data-testid="node-lock">
+          <Icon name={locked ? 'lock' : 'unlock'} size={15} /> {locked ? 'Layout locked' : 'Lock layout'}
+        </button>
         <ReactFlow
+          nodesDraggable={!locked}
           nodes={flowNodes}
           edges={flowEdges}
           nodeTypes={nodeTypes}
@@ -557,6 +564,13 @@ const Inner = forwardRef<EditorHandle, Props>(function Inner({ doc, onChange, hi
         {(['weapon', 'shield', 'component'] as const).map((k) => (
           <datalist key={k} id={`ids-${k}`}>
             {ids[k].map((x) => (
+              <option key={x} value={JSON.stringify(x)} />
+            ))}
+          </datalist>
+        ))}
+        {Object.entries(ENUM_OPTIONS).map(([k, opts]) => (
+          <datalist key={k} id={`ids-${k}`}>
+            {opts!.map((x) => (
               <option key={x} value={JSON.stringify(x)} />
             ))}
           </datalist>

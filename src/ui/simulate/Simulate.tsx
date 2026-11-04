@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { pickDrone, Renderer, screenToWorld, type Camera } from '../../render/renderer';
 import type { Quality } from '../../render/vfx';
+import { BUSES, type CombatAudio } from '../../render/audio';
+import { TRAINING_MAP, TRAININGS, type TrainingId } from '../../data/training';
 import { comWorld } from '../../sim/drone';
 import type { Drone } from '../../sim/types';
 import { useShell } from '../App';
@@ -12,7 +14,7 @@ import { TEAMS } from '../theme';
 import { describeEvent, eventDrone, severity } from './events';
 import { SPEEDS } from './runner';
 import { useSession, type Scenario } from './session';
-import { Spectator } from './Spectator';
+import { cycle, Spectator, type SheetState } from './Spectator';
 
 export const integrity = (d: Drone) => (['rear', 'middle', 'front'] as const).map((p) => (d.sections[p].attached ? d.sections[p].hp / d.sections[p].maxHp : 0)) as [number, number, number];
 
@@ -21,6 +23,7 @@ export function Simulate({ active }: { active: boolean }) {
   const { test } = useShell();
   const { runner, session } = useSession();
   const [selected, setSelected] = useState<number | null>(null);
+  const [spSheet, setSpSheet] = useStoredState<SheetState>('spectator-sheet', 'half');
   const [follow, setFollow] = useState(true);
   const [sensorView, setSensorView] = useState(false);
   const [showArcs, setShowArcs] = useStoredState('sim-arcs', true);
@@ -171,6 +174,7 @@ export function Simulate({ active }: { active: boolean }) {
         e.preventDefault();
       } else if (key === '.') runner.stepTick();
       else if (key === ',') runner.stepDecision();
+      else if ((key === '[' || key === ']') && runner.sim && selected !== null) setSelected(cycle(runner.sim, selected, key === ']' ? 1 : -1));
       else if (key === 'escape') {
         if (sheet) setSheet(false);
         else setSelected(null);
@@ -184,7 +188,7 @@ export function Simulate({ active }: { active: boolean }) {
       window.removeEventListener('keyup', up);
       keys.current.clear();
     };
-  }, [active, runner, sheet]);
+  }, [active, runner, sheet, selected]);
 
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -254,7 +258,7 @@ export function Simulate({ active }: { active: boolean }) {
   const nameOf = (id: number) => sim?.drones.find((d) => d.id === id)?.name ?? `#${id}`;
 
   return (
-    <div className={`simulate ${selDrone ? 'spectating' : ''}`} data-testid="battle">
+    <div className={`simulate ${selDrone ? 'spectating' : ''} sheet-${spSheet}`} data-testid="battle">
       <div className="field">
         <canvas ref={canvasRef} data-testid="battle-canvas" aria-label="Battlefield" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel} />
       </div>
@@ -264,8 +268,8 @@ export function Simulate({ active }: { active: boolean }) {
           <Icon name="deploy" size={16} />
           {cfg ? (
             <span>
-              {cfg.mode === 'duel' ? 'Duel' : 'Sandbox'}
-              <em> · {cfg.drones.map((d) => d.design.name).join(' vs ')}</em>
+              {cfg.arena.name.startsWith('Training: ') ? cfg.arena.name.slice(10).replace(/^./, (c) => c.toUpperCase()) : cfg.mode === 'duel' ? 'Duel' : 'Sandbox'}
+              <em> · {cfg.drones.filter((d) => !cfg.arena.name.startsWith('Training: ') || d.team === 0).map((d) => d.design.name).join(' vs ')}</em>
             </span>
           ) : (
             'Deploy'
@@ -312,7 +316,7 @@ export function Simulate({ active }: { active: boolean }) {
             </button>
           </>
         )}
-        <ViewMenu open={viewMenu} setOpen={setViewMenu} {...{ showArcs, setShowArcs, showSensors, setShowSensors, quality, setQuality, sound, setSound }} onFit={() => (fitRequest.current = true)} />
+        <ViewMenu open={viewMenu} setOpen={setViewMenu} {...{ showArcs, setShowArcs, showSensors, setShowSensors, quality, setQuality, sound, setSound }} audio={runner.audio} onFit={() => (fitRequest.current = true)} />
       </div>
 
       {sim?.result && (
@@ -359,13 +363,14 @@ export function Simulate({ active }: { active: boolean }) {
 
       {sheet && <DeploySheet onClose={() => setSheet(false)} onDeployed={() => ((fitRequest.current = true), setSelected(null), setSheet(false))} />}
 
-      {sim && selDrone && <Spectator sim={sim} drone={selDrone} onClose={() => setSelected(null)} />}
+      {sim && selDrone && <Spectator sim={sim} drone={selDrone} onClose={() => setSelected(null)} onSelect={setSelected} sheet={spSheet} setSheet={setSpSheet} />}
     </div>
   );
 }
 
-function ViewMenu(p: { open: boolean; setOpen: (o: boolean) => void; showArcs: boolean; setShowArcs: (v: boolean) => void; showSensors: boolean; setShowSensors: (v: boolean) => void; quality: Quality; setQuality: (q: Quality) => void; sound: boolean; setSound: (v: boolean) => void; onFit: () => void }) {
+function ViewMenu(p: { open: boolean; setOpen: (o: boolean) => void; showArcs: boolean; setShowArcs: (v: boolean) => void; showSensors: boolean; setShowSensors: (v: boolean) => void; quality: Quality; setQuality: (q: Quality) => void; sound: boolean; setSound: (v: boolean) => void; audio: CombatAudio; onFit: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [, redraw] = useState(0);
   useDismiss(p.open, () => p.setOpen(false), ref);
   return (
     <div className="menu-anchor" ref={ref}>
@@ -375,7 +380,7 @@ function ViewMenu(p: { open: boolean; setOpen: (o: boolean) => void; showArcs: b
       {p.open && (
         <div className="menu pop" role="menu" aria-label="View options">
           <label className="switch-label">
-            <input type="checkbox" className="switch" checked={p.showSensors} onChange={(e) => p.setShowSensors(e.target.checked)} /> Sensor cones
+            <input type="checkbox" className="switch" checked={p.showSensors} onChange={(e) => p.setShowSensors(e.target.checked)} /> Sensors &amp; ranging
           </label>
           <label className="switch-label">
             <input type="checkbox" className="switch" checked={p.showArcs} onChange={(e) => p.setShowArcs(e.target.checked)} /> Weapon arcs
@@ -383,6 +388,28 @@ function ViewMenu(p: { open: boolean; setOpen: (o: boolean) => void; showArcs: b
           <label className="switch-label">
             <input type="checkbox" className="switch" checked={p.sound} onChange={(e) => p.setSound(e.target.checked)} /> Sound
           </label>
+          {p.sound && (
+            <div className="volumes" role="group" aria-label="Volume">
+              {BUSES.map((b) => (
+                <label key={b.id} className="volume-row" title={b.hint}>
+                  <span>{b.name}</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    aria-label={`${b.name} volume`}
+                    value={Math.round(p.audio.settings.volumes[b.id] * 100)}
+                    onChange={(e) => {
+                      p.audio.setVolume(b.id, Number(e.target.value) / 100);
+                      redraw((x) => x + 1);
+                    }}
+                  />
+                  <span className="mono small">{Math.round(p.audio.settings.volumes[b.id] * 100)}</span>
+                </label>
+              ))}
+            </div>
+          )}
           <label className="select-row">
             Effects
             <select aria-label="Effects quality" value={p.quality} onChange={(e) => p.setQuality(e.target.value as Quality)}>
@@ -464,6 +491,7 @@ function DeploySheet({ onClose, onDeployed }: { onClose: () => void; onDeployed:
   const pr = session.problems(lib, s);
   const ok = !pr.global.length && pr.entries.every((e) => !e.length);
   const ref = useRef<HTMLDivElement>(null);
+  const training = s.training ? TRAINING_MAP[s.training] : null;
   return (
     <aside className="deploy card" ref={ref} aria-label="Scenario" data-testid="scenario">
       <header>
@@ -472,13 +500,45 @@ function DeploySheet({ onClose, onDeployed }: { onClose: () => void; onDeployed:
           <Icon name="close" />
         </button>
       </header>
-      <div className="seg" role="radiogroup" aria-label="Mode">
-        {(['duel', 'sandbox'] as const).map((m) => (
-          <button key={m} role="radio" aria-checked={s.mode === m} className={s.mode === m ? 'on' : ''} onClick={() => set({ mode: m })}>
-            {m === 'duel' ? 'Duel' : 'Sandbox'}
-          </button>
-        ))}
-      </div>
+      <label className="course">
+        <span className="label">Course</span>
+        <select
+          aria-label="Course"
+          data-testid="course"
+          value={s.training ?? ''}
+          onChange={(e) => {
+            const id = (e.target.value || null) as TrainingId | null;
+            const t = id ? TRAINING_MAP[id] : null;
+            set({ training: id, timeLimit: t ? t.timeLimit : 180, roster: t ? s.roster.map((x) => ({ ...x, team: 0 })) : s.roster });
+          }}
+        >
+          <option value="">Battle — Foundry Yard</option>
+          <optgroup label="Training">
+            {TRAININGS.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </optgroup>
+        </select>
+      </label>
+      {training ? (
+        <div className="course-brief" data-testid="course-brief">
+          <p>{training.brief}</p>
+          <p className="muted small">{training.teaches}</p>
+          <p className="muted small">
+            Objective: {training.objective === 'goal' ? 'reach the goal' : training.objective === 'survive' ? `survive ${training.timeLimit} s` : 'knock out every target'} · your drones are {TEAMS[0].name}; built-in targets run their own brains.
+          </p>
+        </div>
+      ) : (
+        <div className="seg" role="radiogroup" aria-label="Mode">
+          {(['duel', 'sandbox'] as const).map((m) => (
+            <button key={m} role="radio" aria-checked={s.mode === m} className={s.mode === m ? 'on' : ''} onClick={() => set({ mode: m })}>
+              {m === 'duel' ? 'Duel' : 'Sandbox'}
+            </button>
+          ))}
+        </div>
+      )}
       <ol className="roster">
         {s.roster.map((en, i) => (
           <li key={en.key} data-testid={`roster-${i}`} style={{ ['--team' as string]: TEAMS[en.team % 4].color }}>
@@ -490,13 +550,15 @@ function DeploySheet({ onClose, onDeployed }: { onClose: () => void; onDeployed:
                 </option>
               ))}
             </select>
-            <select aria-label={`Team ${i + 1}`} value={en.team} onChange={(e) => setEntry(i, { team: Number(e.target.value) })}>
-              {TEAMS.map((t, k) => (
-                <option key={k} value={k}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+            {!training && (
+              <select aria-label={`Team ${i + 1}`} value={en.team} onChange={(e) => setEntry(i, { team: Number(e.target.value) })}>
+                {TEAMS.map((t, k) => (
+                  <option key={k} value={k}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <button className="tool" aria-label={`Remove drone ${i + 1}`} onClick={() => set({ roster: s.roster.filter((_, k) => k !== i) })}>
               <Icon name="close" size={16} />
             </button>
@@ -508,7 +570,7 @@ function DeploySheet({ onClose, onDeployed }: { onClose: () => void; onDeployed:
           </li>
         ))}
       </ol>
-      <button className="btn ghost" onClick={() => set({ roster: [...s.roster, { key: Date.now(), team: s.roster.length % 2, designId: lib.designs[0]?.id ?? '' }] })}>
+      <button className="btn ghost" onClick={() => set({ roster: [...s.roster, { key: Date.now(), team: training ? 0 : s.roster.length % 2, designId: lib.designs[0]?.id ?? '' }] })}>
         <Icon name="plus" /> Add drone
       </button>
       <p className="muted small">Each drone runs its own brain — edit it under Program.</p>

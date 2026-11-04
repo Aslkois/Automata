@@ -1,6 +1,10 @@
 // Component, section and joint damage; structural detachment; derived damage states.
+import { ratedMassOf } from './load';
 import { SECTION_POSITIONS, type SectionPos } from './content/sections';
+import type { AmmoType } from './content/components';
+import { moduleRounds } from './ammo';
 import type { SimContext } from './context';
+import { cookOffPerRound } from './design';
 import { boundingRadius, localToWorld, pointVelocity, recomputeMass } from './drone';
 import type { Debris, Drone, DroneStatus, FailureEvent, RComponent, RSection } from './types';
 
@@ -22,17 +26,24 @@ export function damageComponent(sim: SimContext, d: Drone, c: RComponent, amount
     failure(sim, d, { type: 'component-destroyed', component: c.id, kind: c.kind, section: c.section, detail: `${c.name} (${c.id}) destroyed` });
     if (c.shield) c.shield.charge = 0;
     if (c.weapon) c.weapon.trigger = false;
+    const storedPower = c.battery?.charge ?? 0;
     if (c.battery) c.battery.charge = 0;
     if (c.ammo && c.def?.ammo) {
-      const energy = c.ammo.rounds * c.def.ammo.cookOffPerRound;
-      c.ammo.rounds = 0;
+      let energy = 0;
+      for (const [t, n] of Object.entries(c.ammo.stock)) energy += (n ?? 0) * cookOffPerRound(c.def, t as AmmoType);
+      const rounds = moduleRounds(c.ammo.stock);
+      c.ammo.stock = {};
       if (energy > 1) {
         sim.emit({ t: sim.time, type: 'cookoff', drone: d.id, component: c.id, x: w.x, y: w.y, energy });
         const sec = d.sections[c.section];
         damageSection(sim, d, sec, energy * 0.6);
         for (const o of d.components) if (o !== c && o.section === c.section && !o.destroyed) damageComponent(sim, d, o, energy * 0.35);
+        // burning propellant: an ammunition fire that outlasts the blast
+        if (rounds > 0) ignite(sim, d, c.section, Math.min(1, 0.4 + energy / 200), Math.min(18, 6 + energy / 20), `${c.name} (${c.id}) cooked off and started a fire`);
       }
     }
+    // energy stores and power plants burn when wrecked
+    if ((c.kind === 'generator' && (c.def?.power?.generation ?? 0) >= 60) || storedPower > 150) ignite(sim, d, c.section, 0.5, 9, `${c.name} (${c.id}) caught fire`);
   } else {
     sim.emit({ t: sim.time, type: 'component-damaged', drone: d.id, component: c.id, hp: c.hp / c.maxHp, x: w.x, y: w.y });
     if (!c.damagedReported && c.hp < c.maxHp * 0.5) {
@@ -65,10 +76,34 @@ export function damageSection(sim: SimContext, d: Drone, s: RSection, amount: nu
   }
 }
 
+/** A working Reinforced Coupling bracing this joint (front = front–middle, rear = middle–rear). */
+export function jointReinforcement(d: Drone, j: Drone['joints'][number]): number {
+  const which = j.a === 'front' || j.b === 'front' ? 'front' : 'rear';
+  let r = 0;
+  for (const c of d.components) if (c.braces === which && c.def?.support?.jointReinforcement && !c.destroyed && d.sections[c.section].attached) r = Math.max(r, c.def.support.jointReinforcement);
+  return r;
+}
+
 export function damageJoint(sim: SimContext, d: Drone, j: Drone['joints'][number], amount: number): void {
   if (!j.intact) return;
-  j.hp -= amount;
+  // +35% effective durability means 1/1.35 of the damage gets through
+  j.hp -= amount / (1 + jointReinforcement(d, j));
   if (j.hp <= 0) processJoints(sim, d);
+}
+
+/** Start (or feed) a fire in a section. Deterministic: only real events start fires. */
+export function ignite(sim: SimContext, d: Drone, pos: SectionPos, intensity: number, fuel: number, detail: string): void {
+  const s = d.sections[pos];
+  if (!s.attached || s.destroyed) return;
+  const wasBurning = s.fire > 0;
+  s.fire = Math.max(s.fire, Math.max(0, Math.min(1, intensity)));
+  s.fireFuel = Math.max(s.fireFuel, fuel);
+  if (!wasBurning) {
+    s.fireSince = sim.time;
+    const w = localToWorld(d.body, { x: s.cx, y: 0 });
+    sim.emit({ t: sim.time, type: 'fire', drone: d.id, section: pos, phase: 'start', x: w.x, y: w.y });
+    failure(sim, d, { type: 'fire', section: pos, detail });
+  }
 }
 
 /** Break failed joints and split disconnected section groups off as debris. */
@@ -79,6 +114,8 @@ export function processJoints(sim: SimContext, d: Drone): void {
       j.hp = 0;
       j.intact = false;
       changed = true;
+      const w = localToWorld(d.body, { x: j.x, y: 0 });
+      sim.emit({ t: sim.time, type: 'joint-failed', drone: d.id, a: j.a, b: j.b, x: w.x, y: w.y });
     }
   }
   if (!changed) return;
@@ -117,6 +154,7 @@ export function processJoints(sim: SimContext, d: Drone): void {
   const secs = SECTION_POSITIONS.map((p) => d.sections[p]).filter((s) => s.attached);
   recomputeMass(d.body, secs, d.components, d.chassis.gearMassPerSide);
   d.radius = boundingRadius(secs);
+  d.ratedMass = ratedMassOf(d);
 }
 
 function detachGroup(sim: SimContext, d: Drone, group: SectionPos[]): void {
@@ -153,6 +191,7 @@ function detachGroup(sim: SimContext, d: Drone, group: SectionPos[]): void {
     components: debrisComps,
     radius: boundingRadius(debrisSecs),
     chassis: d.chassis,
+    age: 0,
   };
   sim.debris.push(debris);
   for (const s of secs) s.attached = false;
@@ -181,8 +220,8 @@ export function computeStatus(d: Drone): DroneStatus {
   const armed = att.some((c) => {
     if (c.kind !== 'weapon' || !ok(c) || !c.weapon || !c.def?.weapon) return false;
     if (c.weapon.mag > 0) return true;
-    const cal = c.def.weapon.caliber;
-    return att.some((a) => a.kind === 'ammo' && ok(a) && a.def?.ammo?.caliber === cal && (a.ammo?.rounds ?? 0) > 0);
+    const types = c.def.weapon.ammo;
+    return att.some((a) => a.kind === 'ammo' && ok(a) && types.some((t) => (a.ammo?.stock[t] ?? 0) > 0));
   });
   // Structurally destroyed: nothing of the remaining hull is intact.
   const destroyed = SECTION_POSITIONS.every((p) => d.sections[p].destroyed || !d.sections[p].attached);

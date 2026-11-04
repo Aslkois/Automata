@@ -694,7 +694,7 @@ input[type='range'] {
 
 /* ------------------------------------------------------------------ shell */
 .app {
-  height: 100%;
+  height: calc(100% - var(--kb, 0px));
   display: grid;
   grid-template-columns: var(--rail) minmax(0, 1fr);
 }
@@ -1464,6 +1464,284 @@ input[type='range'] {
   background: var(--graphite);
   color: var(--ivory);
   border-color: var(--graphite);
+}
+/* hardpoint layouts: three drawn-to-scale miniatures */
+.layout-pick {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.layout-pick button {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  text-align: left;
+  min-height: 44px;
+  transition: background var(--slow) var(--ease);
+}
+.layout-pick button:hover {
+  background: rgba(42, 39, 35, 0.05);
+}
+.layout-pick button.on {
+  background: var(--graphite);
+  color: var(--ivory);
+  border-color: var(--graphite);
+}
+.layout-pick b {
+  font-size: 13px;
+}
+.layout-pick small {
+  font-size: 11px;
+  opacity: 0.8;
+}
+.layout-pick .warn,
+.class-pick .warn {
+  color: var(--warn);
+  opacity: 1;
+}
+.layout-preview {
+  width: 100%;
+  height: 58px;
+  margin-bottom: 4px;
+}
+.layout-preview .lp-hull {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 0.5;
+  opacity: 0.55;
+}
+.layout-preview .lp-mount {
+  fill: rgba(42, 39, 35, 0.08);
+  stroke: currentColor;
+  stroke-width: 0.45;
+}
+.layout-pick button.on .lp-mount {
+  fill: rgba(239, 232, 218, 0.12);
+}
+.layout-preview .lp-size {
+  font: 600 3.2px var(--mono);
+  fill: currentColor;
+}
+.confirm {
+  margin: 10px 0;
+  padding: 12px;
+  border: 1px solid var(--warn);
+  border-radius: var(--r);
+  background: rgba(176, 122, 44, 0.07);
+  font-size: 13px;
+  animation: rise var(--slow) var(--ease);
+}
+.confirm ul {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+.confirm .actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+/* per-mount configuration */
+.mount-config {
+  display: grid;
+  gap: 10px;
+  margin: 6px 0 10px;
+}
+.mount-config .choice {
+  display: grid;
+  gap: 4px;
+}
+.mount-config .seg {
+  display: flex;
+  flex-wrap: wrap;
+}
+.mount-config .seg button {
+  flex: 1 1 auto;
+  min-height: 36px;
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stepper .label {
+  flex: 1;
+}
+.stepper .num {
+  min-width: 2ch;
+  text-align: center;
+}
+.tool.sm {
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+}
+.desc.warn {
+  color: var(--warn);
+}
+.toast {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  top: 76px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--graphite);
+  color: var(--ivory);
+  font-size: 13px;
+  box-shadow: var(--shadow-dark);
+  animation: rise var(--slow) var(--ease);
+}
+.toast .link {
+  color: var(--ivory);
+  text-decoration: underline;
+}
+.tray .seg.sizes button {
+  min-width: 32px;
+}
+.deploy .course {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.deploy .course select {
+  width: 100%;
+  min-height: 40px;
+}
+.course-brief {
+  padding: 8px 10px;
+  border-left: 2px solid var(--line-strong);
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.course-brief p {
+  margin: 0 0 4px;
+}
+.flow-host {
+  position: relative;
+}
+.flow-lock {
+  position: absolute;
+  z-index: 6;
+  top: 10px;
+  right: 12px;
+  background: var(--ivory);
+}
+.flow-lock.on {
+  background: var(--graphite);
+  color: var(--ivory);
+}
+.diagnostics {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(460px, calc(100vw - 32px));
+  max-height: min(70vh, 640px);
+  overflow: auto;
+  padding: 12px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+  background: var(--ivory);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 12px;
+}
+.diagnostics h3 {
+  margin: 0 0 4px;
+  font: 600 11px/1.4 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--iron);
+}
+.diagnostics section {
+  display: grid;
+  gap: 2px;
+}
+.dg-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  padding: 2px 0;
+  border-bottom: 1px dotted var(--line);
+}
+.dg-row .num {
+  text-align: right;
+}
+.dg-meter {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.dg-meter > span:first-child {
+  text-transform: capitalize;
+}
+.dg-note {
+  margin: 0 0 2px;
+  font-size: 11.5px;
+  color: var(--iron);
+}
+.dg-note.warn,
+.dg-row .warn {
+  color: var(--warn);
+}
+.dg-row .fault {
+  color: var(--fault);
+}
+.part-model {
+  pointer-events: none;
+}
+.ghost-model {
+  opacity: 0.28;
+  pointer-events: none;
+}
+.slot .mount-ring {
+  /* the whole footprint is the touch target, under the model */
+  fill: rgba(255, 252, 244, 0.001);
+  pointer-events: all;
+  stroke-dasharray: 0.6 0.5;
+  stroke: var(--iron);
+  stroke-width: 0.16;
+}
+.slot.sel .mount-ring {
+  stroke: var(--signal);
+  stroke-width: 0.45;
+  stroke-dasharray: none;
+}
+.slot.target .mount-ring {
+  fill: rgba(61, 110, 125, 0.18);
+}
+.tray .part .pmodel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 34px;
+  margin: 2px 0 4px;
+  border-radius: var(--r);
+  background: rgba(42, 39, 35, 0.06);
+}
+.model-plate {
+  display: flex;
+  justify-content: center;
+  padding: 10px 8px;
+  margin: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: repeating-linear-gradient(0deg, transparent 0 9px, rgba(42, 39, 35, 0.05) 9px 10px), repeating-linear-gradient(90deg, transparent 0 9px, rgba(42, 39, 35, 0.05) 9px 10px), var(--vellum);
+}
+.part-preview {
+  display: block;
+  overflow: visible;
 }
 .slot-list {
   list-style: none;
@@ -2640,6 +2918,31 @@ select.nf {
   align-items: center;
   font-size: 13px;
 }
+.menu .volumes {
+  display: grid;
+  gap: 6px;
+  padding: 2px 0 4px 2px;
+  border-left: 1px solid var(--line-dark-strong);
+  margin-left: 6px;
+  padding-left: 10px;
+}
+.menu .volume-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 26px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ivory);
+}
+.menu .volume-row input[type='range'] {
+  width: 100%;
+  accent-color: var(--ivory);
+  min-height: 24px;
+}
+.menu .volume-row .mono {
+  text-align: right;
+  opacity: 0.7;
+}
 .menu select {
   background: var(--pitch);
   color: var(--ivory);
@@ -2972,6 +3275,28 @@ select.nf {
   border-color: var(--line-dark-strong);
   box-shadow: var(--shadow-dark);
   animation: slide-r var(--slow) var(--ease);
+}
+.sp-grab {
+  display: none;
+  width: 100%;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+}
+.sp-grab::before {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 4px;
+  margin: 7px auto;
+  border-radius: 2px;
+  background: rgba(239, 232, 218, 0.35);
+}
+.sp-cycle {
+  display: flex;
+  gap: 2px;
 }
 .spectator::before,
 .spectator::after {
@@ -3356,20 +3681,30 @@ select.nf {
 
   .stage {
     position: relative;
-    order: 3;
+    order: 4;
     flex: 1;
     min-height: 0;
   }
+  /* layer and arcs: a compact row in the flow, so they never sit on top of the drone */
   .stage-layer {
+    position: relative;
+    order: 3;
     top: auto;
-    left: 12px;
-    bottom: calc(var(--tray-h, 52px) + 64px);
-    grid-auto-flow: column;
+    left: auto;
+    bottom: auto;
+    margin: 6px 12px 0;
+    display: flex;
+    gap: 12px;
     align-items: center;
+    justify-content: space-between;
+  }
+  .stage-layer .seg button {
+    min-height: 34px;
+    padding: 0 12px;
   }
   .tray {
     position: relative;
-    order: 4;
+    order: 5;
   }
   .stage-tools {
     bottom: 10px;
@@ -3522,14 +3857,39 @@ select.nf {
   .tray .switch-label {
     display: none;
   }
+  .tray .seg.sizes {
+    display: none;
+  }
+  .tray .tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex: 1;
+    min-width: 0;
+  }
   .tray-grid {
     grid-auto-columns: 168px;
     height: 186px;
     padding: 4px 12px 12px;
   }
+  /* the diagnostics chip is an icon on phones, so the header keeps to one row of actions */
+  .diag-btn .chip-lbl {
+    display: none;
+  }
+  .diag-btn {
+    min-width: 40px;
+    justify-content: center;
+  }
   .hint {
     border-radius: var(--r-card);
     font-size: 13px;
+    /* in the flow under the layer row: never over the drone the player is choosing a slot on */
+    position: relative;
+    order: 3;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    margin: 6px 12px 0;
+    padding: 8px 12px;
   }
 
   /* program */
@@ -3699,15 +4059,46 @@ select.nf {
   .sp-head {
     padding: 12px 8px 10px 16px;
   }
+  .spectator[data-sheet='peek'] {
+    height: 168px;
+  }
+  .spectator[data-sheet='full'] {
+    height: calc(100% - 64px);
+  }
+  .sp-grab {
+    display: block;
+  }
   /* while spectating, the transport rides above the sheet */
   .simulate.spectating .transport {
     bottom: calc(52% + 10px);
+  }
+  .simulate.spectating.sheet-peek .transport {
+    bottom: calc(168px + 10px);
+  }
+  .simulate.spectating.sheet-full .transport {
+    display: none;
+  }
+  /* the keyboard is open: the bottom bar gives its space to the editor */
+  .kb-open .rail {
+    display: none;
+  }
+  .kb-open .app {
+    grid-template-rows: minmax(0, 1fr);
   }
   .simulate.spectating .timeline {
     display: none;
   }
   .silhouette {
     height: 70px;
+  }
+}
+@media (max-width: 720px) and (max-height: 760px) {
+  .tray-grid {
+    height: 142px;
+  }
+  .tray .part .pmodel {
+    height: 28px;
+    margin: 0 0 2px;
   }
 }
 @media (max-width: 380px) {
@@ -3783,4 +4174,44 @@ select.nf {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ------------------------------------------------------------------ component specimen sheet */
+.parts-sheet {
+  padding: 24px;
+  overflow: auto;
+  height: 100%;
+}
+.parts-sheet h2 {
+  font: 600 12px var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.sheet-icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.sheet-icons figure {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.sheet-icons figcaption {
+  width: 100%;
+  font-size: 12px;
+}
+.sheet-models td.sheet-field {
+  background: #191816;
+  padding: 2px;
+}
+.sheet-models th {
+  font-size: 12px;
+  text-align: left;
+  padding: 0 8px;
 }

@@ -2,7 +2,13 @@
 import { comWorld, localToWorld } from '../sim/drone';
 import { activeSensors } from '../sim/sensors';
 import type { Simulation } from '../sim/world';
-import type { Debris, Drone, RComponent, RSection } from '../sim/types';
+import type { Debris, Drone, Projectile, RComponent, RSection } from '../sim/types';
+import { DISTANCE_RANGE } from '../sim/content/integrated';
+import { droneAlpha, fadeAlpha } from '../sim/debris';
+import { damageLevel, loadedTubes, type PartAnimator } from './parts/animator';
+import { CanvasPen } from './parts/canvasPen';
+import { MODELS, restVisual } from './parts/models';
+import { palette, wreckPalette, type Palette } from './parts/palette';
 import type { Vfx } from './vfx';
 import { TEAM_LIGHT } from '../ui/theme';
 
@@ -60,6 +66,7 @@ export function pickDrone(sim: Simulation, x: number, y: number): Drone | null {
     const s = Math.sin(d.body.angle);
     const lx = dx * c + dy * s;
     const ly = -dx * s + dy * c;
+    if (droneAlpha(d) <= 0) continue;
     for (const sec of Object.values(d.sections)) {
       if (!sec.attached) continue;
       if (Math.abs(lx - sec.cx) <= sec.length / 2 + 4 && Math.abs(ly) <= sec.width / 2 + 4) return d;
@@ -72,8 +79,11 @@ export class Renderer {
   private off: HTMLCanvasElement | null = null;
   constructor(private ctx: CanvasRenderingContext2D) {}
 
+  private parts: PartAnimator | null = null;
+
   draw(sim: Simulation, cam: Camera, vfx: Vfx, opts: ViewOptions, w: number, h: number, dpr: number) {
     const ctx = this.ctx;
+    this.parts = vfx.parts;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#191816';
     ctx.fillRect(0, 0, w * dpr, h * dpr);
@@ -156,28 +166,38 @@ export class Renderer {
       ctx.strokeRect(x, y, o.hw * 2, o.hh * 2);
     }
 
+    // training goal: a ring and a label
+    if (A.goal) {
+      const g = A.goal;
+      ctx.strokeStyle = 'rgba(236,230,216,0.7)';
+      ctx.lineWidth = 1.4 * px;
+      ctx.setLineDash([6 * px, 5 * px]);
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      brackets(ctx, g.x, g.y, g.r * 0.45, g.r * 0.18);
+      ctx.fillStyle = 'rgba(236,230,216,0.75)';
+      ctx.font = `${11 * px}px ${MONO}`;
+      ctx.textAlign = 'center';
+      ctx.fillText('GOAL', g.x, g.y + g.r + 16 * px);
+    }
+
     const sel = opts.selected !== null ? sim.drones.find((d) => d.id === opts.selected) ?? null : null;
     const sensorMode = opts.sensorView && sel;
     const visible = new Set<number>(sensorMode ? [sel.id, ...sel.perception.contacts.map((c) => c.id)] : sim.drones.map((d) => d.id));
 
     for (const b of sim.debris) this.drawDebris(b, px);
-    if (sel && (opts.showSensors || sensorMode)) this.drawSensors(sel, px);
+    if (sel && (opts.showSensors || sensorMode)) {
+      this.drawSensors(sel, px);
+      this.drawEnvironment(sim, sel, px);
+    }
     if (sel && opts.showArcs) this.drawArcs(sel, px);
     for (const d of sim.drones) if (visible.has(d.id)) this.drawDrone(d, px, sel?.id === d.id);
 
-    // projectiles
+    // projectiles, drawn by what they physically are
     ctx.lineCap = 'round';
-    for (const p of sim.projectiles) {
-      const large = p.caliber === 'large';
-      ctx.strokeStyle = large ? '#f4ead2' : p.caliber === 'medium' ? '#e6d3a3' : '#d9cfb8';
-      ctx.lineWidth = Math.max(px * (large ? 2.2 : 1.2), large ? 1.6 : 0.6);
-      const sp = Math.hypot(p.vel.x, p.vel.y) || 1;
-      const tail = Math.min(large ? 14 : 9, Math.hypot(p.pos.x - p.prev.x, p.pos.y - p.prev.y));
-      ctx.beginPath();
-      ctx.moveTo(p.pos.x, p.pos.y);
-      ctx.lineTo(p.pos.x - (p.vel.x / sp) * tail, p.pos.y - (p.vel.y / sp) * tail);
-      ctx.stroke();
-    }
+    for (const p of sim.projectiles) this.drawProjectile(p, px);
     vfx.draw(ctx, z);
 
     // contacts of the selected drone (what its program can see)
@@ -252,7 +272,7 @@ export class Renderer {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.textAlign = 'left';
       for (const d of sim.drones) {
-        if (!visible.has(d.id)) continue;
+        if (!visible.has(d.id) || droneAlpha(d) <= 0) continue;
         const c = comWorld(d.body);
         const s = worldToScreen(cam, w, h, c.x + d.radius * 0.7, c.y - d.radius * 0.9);
         const dead = d.status.disabled || d.status.destroyed;
@@ -347,6 +367,35 @@ export class Renderer {
     void px;
   }
 
+  /** Hardpoints draw their own model; anything without one falls back to a simple mark. */
+  private drawPart(d: Drone | null, c: RComponent, teamColor: string, px: number, parts: PartAnimator | null) {
+    if (!c.external || c.kind === 'gear') return;
+    const model = c.def ? MODELS[c.def.id] : undefined;
+    if (!model) return this.drawComponent(c, teamColor, px, c.weapon ? c.weapon.aim : null);
+    // debris: a still part, with whatever rounds its magazine still held when it came off
+    const v = d && parts ? parts.visual(d, c) : { ...restVisual({ aim: c.weapon?.aim ?? c.shield?.facing ?? c.facing, facing: c.facing, seed: c.uid, active: false, loaded: loadedTubes(c) }), damage: c.destroyed ? (3 as const) : damageLevel(c) };
+    const pal = this.fieldPalette(teamColor, v.damage === 3);
+    const pen = (this.pen ??= new CanvasPen(this.ctx, pal, px));
+    pen.setPalette(pal);
+    pen.setScale(px);
+    this.ctx.save();
+    this.ctx.translate(c.x, c.y);
+    model.draw(pen, v);
+    this.ctx.restore();
+  }
+
+  private pen: CanvasPen | null = null;
+  private palettes = new Map<string, Palette>();
+  private fieldPalette(team: string, wreck = false): Palette {
+    const k = wreck ? `${team}|wreck` : team;
+    let p = this.palettes.get(k);
+    if (!p) {
+      p = wreck ? wreckPalette(this.fieldPalette(team)) : palette('field', team);
+      this.palettes.set(k, p);
+    }
+    return p;
+  }
+
   private drawComponent(c: RComponent, teamColor: string, px: number, aimLocal: number | null) {
     const ctx = this.ctx;
     if (!c.external || c.kind === 'gear') return;
@@ -359,11 +408,38 @@ export class Renderer {
       const len = c.def?.size === 'L' ? 15 : c.def?.size === 'M' ? 9 : 6.5;
       ctx.strokeStyle = col;
       ctx.lineWidth = c.def?.size === 'L' ? 2.4 : c.def?.size === 'M' ? 1.5 : 1;
+      const w = c.def?.weapon;
       if (!dead) {
-        ctx.beginPath();
-        ctx.moveTo(c.x + Math.cos(a) * r * 0.5, c.y + Math.sin(a) * r * 0.5);
-        ctx.lineTo(c.x + Math.cos(a) * (r + len), c.y + Math.sin(a) * (r + len));
-        ctx.stroke();
+        const barrels = w?.barrels ?? [0];
+        const launcher = !!w && (w.ammo.includes('rocket') || w.ammo.includes('missile'));
+        if (launcher) {
+          // a box of launch tubes
+          const bl = len * 0.75;
+          const bw = (Math.max(...barrels.map(Math.abs)) + 1.2) * 1;
+          ctx.save();
+          ctx.translate(c.x, c.y);
+          ctx.rotate(a);
+          ctx.fillStyle = '#22211e';
+          ctx.fillRect(-r * 0.2, -bw, r * 0.2 + bl, bw * 2);
+          ctx.strokeRect(-r * 0.2, -bw, r * 0.2 + bl, bw * 2);
+          for (let i = 0; i < barrels.length; i++) {
+            const loaded = i < (c.weapon?.mag ?? 0);
+            ctx.beginPath();
+            ctx.arc(bl - 0.9, barrels[i], 0.55, 0, Math.PI * 2);
+            if (loaded) ctx.fill();
+            ctx.stroke();
+          }
+          ctx.restore();
+        } else {
+          const nx = -Math.sin(a);
+          const ny = Math.cos(a);
+          for (const off of barrels) {
+            ctx.beginPath();
+            ctx.moveTo(c.x + Math.cos(a) * r * 0.5 + nx * off, c.y + Math.sin(a) * r * 0.5 + ny * off);
+            ctx.lineTo(c.x + Math.cos(a) * (r + len) + nx * off, c.y + Math.sin(a) * (r + len) + ny * off);
+            ctx.stroke();
+          }
+        }
       } else {
         // broken barrel: short, bent
         ctx.beginPath();
@@ -378,6 +454,15 @@ export class Renderer {
       ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+      // coilgun capacitor bank: charge shown as a closing ring
+      if (!dead && w?.charge && c.weapon) {
+        const ch = c.weapon.charge;
+        ctx.strokeStyle = ch >= 1 ? '#f7f3ea' : 'rgba(226,228,226,0.6)';
+        ctx.lineWidth = Math.max(px * 1.2, 0.7);
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, r + 1.6, -Math.PI / 2, -Math.PI / 2 + ch * Math.PI * 2);
+        ctx.stroke();
+      }
     } else if (c.kind === 'sensor') {
       ctx.strokeStyle = dead ? '#4a4843' : BONE;
       ctx.fillStyle = '#22211e';
@@ -462,7 +547,10 @@ export class Renderer {
     const team = TEAM_COLORS[d.team % TEAM_COLORS.length];
     const dead = d.status.disabled || d.status.destroyed;
     const secs = Object.values(d.sections).filter((s) => s.attached);
+    const alpha = droneAlpha(d);
+    if (alpha <= 0) return;
     ctx.save();
+    ctx.globalAlpha = alpha;
     ctx.translate(b.pos.x, b.pos.y);
     ctx.rotate(b.angle);
     for (const s of secs) this.drawGear(d, s, px, d.treadPhase);
@@ -478,7 +566,7 @@ export class Renderer {
       ctx.lineTo(j.x, 6);
       ctx.stroke();
     }
-    for (const c of d.components) if (d.sections[c.section].attached) this.drawComponent(c, dead ? '#6b6357' : BONE, px, c.weapon ? c.weapon.aim : null);
+    for (const c of d.components) if (d.sections[c.section].attached) this.drawPart(d, c, dead ? '#6b6357' : team, px, this.parts);
     if (selected) {
       // tracking reticle: corner brackets and centre ticks around the hull
       ctx.strokeStyle = BONE;
@@ -514,12 +602,15 @@ export class Renderer {
 
   private drawDebris(b: Debris, px: number) {
     const ctx = this.ctx;
+    const a = fadeAlpha(b.age);
+    if (a <= 0) return;
     ctx.save();
+    ctx.globalAlpha = a;
     ctx.translate(b.body.pos.x, b.body.pos.y);
     ctx.rotate(b.body.angle);
     for (const s of b.sections) this.drawGear(b, s, px, null);
     this.drawHull(b.sections, '#1d1c1a', '#55524c', px);
-    for (const c of b.components) this.drawComponent({ ...c, destroyed: true }, '#55524c', px, null);
+    for (const c of b.components) this.drawPart(null, { ...c, destroyed: true }, '#55524c', px, null);
     ctx.restore();
   }
 
@@ -538,6 +629,119 @@ export class Renderer {
       }
       ctx.fill();
       ctx.stroke();
+    }
+  }
+
+  private drawProjectile(p: Projectile, px: number) {
+    const ctx = this.ctx;
+    const sp = Math.hypot(p.vel.x, p.vel.y) || 1;
+    const ux = p.vel.x / sp;
+    const uy = p.vel.y / sp;
+    const moved = Math.hypot(p.pos.x - p.prev.x, p.pos.y - p.prev.y);
+    switch (p.kind) {
+      case 'pellet': {
+        ctx.strokeStyle = '#d9cfb8';
+        ctx.lineWidth = Math.max(px * 0.9, 0.5);
+        const tail = Math.min(4, moved);
+        ctx.beginPath();
+        ctx.moveTo(p.pos.x, p.pos.y);
+        ctx.lineTo(p.pos.x - ux * tail, p.pos.y - uy * tail);
+        ctx.stroke();
+        return;
+      }
+      case 'slug': {
+        // coilgun penetrator: a long, bright, perfectly straight streak
+        const tail = Math.min(36, moved);
+        ctx.strokeStyle = 'rgba(226,228,226,0.35)';
+        ctx.lineWidth = Math.max(px * 4, 2.4);
+        ctx.beginPath();
+        ctx.moveTo(p.pos.x, p.pos.y);
+        ctx.lineTo(p.pos.x - ux * tail, p.pos.y - uy * tail);
+        ctx.stroke();
+        ctx.strokeStyle = '#f7f3ea';
+        ctx.lineWidth = Math.max(px * 1.4, 0.9);
+        ctx.stroke();
+        return;
+      }
+      case 'rocket':
+      case 'interceptor':
+      case 'missile': {
+        const len = p.kind === 'missile' ? 7 : p.kind === 'rocket' ? 4.5 : 3.2;
+        const wid = p.kind === 'missile' ? 1.8 : 1.1;
+        // exhaust plume while the motor burns
+        if (p.rocket) {
+          ctx.fillStyle = p.kind === 'interceptor' ? 'rgba(236,230,216,0.8)' : 'rgba(227,196,146,0.85)';
+          ctx.beginPath();
+          ctx.moveTo(p.pos.x - ux * len, p.pos.y - uy * len);
+          ctx.lineTo(p.pos.x - ux * (len + 5 + Math.random() * 3) - uy * wid * 0.6, p.pos.y - uy * (len + 5 + Math.random() * 3) + ux * wid * 0.6);
+          ctx.lineTo(p.pos.x - ux * (len + 5 + Math.random() * 3) + uy * wid * 0.6, p.pos.y - uy * (len + 5 + Math.random() * 3) - ux * wid * 0.6);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.strokeStyle = p.kind === 'interceptor' ? '#ece6d8' : '#d8cdb4';
+        ctx.lineWidth = Math.max(px * wid * 1.3, wid);
+        ctx.beginPath();
+        ctx.moveTo(p.pos.x, p.pos.y);
+        ctx.lineTo(p.pos.x - ux * len, p.pos.y - uy * len);
+        ctx.stroke();
+        return;
+      }
+      default: {
+        const large = p.caliber === 'large';
+        ctx.strokeStyle = large ? '#f4ead2' : p.caliber === 'medium' ? '#e6d3a3' : '#d9cfb8';
+        ctx.lineWidth = Math.max(px * (large ? 2.2 : 1.2), large ? 1.6 : 0.6);
+        const tail = Math.min(large ? 14 : 9, moved);
+        ctx.beginPath();
+        ctx.moveTo(p.pos.x, p.pos.y);
+        ctx.lineTo(p.pos.x - ux * tail, p.pos.y - uy * tail);
+        ctx.stroke();
+      }
+    }
+  }
+
+  /** What the selected drone measures of its surroundings: distance rays, LIDAR returns, missile tracks. */
+  private drawEnvironment(sim: Simulation, d: Drone, px: number) {
+    const ctx = this.ctx;
+    ctx.lineWidth = px;
+    for (const r of d.ranges) {
+      const ok = r.status === 'ok';
+      const hit = ok && r.distance !== null;
+      ctx.strokeStyle = !ok ? 'rgba(201,115,94,0.55)' : hit ? 'rgba(236,230,216,0.5)' : 'rgba(236,230,216,0.18)';
+      ctx.setLineDash(hit ? [] : [3 * px, 4 * px]);
+      const len = hit ? r.distance! : ok ? DISTANCE_RANGE : 18;
+      ctx.beginPath();
+      ctx.moveTo(r.ox, r.oy);
+      ctx.lineTo(r.ox + Math.cos(r.dir) * len, r.oy + Math.sin(r.dir) * len);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (hit) {
+        ctx.beginPath();
+        ctx.moveTo(r.hx! - 4 * px, r.hy! - 4 * px);
+        ctx.lineTo(r.hx! + 4 * px, r.hy! + 4 * px);
+        ctx.moveTo(r.hx! + 4 * px, r.hy! - 4 * px);
+        ctx.lineTo(r.hx! - 4 * px, r.hy! + 4 * px);
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = 'rgba(236,230,216,0.75)';
+    for (const c of d.components) {
+      if (!c.scan) continue;
+      for (const ray of c.scan.rays) {
+        if (ray.x === null || ray.y === null) continue;
+        ctx.fillRect(ray.x - 1.2 * px, ray.y - 1.2 * px, 2.4 * px, 2.4 * px);
+      }
+    }
+    // this drone's guided rounds: where each believes its target is
+    for (const p of sim.projectiles) {
+      if (p.owner !== d.id || !p.guidance || !p.track) continue;
+      const fresh = sim.time - p.track.time <= p.guidance.memory + 0.12;
+      ctx.strokeStyle = fresh ? (p.track.source === 'seeker' ? 'rgba(236,230,216,0.55)' : 'rgba(185,178,163,0.45)') : 'rgba(201,115,94,0.5)';
+      ctx.setLineDash([2 * px, 3 * px]);
+      ctx.beginPath();
+      ctx.moveTo(p.pos.x, p.pos.y);
+      ctx.lineTo(p.track.x, p.track.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
   }
 

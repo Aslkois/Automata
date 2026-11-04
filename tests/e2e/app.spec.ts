@@ -176,6 +176,92 @@ test('deployment is blocked by a brain that does nothing, and explains why', asy
   await expect(page.getByTestId('drone-list')).toContainText('Skirmisher');
 });
 
+
+test('construct: hardpoint layouts relocate parts, ask before removing any, and undo restores', async ({ page }) => {
+  await go(page, 'Construct');
+  await page.getByTestId('section-front').click();
+  // Assault Platform front: two heavy cannons on a heavy Maximum section; Medium has one large mount
+  await expect(page.getByTestId('layout-pick-front').getByTestId('layout-max')).toHaveAttribute('aria-checked', 'true');
+  await page.getByTestId('layout-pick-front').getByTestId('layout-medium').click();
+  const confirm = page.getByTestId('layout-confirm');
+  await expect(confirm).toContainText('Heavy Cannon');
+  await confirm.getByRole('button', { name: 'Keep current' }).click();
+  await expect(page.getByTestId('layout-pick-front').getByTestId('layout-max')).toHaveAttribute('aria-checked', 'true');
+  await page.getByTestId('layout-pick-front').getByTestId('layout-medium').click();
+  await page.getByTestId('layout-confirm').getByRole('button', { name: /Change and remove/ }).click();
+  await expect(page.getByTestId('layout-pick-front').getByTestId('layout-medium')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('slot-F.H1')).toHaveAttribute('aria-label', /Heavy Cannon/);
+  // undo brings the second cannon back
+  await page.getByTestId('undo').click();
+  await expect(page.getByTestId('notice')).toContainText('front section');
+  await expect(page.getByTestId('layout-pick-front').getByTestId('layout-max')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('slot-F.H2')).toHaveAttribute('aria-label', /Heavy Cannon/);
+  // engineering diagnostics come from the design data
+  await page.getByTestId('diagnostics-toggle').click();
+  await expect(page.getByTestId('diagnostics')).toContainText('Rated mass on this chassis');
+  await expect(page.getByTestId('diagnostics')).toContainText('Recoil and mounts');
+  await page.getByTestId('diagnostics-toggle').click();
+  // a mount setting: the rocket cassette's interceptor split on an empty bay
+  await page.getByTestId('slot-F.H3').click();
+  await page.getByTestId('move-part').click();
+  await expect(page.locator('.hint')).toContainText('Moving Optical Camera');
+  await page.getByRole('radio', { name: 'Internal bays' }).click();
+  await page.getByRole('radio', { name: 'Hardpoints' }).click();
+  await page.getByTestId('slot-M.H3').click();
+  // M.H3 holds the radar; the heavy Maximum F.H3 mount is medium-size, so the two swap
+  await expect(page.getByTestId('notice')).toContainText('Swapped');
+  await expect(page.getByTestId('slot-F.H3')).toHaveAttribute('aria-label', /Search Radar/);
+  await expect(page.getByTestId('slot-M.H3')).toHaveAttribute('aria-label', /Optical Camera/);
+  // and a part that cannot fit back is refused with a reason: the heavy cannon onto a medium mount
+  await page.getByTestId('slot-F.H1').click();
+  await page.getByTestId('move-part').click();
+  await page.getByTestId('slot-M.H1').click();
+  await expect(page.getByTestId('notice')).toContainText('does not fit');
+});
+
+test('simulate: a training course deploys with its targets, objective and goal', async ({ page }) => {
+  await go(page, 'Simulate');
+  await page.getByTestId('scenario-button').click();
+  await page.getByTestId('course').selectOption('maze');
+  await expect(page.getByTestId('course-brief')).toContainText('reach the goal');
+  await page.getByLabel('Drone 1', { exact: true }).selectOption({ label: 'Pathfinder' });
+  await page.getByRole('button', { name: 'Remove drone 2' }).click();
+  await page.getByRole('button', { name: 'Deploy' }).click();
+  await expect(page.getByTestId('drone-list')).toContainText('Pathfinder');
+  const controls = page.getByTestId('sim-controls');
+  await controls.getByRole('radio', { name: '8×' }).click();
+  await controls.getByRole('button', { name: 'Play' }).click();
+  await page.waitForTimeout(1500);
+  await controls.getByRole('button', { name: 'Pause' }).click();
+  expect(await clock(page)).toBeGreaterThan(3);
+  // the weapon range has built-in targets on the other team
+  await page.getByTestId('scenario-button').click();
+  await page.getByTestId('course').selectOption('range');
+  await page.getByRole('button', { name: 'Deploy' }).click();
+  await expect(page.getByTestId('drone-list')).toContainText('Target 4');
+});
+
+test('component artwork: own icons in the tray, models on the stage and in the specimen sheet', async ({ page }) => {
+  await go(page, 'Construct');
+  // the tray: every card carries its component's own icon and a model preview for hardpoints
+  const cards = page.getByRole('list', { name: 'Equipment library' }).getByRole('listitem');
+  const n = await cards.count();
+  expect(n).toBeGreaterThan(10);
+  const icons = await page.locator('.tray-grid .part-icon').evaluateAll((els) => els.map((e) => e.getAttribute('data-icon')));
+  expect(icons.every((x) => x && !x.startsWith('kind:'))).toBe(true);
+  expect(new Set(icons).size).toBe(icons.length);
+  await expect(page.locator('.tray-grid .pmodel svg').first()).toBeVisible();
+  // the stage draws the hardpoint models (not placeholder glyphs)
+  await expect(page.getByTestId('slot-F.H1').locator('.part-model > *').first()).toBeAttached();
+  // the specimen sheet: 32 icons, 16 models in six states, all drawn
+  await page.goto('/?parts-sheet');
+  await expect(page.getByTestId('parts-sheet')).toBeVisible();
+  await expect(page.locator('[data-testid^="icon-"]')).toHaveCount(32);
+  await expect(page.locator('[data-testid^="model-"]')).toHaveCount(16);
+  const empty = await page.locator('.sheet-model').evaluateAll((els) => els.filter((e) => e.querySelectorAll('rect,circle,polygon,line,path').length < 4).length);
+  expect(empty).toBe(0);
+});
+
 test.describe('touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   test('every workspace is usable by touch', async ({ page }) => {
@@ -199,7 +285,25 @@ test.describe('touch phone', () => {
     await page.waitForTimeout(600);
     await page.getByTestId('drone-list').getByRole('button', { name: /Assault Platform/ }).tap();
     await expect(page.getByTestId('inspected-name')).toBeVisible();
+    // previous / next drone and the sheet sizes
+    await page.getByRole('button', { name: 'Next drone' }).tap();
+    await expect(page.getByTestId('inspected-name')).toContainText('AA Destroyer');
+    await page.getByTestId('sheet-grab').tap();
+    await expect(page.getByTestId('inspector')).toHaveAttribute('data-sheet', /full|peek|half/);
     await page.getByRole('button', { name: 'Close diagnostics' }).tap();
     await expect(page.getByTestId('inspector')).toHaveCount(0);
+  });
+
+  test('a part can be moved to another slot by touch, and the drone stays visible', async ({ page }) => {
+    await go(page, 'Construct');
+    await page.getByTestId('slot-M.H1').tap();
+    await page.getByTestId('move-part').tap();
+    await expect(page.locator('.hint')).toContainText('Moving');
+    // the tray folds away while moving so the stage keeps its height
+    const stage = (await page.locator('.stage').boundingBox())!;
+    expect(stage.height).toBeGreaterThan(250);
+    await page.getByTestId('slot-M.H2').tap();
+    await expect(page.getByTestId('notice')).toContainText('Swapped');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 });

@@ -1,4 +1,5 @@
-import { DESIGN_SCHEMA_VERSION, type DroneDesign, type MountDesign } from '../../src/sim/design';
+import { DESIGN_SCHEMA_VERSION, type DroneDesign, type MountDesign, type SectionDesign } from '../../src/sim/design';
+import type { SectionPos } from '../../src/sim/content/sections';
 import type { ProgramSource } from '../../src/program/types';
 import { PROGRAM_SCHEMA_VERSION } from '../../src/program/types';
 import { defaultArena, Simulation, type DroneSpec } from '../../src/sim/world';
@@ -7,16 +8,21 @@ import { getComponent } from '../../src/sim/content/components';
 
 export const m = (component: string, rotation = 0): MountDesign => ({ component, rotation });
 
-export function design(over: Partial<DroneDesign> & { sections?: DroneDesign['sections'] } = {}): DroneDesign {
+/** Sections may omit the layout (Medium, as every design before schema 3). */
+type LooseSection = Omit<SectionDesign, 'layout'> & { layout?: SectionDesign['layout'] };
+
+export function design(over: Omit<Partial<DroneDesign>, 'sections'> & { sections?: Record<SectionPos, LooseSection> } = {}): DroneDesign {
+  const sec = (s: LooseSection): SectionDesign => ({ ...s, layout: s.layout ?? 'medium' });
+  const given = over.sections;
   return {
     schema: DESIGN_SCHEMA_VERSION,
     id: over.id ?? 'test',
     name: over.name ?? 'Test',
     chassis: over.chassis ?? 'tracked',
-    sections: over.sections ?? {
-      front: { class: 'heavy', armor: 70, slots: { H1: m('heavy_cannon'), H2: m('mg'), H3: m('camera'), I1: m('ammo_small'), I2: m('shell_rack') } },
-      middle: { class: 'medium', armor: 30, slots: { H1: m('shield_dir'), H2: m('mg', 90), H3: m('radar'), I2: m('generator_s') } },
-      rear: { class: 'light', armor: 10, slots: { H1: m('mg', 180), I1: m('battery'), I2: m('cooler') } },
+    sections: given ? { front: sec(given.front), middle: sec(given.middle), rear: sec(given.rear) } : {
+      front: { class: 'heavy', layout: 'medium', armor: 70, slots: { H1: m('heavy_cannon'), H2: m('mg'), H3: m('camera'), I1: m('ammo_small'), I2: m('shell_rack') } },
+      middle: { class: 'medium', layout: 'medium', armor: 30, slots: { H1: m('shield_dir'), H2: m('mg', 90), H3: m('radar'), I2: m('generator_s') } },
+      rear: { class: 'light', layout: 'medium', armor: 10, slots: { H1: m('mg', 180), I1: m('battery'), I2: m('cooler') } },
     },
   };
 }
@@ -46,6 +52,13 @@ export function shoot(sim: Simulation, weaponId: string, from: { x: number; y: n
     team,
     weapon: weaponId,
     mount: 'test',
+    kind: 'bullet',
+    ammo: w.ammo[0],
+    age: 0,
+    fixedYield: false,
+    target: null,
+    track: null,
+    spawnLag: 0,
     pos: { ...from },
     prev: { ...from },
     vel: { x: (dx / l) * w.muzzleVelocity, y: (dy / l) * w.muzzleVelocity },

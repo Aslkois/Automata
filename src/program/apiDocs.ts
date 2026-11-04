@@ -4,7 +4,7 @@ export interface ApiDoc {
   sig: string;
   returns: string;
   doc: string;
-  group: 'Self' | 'Sensors' | 'Movement' | 'Weapons' | 'Shields' | 'Power' | 'Hardware' | 'Timers' | 'Globals';
+  group: 'Self' | 'Sensors' | 'Environment' | 'Movement' | 'Weapons' | 'Shields' | 'Power' | 'Hardware' | 'Timers' | 'Globals';
 }
 
 export const API_DOCS: ApiDoc[] = [
@@ -18,6 +18,7 @@ export const API_DOCS: ApiDoc[] = [
   { group: 'Self', name: 'angleTo', sig: 'drone.angleTo(x, y)', returns: 'degrees', doc: 'Bearing from self to a point.' },
   { group: 'Self', name: 'distanceTo', sig: 'drone.distanceTo(x, y)', returns: 'number', doc: 'Distance from self to a point.' },
   { group: 'Self', name: 'arena', sig: 'drone.arena()', returns: '{width, height}', doc: 'Arena dimensions (public map knowledge).' },
+  { group: 'Environment', name: 'goal', sig: 'drone.goal()', returns: '{x, y, radius} | null', doc: 'The scenario’s goal point in training courses (public mission data). The walls between you and it are not known — find them with your sensors.' },
   { group: 'Self', name: 'id', sig: 'drone.id()', returns: 'number', doc: 'Own id.' },
   { group: 'Self', name: 'team', sig: 'drone.team()', returns: 'number', doc: 'Own team.' },
   { group: 'Self', name: 'random', sig: 'drone.random()', returns: '0..1', doc: 'Seeded deterministic random number (Math.random is the same source).' },
@@ -25,18 +26,31 @@ export const API_DOCS: ApiDoc[] = [
   { group: 'Sensors', name: 'contacts', sig: 'drone.contacts()', returns: 'Contact[]', doc: 'All contacts detected this tick by powered, working sensors with line of sight. Sorted by distance.' },
   { group: 'Sensors', name: 'enemies', sig: 'drone.enemies()', returns: 'Contact[]', doc: 'Detected enemy contacts.' },
   { group: 'Sensors', name: 'nearestEnemy', sig: 'drone.nearestEnemy()', returns: 'Contact | null', doc: 'Closest detected enemy not known to be disabled.' },
-  { group: 'Sensors', name: 'threats', sig: 'drone.threats()', returns: 'Threat[]', doc: 'Interceptable shells on a collision course (needs a radar).' },
+  { group: 'Sensors', name: 'threats', sig: 'drone.threats()', returns: 'Threat[]', doc: 'Incoming interceptable rounds seen by a radar: shells and rockets on a collision course, guided missiles closing in. Each: id, x, y, vx, vy, speed, size, distance, bearing, closingTime, missDistance. Soonest first.' },
   { group: 'Sensors', name: 'sensors', sig: 'drone.sensors()', returns: 'Sensor[]', doc: 'Own sensors with status, arc, range and facing.' },
+  { group: 'Environment', name: 'distance', sig: 'drone.distance(side)', returns: 'number | null', doc: 'Distance (u) from the built-in "front", "left" or "right" distance sensor to the nearest wall, obstacle or hull, up to 500 u. null when nothing is in range — or when the sensor does not work; tell them apart with rangeStatus().' },
+  { group: 'Environment', name: 'obstacleDetected', sig: 'drone.obstacleDetected(side, within = 150)', returns: 'boolean', doc: 'True when that distance sensor reads a surface closer than `within`. False when the sensor does not work.' },
+  { group: 'Environment', name: 'rangeStatus', sig: 'drone.rangeStatus(side)', returns: '"ok" | "unpowered" | "destroyed" | "detached"', doc: 'Whether a distance sensor is working. "ok" with distance() null means nothing within 500 u.' },
+  { group: 'Environment', name: 'ranges', sig: 'drone.ranges()', returns: 'Range[]', doc: 'All three distance readings: side, distance (or null), status. Sampled at each decision.' },
+  { group: 'Environment', name: 'bumper', sig: 'drone.bumper(side)', returns: 'boolean', doc: 'True while the "front", "rear", "left" or "right" of the hull is pressing against something (contact within the last 0.15 s).' },
+  { group: 'Environment', name: 'bumpers', sig: 'drone.bumpers()', returns: '{front, rear, left, right, …Impulse}', doc: 'All four bumpers at once, with the contact impulse of each.' },
+  { group: 'Environment', name: 'lidar', sig: 'drone.lidar(id?)', returns: 'Ray[]', doc: 'Latest LIDAR scan: rays left to right, each {angle (relative to the hull heading), distance or null, x, y}. Geometry only — it does not identify drones. Empty without a working, powered LIDAR.' },
+  { group: 'Environment', name: 'lidarAge', sig: 'drone.lidarAge()', returns: 'seconds | null', doc: 'Age of the latest LIDAR scan (it refreshes every 0.25 s).' },
   { group: 'Movement', name: 'drive', sig: 'drone.drive(throttle, steer)', returns: '', doc: 'Persistent propulsion command, both in [-1, 1]. Positive steer turns clockwise.' },
   { group: 'Movement', name: 'turnToward', sig: 'drone.turnToward(x, y, throttle = 1)', returns: '', doc: 'Proportional steering toward a point (slows down for sharp turns).' },
   { group: 'Movement', name: 'stop', sig: 'drone.stop()', returns: '', doc: 'Zero throttle and steering.' },
-  { group: 'Weapons', name: 'weapons', sig: 'drone.weapons()', returns: 'Weapon[]', doc: 'Own weapons: id, type, functional, ammo, reserve, reloading, ready, heat, aim, arcMin/arcMax, range, blocked.' },
+  { group: 'Weapons', name: 'weapons', sig: 'drone.weapons()', returns: 'Weapon[]', doc: 'Own weapons: id, type, functional, ammo, magazine, reserve, ammoTypes, selectedAmmo, loaded, reserveByType, reloading, reloadProgress, charging, charge, spin, barrels, activeBarrels, fireMode, rpm, recoil, mountRating, mountStress (last shot’s recoil / rating), guided, ready, heat, aim, arcMin/arcMax, range, blocked.' },
   { group: 'Weapons', name: 'weapon', sig: 'drone.weapon(id)', returns: 'Weapon', doc: 'One weapon by id ("F.H1"), index or object.' },
   { group: 'Weapons', name: 'aim', sig: 'drone.aim(id, angle)', returns: '', doc: 'Command a turret to a world angle (degrees). Turrets are stabilised and traverse at their rate within their arc.' },
   { group: 'Weapons', name: 'aimAt', sig: 'drone.aimAt(id, x, y)', returns: '', doc: 'Command a turret toward a point.' },
   { group: 'Weapons', name: 'fire', sig: 'drone.fire(id, on = true)', returns: '', doc: 'Hold (or release) the trigger. The weapon fires whenever loaded, cool and unobstructed.' },
   { group: 'Weapons', name: 'ceaseFire', sig: 'drone.ceaseFire(id?)', returns: '', doc: 'Release one or all triggers.' },
   { group: 'Weapons', name: 'reload', sig: 'drone.reload(id)', returns: '', doc: 'Start a reload from ammunition storage.' },
+  { group: 'Weapons', name: 'setFireMode', sig: 'drone.setFireMode(id, mode)', returns: 'boolean', doc: 'Multi-barrel weapons that support it: "sequence" (barrels in turn) or "sync" (all together). Same combined rate; sync doubles the kick. False if unsupported.' },
+  { group: 'Weapons', name: 'selectAmmo', sig: 'drone.selectAmmo(id, ammo)', returns: 'boolean', doc: 'Which loaded ammunition fires next, e.g. "rocket" or "interceptor" for a rocket pod. False if the weapon does not take it.' },
+  { group: 'Weapons', name: 'designate', sig: 'drone.designate(id, contact)', returns: 'boolean', doc: 'Choose the target a missile launcher guides on (a current contact, or null for the one nearest its aim).' },
+  { group: 'Weapons', name: 'ammoStock', sig: 'drone.ammoStock()', returns: '{type: rounds}', doc: 'Rounds left in working ammunition storage, by family (not counting loaded magazines).' },
+  { group: 'Weapons', name: 'missiles', sig: 'drone.missiles()', returns: 'Missile[]', doc: 'Own guided rounds in flight: id, kind, x, y, target, tracking ("uplink", "seeker" or "lost"), age.' },
   { group: 'Weapons', name: 'canFire', sig: 'drone.canFire(id, x, y)', returns: 'boolean', doc: 'Point within traverse arc, not obstructed by own sections, weapon loaded, cool and functional.' },
   { group: 'Weapons', name: 'inArc', sig: 'drone.inArc(id, x, y)', returns: 'boolean', doc: 'Point within traverse arc and not obstructed (ignores ammunition state).' },
   { group: 'Weapons', name: 'aimError', sig: 'drone.aimError(id, x, y)', returns: 'degrees', doc: 'Angle between the current turret direction and a point.' },
@@ -53,6 +67,12 @@ export const API_DOCS: ApiDoc[] = [
   { group: 'Hardware', name: 'sections', sig: 'drone.sections()', returns: 'Section[]', doc: 'front/middle/rear: class, attached, destroyed, integrity, armor.' },
   { group: 'Hardware', name: 'count', sig: 'drone.count(kind)', returns: 'number', doc: 'Working components of a kind (weapon, sensor, motor, shield, generator, controller, gear…).' },
   { group: 'Hardware', name: 'status', sig: 'drone.status()', returns: 'Status', doc: 'Derived flags: degraded, immobilized, disarmed, disabled, label.' },
+  { group: 'Hardware', name: 'fires', sig: 'drone.fires()', returns: 'Fire[]', doc: 'Burning sections: section, intensity, burning (seconds).' },
+  { group: 'Hardware', name: 'suppressFire', sig: 'drone.suppressFire(section)', returns: '', doc: 'Fire a suppression charge at the "front", "middle" or "rear" section (needs a Fire Suppression System in it or next to it).' },
+  { group: 'Hardware', name: 'setAutoSuppression', sig: 'drone.setAutoSuppression(on = true)', returns: '', doc: 'Let suppressors put fires out by themselves after 0.5 s (default), or only when the brain asks.' },
+  { group: 'Hardware', name: 'chassis', sig: 'drone.chassis()', returns: '{type, mass, ratedMass, load, sectionLoad, traction, rolling, lift, supportPower}', doc: 'Load on the running gear: load = mass / rated mass (above 1 is overloaded), sectionLoad = equipment / rated per section, traction and rolling = multipliers the load causes, lift = share of the weight a flyer’s thrusters carry, supportPower = PU/s spent holding the weight up.' },
+  { group: 'Hardware', name: 'stability', sig: 'drone.stability()', returns: '{angularVelocity, lateralSpeed, shake, braced}', doc: 'How settled the hull is: rotation (deg/s), sideways sliding (u/s), recoil shake (degrees of aim disturbance) and, for walkers, whether the feet are planted (no drive command). Wait for small values before a precision shot.' },
+  { group: 'Hardware', name: 'joints', sig: 'drone.joints()', returns: 'Joint[]', doc: 'Structural joints: between ("front-middle", "middle-rear"), intact, integrity (0..1). Recoil beyond a mount rating and hard collisions wear them.' },
   { group: 'Hardware', name: 'failures', sig: 'drone.failures()', returns: 'Failure[]', doc: 'Hardware failure events since the previous decision tick.' },
   { group: 'Timers', name: 'resetTimer', sig: 'drone.resetTimer(name)', returns: '', doc: 'Reset a named timer to now.' },
   { group: 'Timers', name: 'elapsed', sig: 'drone.elapsed(name)', returns: 'seconds', doc: 'Seconds since the timer was reset (starts on first use).' },

@@ -34,8 +34,16 @@ Limits: call depth 64; arrays and strings up to 10 000 elements or characters.
 ## Data shapes
 
 - **Contact**: `{ id, team: 'enemy'|'friend', x, y, distance, bearing, vx, vy, heading, size, disabled, sensors[] }`. `vx`/`vy` are `null` unless a velocity-capable sensor sees the target. `heading`, `size` and `disabled` are `null` unless a classifying sensor (camera) sees it.
-- **Threat**: `{ x, y, vx, vy, distance, bearing, closingTime }`. Reported only for interceptable shells on a collision course, and only by a radar.
-- **Failure**: `{ time, type, component?, kind?, section?, detail }`. Types are `component-damaged`, `component-destroyed`, `section-destroyed`, `section-detached`, `shield-overload`, `power-shortage`, `overheat` and `ammo-depleted`.
+- **Threat**: `{ id, x, y, vx, vy, speed, size, distance, bearing, closingTime, missDistance }`. Reported only by a radar, for interceptable rounds: shells and rockets on a collision course, and guided missiles closing within 900 u. Soonest first.
+- **Range**: `{ side: 'front'|'left'|'right', distance, status }`. `distance` is `null` when nothing is within 500 u. `status` is `'ok'`, `'unpowered'`, `'destroyed'` or `'detached'`; anything but `'ok'` also gives `null`, so check the status to tell "nothing there" from "cannot see".
+- **Ray** (LIDAR): `{ angle, distance, x, y }`. `angle` is relative to the hull heading (−90 left … +90 right); `distance`, `x` and `y` are `null` for no return.
+- **Weapon** adds, for the new equipment:
+  - `ammoTypes`, `selectedAmmo`, `loaded` (by type), `reserveByType`;
+  - `reloadProgress` (0–1), `reloadTime`, `charging`, `charge` (coilgun 0–1), `spin` (rotary 0–1);
+  - `barrels`, `activeBarrels`, `fireMode`, `fireModes`, `rpm` (per mount), `guided`, `designated`.
+- **Missile**: `{ id, kind, x, y, target, tracking: 'seeker'|'uplink'|'lost', age }`.
+- **Fire**: `{ section, intensity, burning }`.
+- **Failure**: `{ time, type, component?, kind?, section?, detail }`. Types are `component-damaged`, `component-destroyed`, `section-destroyed`, `section-detached`, `shield-overload`, `power-shortage`, `overheat`, `ammo-depleted`, `charge-interrupted`, `fire` and `fire-out`.
 - **Component ids** have the form `<section letter>.<slot>`, for example `F.H1` (front hardpoint 1) or `M.I3` (middle internal bay 3). Running gear is `F.gearL`, `F.gearR` and so on.
 
 ## Reference
@@ -65,9 +73,23 @@ Limits: call depth 64; arrays and strings up to 10 000 elements or characters.
 | --- | --- | --- |
 | `drone.contacts()` | `Contact[]` | All contacts detected this tick by powered, working sensors with line of sight. Sorted by distance. |
 | `drone.enemies()` | `Contact[]` | Detected enemy contacts. |
-| `drone.nearestEnemy()` | `Contact | null` | Closest detected enemy not known to be disabled. |
-| `drone.threats()` | `Threat[]` | Interceptable shells on a collision course (needs a radar). |
+| `drone.nearestEnemy()` | `Contact \| null` | Closest detected enemy not known to be disabled. |
+| `drone.threats()` | `Threat[]` | Incoming interceptable rounds seen by a radar: shells and rockets on a collision course, guided missiles closing in. Each: id, x, y, vx, vy, speed, size, distance, bearing, closingTime, missDistance. Soonest first. |
 | `drone.sensors()` | `Sensor[]` | Own sensors with status, arc, range and facing. |
+
+### Environment
+
+| Call | Returns | Description |
+| --- | --- | --- |
+| `drone.goal()` | `{x, y, radius} \| null` | The scenario’s goal point in training courses (public mission data). The walls between you and it are not known — find them with your sensors. |
+| `drone.distance(side)` | `number \| null` | Distance (u) from the built-in "front", "left" or "right" distance sensor to the nearest wall, obstacle or hull, up to 500 u. null when nothing is in range — or when the sensor does not work; tell them apart with rangeStatus(). |
+| `drone.obstacleDetected(side, within = 150)` | `boolean` | True when that distance sensor reads a surface closer than `within`. False when the sensor does not work. |
+| `drone.rangeStatus(side)` | `"ok" \| "unpowered" \| "destroyed" \| "detached"` | Whether a distance sensor is working. "ok" with distance() null means nothing within 500 u. |
+| `drone.ranges()` | `Range[]` | All three distance readings: side, distance (or null), status. Sampled at each decision. |
+| `drone.bumper(side)` | `boolean` | True while the "front", "rear", "left" or "right" of the hull is pressing against something (contact within the last 0.15 s). |
+| `drone.bumpers()` | `{front, rear, left, right, …Impulse}` | All four bumpers at once, with the contact impulse of each. |
+| `drone.lidar(id?)` | `Ray[]` | Latest LIDAR scan: rays left to right, each {angle (relative to the hull heading), distance or null, x, y}. Geometry only — it does not identify drones. Empty without a working, powered LIDAR. |
+| `drone.lidarAge()` | `seconds \| null` | Age of the latest LIDAR scan (it refreshes every 0.25 s). |
 
 ### Movement
 
@@ -81,17 +103,22 @@ Limits: call depth 64; arrays and strings up to 10 000 elements or characters.
 
 | Call | Returns | Description |
 | --- | --- | --- |
-| `drone.weapons()` | `Weapon[]` | Own weapons: id, type, functional, ammo, reserve, reloading, ready, heat, aim, arcMin/arcMax, range, blocked. |
+| `drone.weapons()` | `Weapon[]` | Own weapons: id, type, functional, ammo, magazine, reserve, ammoTypes, selectedAmmo, loaded, reserveByType, reloading, reloadProgress, charging, charge, spin, barrels, activeBarrels, fireMode, rpm, recoil, mountRating, mountStress (last shot’s recoil / rating), guided, ready, heat, aim, arcMin/arcMax, range, blocked. |
 | `drone.weapon(id)` | `Weapon` | One weapon by id ("F.H1"), index or object. |
 | `drone.aim(id, angle)` |  | Command a turret to a world angle (degrees). Turrets are stabilised and traverse at their rate within their arc. |
 | `drone.aimAt(id, x, y)` |  | Command a turret toward a point. |
 | `drone.fire(id, on = true)` |  | Hold (or release) the trigger. The weapon fires whenever loaded, cool and unobstructed. |
 | `drone.ceaseFire(id?)` |  | Release one or all triggers. |
 | `drone.reload(id)` |  | Start a reload from ammunition storage. |
+| `drone.setFireMode(id, mode)` | `boolean` | Multi-barrel weapons that support it: "sequence" (barrels in turn) or "sync" (all together). Same combined rate; sync doubles the kick. False if unsupported. |
+| `drone.selectAmmo(id, ammo)` | `boolean` | Which loaded ammunition fires next, e.g. "rocket" or "interceptor" for a rocket pod. False if the weapon does not take it. |
+| `drone.designate(id, contact)` | `boolean` | Choose the target a missile launcher guides on (a current contact, or null for the one nearest its aim). |
+| `drone.ammoStock()` | `{type: rounds}` | Rounds left in working ammunition storage, by family (not counting loaded magazines). |
+| `drone.missiles()` | `Missile[]` | Own guided rounds in flight: id, kind, x, y, target, tracking ("uplink", "seeker" or "lost"), age. |
 | `drone.canFire(id, x, y)` | `boolean` | Point within traverse arc, not obstructed by own sections, weapon loaded, cool and functional. |
 | `drone.inArc(id, x, y)` | `boolean` | Point within traverse arc and not obstructed (ignores ammunition state). |
 | `drone.aimError(id, x, y)` | `degrees` | Angle between the current turret direction and a point. |
-| `drone.lead(id, contact)` | `{x, y, t} | null` | Intercept point for a contact using its observed velocity and the weapon muzzle velocity. |
+| `drone.lead(id, contact)` | `{x, y, t} \| null` | Intercept point for a contact using its observed velocity and the weapon muzzle velocity. |
 
 ### Shields
 
@@ -117,8 +144,14 @@ Limits: call depth 64; arrays and strings up to 10 000 elements or characters.
 | `drone.components()` | `Component[]` | Every component: health, destroyed, attached, functional, heat. |
 | `drone.component(id)` | `Component` | One component by id. |
 | `drone.sections()` | `Section[]` | front/middle/rear: class, attached, destroyed, integrity, armor. |
-| `drone.count(kind)` | `number` | Working components of a kind (weapon, sensor, motor, shield, generator, controller, gear…). The integrated drive, CPU, power core, coolant loop and proximity array count as motor, controller, generator, cooler and sensor. |
+| `drone.count(kind)` | `number` | Working components of a kind (weapon, sensor, motor, shield, generator, controller, gear…). |
 | `drone.status()` | `Status` | Derived flags: degraded, immobilized, disarmed, disabled, label. |
+| `drone.fires()` | `Fire[]` | Burning sections: section, intensity, burning (seconds). |
+| `drone.suppressFire(section)` |  | Fire a suppression charge at the "front", "middle" or "rear" section (needs a Fire Suppression System in it or next to it). |
+| `drone.setAutoSuppression(on = true)` |  | Let suppressors put fires out by themselves after 0.5 s (default), or only when the brain asks. |
+| `drone.chassis()` | `{type, mass, ratedMass, load, sectionLoad, traction, rolling, lift, supportPower}` | Load on the running gear: load = mass / rated mass (above 1 is overloaded), sectionLoad = equipment / rated per section, traction and rolling = multipliers the load causes, lift = share of the weight a flyer’s thrusters carry, supportPower = PU/s spent holding the weight up. |
+| `drone.stability()` | `{angularVelocity, lateralSpeed, shake, braced}` | How settled the hull is: rotation (deg/s), sideways sliding (u/s), recoil shake (degrees of aim disturbance) and, for walkers, whether the feet are planted (no drive command). Wait for small values before a precision shot. |
+| `drone.joints()` | `Joint[]` | Structural joints: between ("front-middle", "middle-rear"), intact, integrity (0..1). Recoil beyond a mount rating and hard collisions wear them. |
 | `drone.failures()` | `Failure[]` | Hardware failure events since the previous decision tick. |
 
 ### Timers
@@ -151,4 +184,11 @@ A drone's brain is one AutoScript program; Blocks and Nodes are other ways of sh
   - `shieldFaceContact(shield, contact)`
   - `canFireAt(weapon, contact)`
   - `itemAt(list, position)` (1-based)
+  - `openDistance(side)`: a distance reading you can compare. Nothing in range counts as 500; a sensor that does not work counts as 0.
+  - `steerClear(throttle = 1)`: drive on and turn toward the more open side; back out when the front bumper touches.
+  - `widestGap()`: relative angle of the longest clear LIDAR ray, or `null`.
+  - `interceptThreat(weapon)`: aim at the soonest radar threat with lead and fire inside 350 u.
+
+  Helpers may call each other; everything a brain uses is included.
+- **Pickers.** Arguments that name a weapon, shield or component, a side (`"front"`, `"left"`, `"right"`, and `"rear"` for bumpers), an ammunition type, a fire mode or a section are dropdowns in Blocks and suggestion lists in Nodes.
 - **Node graphs.** Execution flows through diamond ports, and each step follows exactly one step. A data node used by several inputs is evaluated at each use.

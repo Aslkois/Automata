@@ -2,6 +2,8 @@
 // oriented by that event's contact point, surface normal and incoming direction.
 // Effects are purely visual: nothing here feeds back into the simulation.
 import { localToWorld } from '../sim/drone';
+import { DEBRIS_FADE_S, DEBRIS_PHYSICAL_S } from '../sim/debris';
+import { PartAnimator } from './parts/animator';
 import type { Simulation } from '../sim/world';
 import type { SimEvent } from '../sim/types';
 
@@ -46,6 +48,8 @@ interface Decal {
 const rnd = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
 export class Vfx {
+  /** mechanical animation of hardpoints (recoil, spin, charge, tubes, sensor sweeps) */
+  readonly parts = new PartAnimator();
   particles: P[] = [];
   emitters: Emitter[] = [];
   decals: Decal[] = [];
@@ -123,17 +127,59 @@ export class Vfx {
   }
 
   onEvent(sim: Simulation, e: SimEvent): void {
+    this.parts.onEvent(e);
     const big = (c: string) => (c === 'large' ? 1 : c === 'medium' ? 0.45 : 0.22);
     switch (e.type) {
       case 'shot': {
         const k = big(e.caliber);
         const dx = Math.cos(e.dir);
         const dy = Math.sin(e.dir);
-        this.flash(e.x + dx * 1.5, e.y + dy * 1.5, 2 + k * 5, 0.045 + k * 0.04, '#f2e6cc');
-        this.sparks(e.x, e.y, dx, dy, 0.25, 2 + k * 6, 160 + k * 120, '#eed7a6');
-        if (k === 1) this.smoke(e.x + dx * 4, e.y + dy * 4, 4, 6);
+        if (e.ammo === 'rocket' || e.ammo === 'interceptor' || e.ammo === 'missile') {
+          // launch: back-blast and a puff of smoke from the tube, no muzzle flash
+          const m = e.ammo === 'missile' ? 1.6 : 1;
+          this.flash(e.x, e.y, 2.5 * m, 0.06, '#e3c492');
+          this.sparks(e.x, e.y, -dx, -dy, 0.5, 4 * m, 90, '#e3c492');
+          this.smoke(e.x - dx * 3, e.y - dy * 3, 3 * m, 5 * m);
+          break;
+        }
+        if (e.weapon === 'coilgun') {
+          this.flash(e.x + dx * 2, e.y + dy * 2, 6, 0.08, '#f7f3ea');
+          this.arcs(e.x, e.y, 4, 10);
+          break;
+        }
+        const pel = e.pellets ? 1.6 : 1;
+        this.flash(e.x + dx * 1.5, e.y + dy * 1.5, (2 + k * 5) * pel, 0.045 + k * 0.04, '#f2e6cc');
+        this.sparks(e.x, e.y, dx, dy, e.pellets ? 0.4 : 0.25, (2 + k * 6) * pel, 160 + k * 120, '#eed7a6');
+        if (k === 1 || e.pellets) this.smoke(e.x + dx * 4, e.y + dy * 4, e.pellets ? 2 : 4, 6);
         break;
       }
+      case 'explosion': {
+        const R = e.radius;
+        const kind = e.kind;
+        const c = kind === 'interceptor' || kind === 'intercepted' ? 0.6 : 1;
+        this.flash(e.x, e.y, R * 0.45 * c, 0.12, '#f3e3c2');
+        this.add({ kind: 'ring', x: e.x, y: e.y, vx: 0, vy: 0, life: 0.28, max: 0.28, size: R, color: '#e3c492' });
+        this.sparks(e.x, e.y, 1, 0, Math.PI, 10 + R * 0.5 * c, 150 + R * 3, '#e2b48a');
+        this.frags(e.x, e.y, 1, 0, Math.PI, 4 + R * 0.25 * c, 90 + R * 2, 1.1);
+        this.smoke(e.x, e.y, 3 + R * 0.15 * c, 4 + R * 0.18, true);
+        if (kind === 'rocket' || kind === 'missile') this.decal(e.x, e.y, R * 0.3);
+        break;
+      }
+      case 'fire':
+        if (e.phase === 'suppressed') {
+          // extinguisher discharge: a white cloud
+          for (let i = 0; i < this.n(14); i++) this.add({ kind: 'smoke', x: e.x + rnd(-6, 6), y: e.y + rnd(-6, 6), vx: rnd(-20, 20), vy: rnd(-20, 20), life: rnd(0.8, 1.6), max: 1.6, size: rnd(3, 6), color: '#d9d4c8', drag: 2 });
+        } else if (e.phase === 'start') this.flash(e.x, e.y, 6, 0.12, '#e3a46a');
+        break;
+      case 'charge':
+        if (e.phase === 'ready') this.arcs(e.x, e.y, 3, 7);
+        else if (e.phase === 'interrupted') this.sparks(e.x, e.y, 1, 0, Math.PI, 6, 80, '#c9735e');
+        break;
+      case 'joint-failed':
+        this.flash(e.x, e.y, 6, 0.1, '#f0e2c6');
+        this.sparks(e.x, e.y, 1, 0, Math.PI, 16, 180, '#e2b48a');
+        this.frags(e.x, e.y, 1, 0, Math.PI, 6, 80, 1.4);
+        break;
       case 'impact': {
         const k = big(e.caliber);
         // reflect incoming direction about the surface normal for sparks
@@ -207,6 +253,11 @@ export class Vfx {
         this.add({ kind: 'ring', x: e.x, y: e.y, vx: 0, vy: 0, life: 0.3, max: 0.3, size: 30, color: '#d8cfb8' });
         break;
       case 'intercept':
+        if (!e.kill) {
+          // struck but still flying
+          this.sparks(e.x, e.y, 1, 0, Math.PI, 4, 120);
+          break;
+        }
         this.flash(e.x, e.y, 4, 0.08);
         this.sparks(e.x, e.y, 1, 0, Math.PI, 10, 160);
         this.smoke(e.x, e.y, 3, 5);
@@ -217,6 +268,11 @@ export class Vfx {
         this.sparks(e.x, e.y, 1, 0, Math.PI, 26, 220, '#e2b48a');
         this.emitter(sim, e.drone, e.x, e.y, 'fire', 14, 14);
         this.decal(e.x, e.y, 10);
+        break;
+      case 'debris-cleared':
+        // the wreck is gone; a scorch mark stays (decals are never physical)
+        this.decal(e.x, e.y, Math.max(6, e.radius * 0.5));
+        this.smoke(e.x, e.y, 3, 6, true);
         break;
       case 'collision':
         this.sparks(e.x, e.y, 1, 0, Math.PI, Math.min(10, 2 + e.impulse / 3000), 100, '#bdb3a0');
@@ -229,7 +285,33 @@ export class Vfx {
     if (this.decals.length > 220) this.decals.shift();
   }
 
+  private trailAcc = 0;
+  private fireAcc = 0;
+
   update(sim: Simulation, dt: number): void {
+    this.parts.update(sim, dt);
+    // state-driven effects: motor smoke behind powered rounds, flames on burning sections
+    this.trailAcc += dt * 40 * MUL[this.quality];
+    while (this.trailAcc >= 1) {
+      this.trailAcc -= 1;
+      for (const p of sim.projectiles) {
+        if (!p.rocket) continue;
+        const sp = Math.hypot(p.vel.x, p.vel.y) || 1;
+        const big = p.kind === 'missile' ? 1.5 : p.kind === 'rocket' ? 1 : 0.6;
+        this.add({ kind: 'smoke', x: p.pos.x - (p.vel.x / sp) * 6, y: p.pos.y - (p.vel.y / sp) * 6, vx: rnd(-3, 3), vy: rnd(-3, 3), life: rnd(0.5, 1.1) * big, max: 1.1 * big, size: 1.6 * big, color: '#4a4842', drag: 1.5 });
+      }
+    }
+    this.fireAcc += dt * 24 * MUL[this.quality];
+    while (this.fireAcc >= 1) {
+      this.fireAcc -= 1;
+      for (const d of sim.drones)
+        for (const s of Object.values(d.sections)) {
+          if (s.fire <= 0 || !s.attached) continue;
+          const w = localToWorld(d.body, { x: s.cx + rnd(-s.length / 3, s.length / 3), y: rnd(-s.width / 3, s.width / 3) });
+          this.add({ kind: 'fire', x: w.x, y: w.y, vx: rnd(-4, 4), vy: rnd(-12, -3), life: rnd(0.3, 0.7), max: 0.7, size: rnd(1.6, 3.6) * (0.6 + s.fire * 0.6), color: '#c98a5a' });
+          if (Math.random() < 0.35) this.smoke(w.x, w.y, 1, 5, true);
+        }
+    }
     // emitters
     for (const em of this.emitters) {
       em.life -= dt;
@@ -246,7 +328,8 @@ export class Vfx {
         else this.arcs(w.x, w.y, 1, 6);
       }
     }
-    this.emitters = this.emitters.filter((e) => e.life > 0);
+    // emitters die with the body they were bound to (debris and faded wrecks are removed)
+    this.emitters = this.emitters.filter((e) => e.life > 0 && (e.body.kind === 'drone' ? (sim.drones.find((d) => d.id === e.body.id)?.wreckAge ?? 0) < DEBRIS_PHYSICAL_S + DEBRIS_FADE_S : sim.debris.some((d) => d.id === e.body.id)));
     let w = 0;
     for (const p of this.particles) {
       p.life -= dt;
@@ -355,6 +438,7 @@ export class Vfx {
   }
 
   clear() {
+    this.parts.clear();
     this.particles = [];
     this.emitters = [];
     this.decals = [];

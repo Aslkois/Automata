@@ -57,7 +57,7 @@ describe('projectiles and armor', () => {
   it('armor angle matters: oblique hits ricochet where a normal hit would not', () => {
     const sim = makeSim([{ design: target(), program: idle, team: 0, x: 600, y: 500, angle: 0 }]);
     // grazing the top face of the medium middle section (|y| = 13) at ~80 degrees from normal
-    shoot(sim, 'aa_gun', { x: 400, y: 487 - 40 }, { x: 640, y: 487 + 2 });
+    shoot(sim, 'autocannon', { x: 400, y: 487 - 40 }, { x: 640, y: 487 + 2 });
     const ev = impacts(runUntilProjectilesGone(sim));
     expect(ev.some((e) => e.result === 'ricochet')).toBe(true);
   });

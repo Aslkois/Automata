@@ -17,16 +17,19 @@ export const ASSAULT_PLATFORM: DroneDesign = {
   sections: {
     front: {
       class: 'heavy',
+      layout: 'max',
       armor: 70,
       slots: { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('camera'), I1: m('cooler'), I2: m('shell_rack'), I3: m('battery'), I4: m('reactor') },
     },
     middle: {
       class: 'medium',
+      layout: 'medium',
       armor: 30,
       slots: { H1: m('mg', -60), H2: m('mg', 60), H3: m('radar'), I1: m('cooler'), I2: m('ammo_small') },
     },
     rear: {
       class: 'light',
+      layout: 'medium',
       armor: 10,
       slots: { H1: m('point_defense', 180), H2: m('point_defense', 180), I1: m('battery'), I2: m('cooler') },
     },
@@ -41,18 +44,21 @@ export const AA_DESTROYER: DroneDesign = {
   sections: {
     front: {
       class: 'light',
+      layout: 'medium',
       armor: 12,
-      slots: { H1: m('aa_gun'), H2: m('aa_gun'), I1: m('ammo_medium'), I2: m('cooler') },
+      slots: { H1: m('autocannon'), H2: m('autocannon'), I1: m('ammo_medium'), I2: m('cooler') },
     },
     middle: {
       class: 'heavy',
+      layout: 'medium',
       armor: 66,
       slots: { H1: m('radar'), H2: m('shield_dir'), H3: m('camera'), I1: m('cooler'), I3: m('battery'), I4: m('reactor') },
     },
     rear: {
       class: 'light',
+      layout: 'medium',
       armor: 10,
-      slots: { H1: m('aa_gun', 180), H2: m('aa_gun', 180), I1: m('ammo_medium'), I2: m('cooler') },
+      slots: { H1: m('autocannon', 180), H2: m('autocannon', 180), I1: m('ammo_medium'), I2: m('cooler') },
     },
   },
 };
@@ -63,9 +69,9 @@ export const SKIRMISHER: DroneDesign = {
   name: 'Skirmisher',
   chassis: 'wheeled',
   sections: {
-    front: { class: 'light', armor: 15, slots: { H1: m('camera'), H2: m('mg'), I1: m('ammo_small'), I2: m('cooler') } },
-    middle: { class: 'medium', armor: 25, slots: { H1: m('rotary_cannon'), H2: m('shield_dir'), H3: m('camera', 180), I2: m('ammo_medium') } },
-    rear: { class: 'light', armor: 8, slots: { H1: m('mg', 180), I1: m('generator_s'), I2: m('generator_s') } },
+    front: { class: 'light', layout: 'medium', armor: 15, slots: { H1: m('camera'), H2: m('mg'), I1: m('ammo_small'), I2: m('cooler') } },
+    middle: { class: 'medium', layout: 'medium', armor: 25, slots: { H1: m('rotary_cannon'), H2: m('shield_dir'), H3: m('camera', 180), I2: m('ammo_medium') } },
+    rear: { class: 'light', layout: 'medium', armor: 8, slots: { H1: m('mg', 180), I1: m('generator_s'), I2: m('generator_s') } },
   },
 };
 
@@ -75,9 +81,9 @@ export const STRIDER: DroneDesign = {
   name: 'Strider',
   chassis: 'walking',
   sections: {
-    front: { class: 'medium', armor: 30, slots: { H1: m('rotary_cannon'), H3: m('camera'), I2: m('ammo_medium') } },
-    middle: { class: 'medium', armor: 25, slots: { H1: m('mg', -90), H2: m('mg', 90), I1: m('ammo_small') } },
-    rear: { class: 'light', armor: 10, slots: { H1: m('point_defense', 180) } },
+    front: { class: 'medium', layout: 'medium', armor: 30, slots: { H1: m('rotary_cannon'), H3: m('camera'), I2: m('ammo_medium') } },
+    middle: { class: 'medium', layout: 'medium', armor: 25, slots: { H1: m('mg', -90), H2: m('mg', 90), I1: m('ammo_small') } },
+    rear: { class: 'light', layout: 'medium', armor: 10, slots: { H1: m('point_defense', 180) } },
   },
 };
 
@@ -87,9 +93,89 @@ export const WISP: DroneDesign = {
   name: 'Wisp',
   chassis: 'flying',
   sections: {
-    front: { class: 'light', armor: 8, slots: { H1: m('mg'), H2: m('mg'), I1: m('ammo_small') } },
-    middle: { class: 'light', armor: 6, slots: { H1: m('camera'), H2: m('camera', 180) } },
-    rear: { class: 'light', armor: 4, slots: {} },
+    front: { class: 'light', layout: 'medium', armor: 8, slots: { H1: m('mg'), H2: m('mg'), I1: m('ammo_small') } },
+    middle: { class: 'light', layout: 'medium', armor: 6, slots: { H1: m('camera'), H2: m('camera', 180) } },
+    rear: { class: 'light', layout: 'medium', armor: 4, slots: {} },
+  },
+};
+
+// ---------------------------------------------------------------- starters added with the engineering expansion
+
+/** Beginner: learns the arena with a LIDAR and the built-in distance sensors; one machine gun. */
+export const PATHFINDER: DroneDesign = {
+  schema: DESIGN_SCHEMA_VERSION,
+  id: 'example-pathfinder',
+  name: 'Pathfinder',
+  chassis: 'wheeled',
+  sections: {
+    front: { class: 'light', layout: 'medium', armor: 12, slots: { H1: m('lidar'), H2: m('mg'), I1: m('ammo_small') } },
+    middle: { class: 'medium', layout: 'medium', armor: 15, slots: { H3: m('camera') } },
+    rear: { class: 'light', layout: 'min', armor: 8, slots: {} },
+  },
+};
+
+/** Advanced: one coilgun shot every five seconds — positioning and power decide everything. */
+export const NEEDLE: DroneDesign = {
+  schema: DESIGN_SCHEMA_VERSION,
+  id: 'example-needle',
+  name: 'Needle',
+  chassis: 'wheeled',
+  sections: {
+    front: { class: 'medium', layout: 'max', armor: 25, slots: { H1: m('coilgun'), H2: m('camera'), I3: { component: 'shell_rack', rotation: 0, payload: 'penetrator' } } },
+    middle: { class: 'medium', layout: 'medium', armor: 15, slots: { H3: m('camera', 180), I1: m('capacitor'), I2: m('generator_s'), I3: m('stabilizer') } },
+    rear: { class: 'light', layout: 'medium', armor: 6, slots: { H1: m('mg', 180), I1: m('ammo_small'), I2: m('battery') } },
+  },
+};
+
+/** Advanced: a defensive core — radar, two point-defense guns, a compact and a directional shield. */
+export const AEGIS: DroneDesign = {
+  schema: DESIGN_SCHEMA_VERSION,
+  id: 'example-aegis',
+  name: 'Aegis',
+  chassis: 'tracked',
+  sections: {
+    front: { class: 'medium', layout: 'medium', armor: 30, slots: { H1: m('shield_dir'), H2: m('dual_autocannon'), H3: m('camera'), I1: m('ammo_medium'), I2: m('cooler') } },
+    middle: { class: 'heavy', layout: 'medium', armor: 40, slots: { H1: m('radar'), H2: m('shield_compact'), H3: m('point_defense'), I1: m('ammo_small'), I2: m('battery'), I4: m('reactor') } },
+    rear: { class: 'light', layout: 'medium', armor: 10, slots: { H1: m('point_defense', 180), H2: m('camera', 180), I1: m('cooler'), I2: m('fire_suppression') } },
+  },
+};
+
+/** Intermediate: a walker that closes in and empties two scatter cannons at point-blank range. */
+export const MANTIS: DroneDesign = {
+  schema: DESIGN_SCHEMA_VERSION,
+  id: 'example-mantis',
+  name: 'Mantis',
+  chassis: 'walking',
+  sections: {
+    front: { class: 'medium', layout: 'medium', armor: 32, slots: { H1: m('scatter'), H2: m('scatter'), H3: m('camera'), I1: { component: 'ammo_medium', rotation: 0, payload: 'scatter' }, I2: { component: 'ammo_medium', rotation: 0, payload: 'scatter' }, I3: m('cooler') } },
+    middle: { class: 'medium', layout: 'medium', armor: 22, slots: { H3: m('camera', 180), I3: m('spall_liner') } },
+    rear: { class: 'light', layout: 'medium', armor: 8, slots: { H1: m('mg', 180), I1: m('ammo_small') } },
+  },
+};
+
+/** Intermediate: a flyer making rocket runs; reloads while it breaks away. */
+export const HARRIER: DroneDesign = {
+  schema: DESIGN_SCHEMA_VERSION,
+  id: 'example-harrier',
+  name: 'Harrier',
+  chassis: 'flying',
+  sections: {
+    front: { class: 'light', layout: 'max', armor: 6, slots: { H1: m('rocket_pod'), H2: m('camera'), I1: m('rocket_cassette') } },
+    middle: { class: 'light', layout: 'medium', armor: 5, slots: { H1: m('mg'), H2: m('camera', 180), I1: m('ammo_small') } },
+    rear: { class: 'light', layout: 'min', armor: 4, slots: {} },
+  },
+};
+
+/** Expert: two heavy cannons with an autoloader, spall liner and braced joint behind 70 mm of plate. */
+export const BASTION: DroneDesign = {
+  schema: DESIGN_SCHEMA_VERSION,
+  id: 'example-bastion',
+  name: 'Bastion',
+  chassis: 'tracked',
+  sections: {
+    front: { class: 'heavy', layout: 'max', armor: 70, slots: { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('camera'), I1: m('cooler'), I2: m('autoloader'), I3: m('spall_liner'), I4: m('shell_rack') } },
+    middle: { class: 'medium', layout: 'medium', armor: 35, slots: { H1: m('radar'), H2: m('point_defense'), H3: m('mg', 180), I1: m('ammo_small'), I2: m('generator_s'), I3: { component: 'coupling', rotation: 0, joint: 'front' } } },
+    rear: { class: 'light', layout: 'medium', armor: 12, slots: { H1: m('point_defense', 180), I1: m('fire_suppression'), I2: m('battery') } },
   },
 };
 
@@ -355,7 +441,12 @@ export const LEGACY_ASSAULT_PROGRAM: LegacyProgram = { schema: PROGRAM_SCHEMA_VE
 export const LEGACY_AA_PROGRAM: LegacyProgram = { schema: PROGRAM_SCHEMA_VERSION, id: 'example-aa-blocks', name: 'AA Orbit (blocks)', kind: 'blocks', blocks: aaBlocks() };
 export const LEGACY_BRAWLER_PROGRAM: LegacyProgram = { schema: PROGRAM_SCHEMA_VERSION, id: 'example-brawler-nodes', name: 'Brawler (nodes)', kind: 'nodes', nodes: brawlerNodes() };
 
-export const DEFAULT_DESIGNS = [ASSAULT_PLATFORM, AA_DESTROYER, SKIRMISHER, STRIDER, WISP];
+export const DEFAULT_DESIGNS = [ASSAULT_PLATFORM, AA_DESTROYER, SKIRMISHER, STRIDER, WISP, PATHFINDER, NEEDLE, AEGIS, MANTIS, HARRIER, BASTION];
+/** Starters added after the first library release; existing libraries receive them once. */
+export const STARTER_SETS: { set: number; ids: string[] }[] = [
+  { set: 2, ids: ['example-pathfinder', 'example-needle', 'example-aegis', 'example-mantis', 'example-harrier', 'example-bastion'] },
+];
+export const STARTER_SET = 2;
 /** The schema-1 example programs (separate code/block/node programs), kept for migration. */
 export const LEGACY_DEFAULT_PROGRAMS = [LEGACY_ASSAULT_PROGRAM, LEGACY_AA_PROGRAM, LEGACY_BRAWLER_PROGRAM];
 /** Schema-1 example pairing of designs and programs (the old default battle roster). */
@@ -425,6 +516,269 @@ function update() {
 }
 `;
 
+export const PATHFINDER_CODE = `// Pathfinder — explores with its distance sensors and fights with one machine gun.
+// Beginner brain: it follows the wall on its left. In a maze without loops that
+// eventually visits every corridor, so it finds the way out without a map. When a
+// training course gives a goal point and the LIDAR shows a clear line, it goes straight there.
+const GUN = "F.H2";
+let state = "seek";     // seek · follow · corner · back
+let lastLeft = 90;
+
+function setState(s) {
+  state = s;
+  drone.resetTimer("state");
+}
+
+// Is the straight line toward the goal free? Ask the LIDAR rays that point that way.
+function goalInSight(goal) {
+  const rel = angleDiff(drone.heading(), drone.angleTo(goal.x, goal.y));
+  const rays = drone.lidar();
+  if (rays.length == 0 || Math.abs(rel) > 80) return false;
+  const far = Math.min(drone.distanceTo(goal.x, goal.y), 400);
+  for (const r of rays) {
+    if (Math.abs(angleDiff(r.angle, rel)) < 14 && r.distance != null && r.distance < far) return false;
+  }
+  return true;
+}
+
+// Wheels need speed to steer but skid when too fast: hold a target speed instead of a throttle.
+function go(speed, steer) {
+  drone.drive(clamp((speed - drone.speed()) / 40, -1, 1), steer);
+}
+
+function update() {
+  const enemy = drone.nearestEnemy();
+  if (enemy != null) {
+    // something seen: face it and shoot when the gun bears
+    aimAtContact(GUN, enemy);
+    drone.fire(GUN, canFireAt(GUN, enemy) && enemy.distance < 600);
+    turnTowardContact(enemy, enemy.distance > 250 ? 0.7 : 0);
+    return;
+  }
+  drone.ceaseFire(GUN);
+  const left = openDistance("left");
+  const front = openDistance("front");
+  const closing = left - lastLeft;      // how fast the left wall gets nearer (−) or further (+)
+  lastLeft = left;
+  // touching something ahead: reverse straight out for a moment
+  if (state != "back" && drone.bumper("front")) setState("back");
+  if (state == "back") {
+    go(drone.bumper("rear") ? 0 : -45, 0);
+    if (drone.elapsed("state") > 0.7) setState("follow");
+    return;
+  }
+  // scraping a side: steer away from it
+  if (drone.bumper("left")) return go(35, 1);
+  if (drone.bumper("right")) return go(35, -1);
+  // a wall ahead: turn right
+  if (front < 140) {
+    go(35, 1);
+    if (state == "seek" || state == "corner") setState("follow");
+    return;
+  }
+  // training courses publish a goal point: head straight for it whenever the way looks clear
+  const goal = drone.goal();
+  if (goal != null && goalInSight(goal)) {
+    if (state != "seek") setState("seek");
+    return go(85, clamp(angleDiff(drone.heading(), drone.angleTo(goal.x, goal.y)) / 40, -1, 1));
+  }
+  // no wall yet: drive straight until one appears ahead
+  if (state == "seek") return go(90, 0);
+  // the wall on the left ended: drive past its end, then turn left around it
+  if (state == "follow" && left > 260) setState("corner");
+  if (state == "corner") {
+    if (drone.elapsed("state") < 0.6) go(50, 0);
+    else go(40, -1);
+    if (left < 200 && drone.elapsed("state") > 1.2) setState("follow");
+    if (drone.elapsed("state") > 6) setState("seek");     // turned a full circle: open ground
+    return;
+  }
+  // keep the left wall about 90 u away, damped by how fast it is approaching
+  go(85, clamp((90 - left) / 120 - closing / 8, -0.5, 0.5));
+}
+`;
+
+export const NEEDLE_CODE = `// Needle — coilgun sniper. One 92 mm penetrator every 5 s; the charge draws 34 PU/s.
+// Advanced brain: shoot from a standstill, make every shot count, and feed the coil its power.
+const GUN = "F.H1";
+const RANGE = 900;
+
+// hold a target speed (wheels skid when pushed too hard)
+function go(speed, steer) {
+  drone.drive(clamp((speed - drone.speed()) / 40, -1, 1), steer);
+}
+
+function update() {
+  const enemy = drone.nearestEnemy();
+  const gun = drone.weapon(GUN);
+  // while the coil charges, the weapons get power first
+  drone.setPower(gun.charging ? 0.5 : 1, gun.charging ? 2 : 1, 0);
+  if (enemy == null) {
+    drone.ceaseFire(GUN);
+    steerClear(0.6);
+    return;
+  }
+  const p = drone.lead(GUN, enemy) ?? enemy;
+  drone.aimAt(GUN, p.x, p.y);
+  const turn = clamp(angleDiff(drone.heading(), enemy.bearing) / 30, -1, 1);
+  // out of range or the gun cannot bear: close in; otherwise stop and settle
+  const bears = drone.inArc(GUN, p.x, p.y);
+  if (enemy.distance > RANGE || !bears) go(drone.obstacleDetected("front", 120) ? 0 : 90, turn);
+  else go(0, turn);
+  // fire only on a settled, precise aim: a miss costs five seconds
+  const settled = drone.aimError(GUN, p.x, p.y) < 0.8 && Math.abs(drone.speed()) < 25;
+  drone.fire(GUN, gun.ready && settled && drone.canFire(GUN, p.x, p.y));
+  // the rear machine gun covers anything that gets behind
+  const behind = drone.enemies().find((c) => c.distance < 320 && Math.abs(angleDiff(drone.heading(), c.bearing)) > 100);
+  if (behind != null) {
+    aimAtContact("R.H1", behind);
+    drone.fire("R.H1", canFireAt("R.H1", behind));
+  } else {
+    drone.ceaseFire("R.H1");
+  }
+}
+`;
+
+export const AEGIS_CODE = `// Aegis — a shield wall. The radar tracks incoming rounds; two point-defense guns shoot them
+// down while the directional shield faces the greatest danger and the dual autocannon works.
+const SHIELD = "F.H1";   // directional shield
+const BUBBLE = "M.H2";   // compact shield, raised only when something is about to arrive
+const GUNS = "F.H2";     // dual autocannon
+
+function update() {
+  const enemy = drone.nearestEnemy();
+  const threats = drone.threats();
+  // point defense: both guns take the soonest threat inside 350 u
+  interceptThreat("M.H3");
+  interceptThreat("R.H1");
+  // the directional shield faces the soonest threat, otherwise the enemy
+  if (threats.length > 0) {
+    drone.shieldFaceToward(SHIELD, threats[0].x, threats[0].y);
+  } else if (enemy != null) {
+    shieldFaceContact(SHIELD, enemy);
+  }
+  drone.raiseShield(BUBBLE, threats.length > 0 && threats[0].closingTime < 1.2);
+  if (enemy == null) {
+    drone.ceaseFire(GUNS);
+    steerClear(0.5);
+    return;
+  }
+  // synchronised pairs against big targets, alternating fire against small ones
+  drone.setFireMode(GUNS, enemy.size == "large" ? "sync" : "sequence");
+  aimAtContact(GUNS, enemy);
+  drone.fire(GUNS, canFireAt(GUNS, enemy) && enemy.distance < 900);
+  // advance slowly with the front plate toward the enemy
+  const err = angleDiff(drone.heading(), enemy.bearing);
+  drone.drive(enemy.distance > 450 ? 0.6 : 0, clamp(err / 25, -1, 1));
+}
+`;
+
+export const MANTIS_CODE = `// Mantis — a walker with two scatter cannons. Ten pellets per shell: deadly inside 200 u,
+// wasted beyond it. Close the distance, sidestep obstacles, then unload.
+function update() {
+  const enemy = drone.nearestEnemy();
+  if (enemy == null) {
+    drone.ceaseFire();
+    steerClear(0.7);
+    return;
+  }
+  const close = enemy.distance < 220;
+  for (const gun of ["F.H1", "F.H2"]) {
+    aimAtContact(gun, enemy);
+    drone.fire(gun, close && canFireAt(gun, enemy));
+  }
+  // charge straight in; go round anything in the way
+  if (drone.obstacleDetected("front", 90) && enemy.distance > 150) {
+    drone.drive(0.4, openDistance("left") > openDistance("right") ? -1 : 1);
+  } else {
+    turnTowardContact(enemy, enemy.distance > 120 ? 1 : 0.2);
+  }
+  // the rear machine gun discourages flanking
+  aimAtContact("R.H1", enemy);
+  drone.fire("R.H1", canFireAt("R.H1", enemy) && enemy.distance < 500);
+}
+`;
+
+export const HARRIER_CODE = `// Harrier — a flying rocket boat. Six rockets 0.4 s apart: dive in, empty the pod inside
+// 600 u, then break away and circle while it reloads.
+const POD = "F.H1";
+let run = "attack";
+
+function update() {
+  const enemy = drone.nearestEnemy();
+  if (enemy == null) {
+    // search: head for the middle of the arena, keeping clear of walls
+    drone.ceaseFire();
+    const a = drone.arena();
+    if (drone.distanceTo(a.width / 2, a.height / 2) > 300 && !drone.obstacleDetected("front", 220)) drone.turnToward(a.width / 2, a.height / 2, 0.8);
+    else steerClear(0.8);
+    return;
+  }
+  const pod = drone.weapon(POD);
+  if (run == "attack" && (pod.reloading || pod.ammo == 0)) run = "break";
+  if (run == "break" && !pod.reloading && pod.ammo > 0 && enemy.distance > 520) run = "attack";
+  aimAtContact(POD, enemy);
+  aimAtContact("M.H1", enemy);
+  drone.fire("M.H1", canFireAt("M.H1", enemy) && enemy.distance < 500);
+  if (run == "attack") {
+    drone.fire(POD, enemy.distance < 600 && canFireAt(POD, enemy) && drone.aimError(POD, enemy.x, enemy.y) < 3);
+    turnTowardContact(enemy, 1);
+  } else {
+    drone.ceaseFire(POD);
+    // break away at an angle, then come round for the next run — never into a wall
+    if (drone.obstacleDetected("front", 200)) drone.drive(0.6, openDistance("left") > openDistance("right") ? -1 : 1);
+    else drone.drive(1, clamp(angleDiff(drone.heading(), enemy.bearing + 150) / 30, -1, 1));
+  }
+}
+`;
+
+export const BASTION_CODE = `// Bastion — expert heavy. Two 100 mm cannons share an autoloader behind 70 mm of plate.
+// Doctrine: angle the hull about 30 degrees to the enemy (more armor along the line of fire),
+// fire both cannons together only when both are on target, shoot down incoming rounds,
+// hold fire before an overheat, and put out fires in the gun section at once.
+const CANNONS = ["F.H1", "F.H2"];
+let angleSide = 1;
+
+function cannonsOnTarget(p) {
+  for (const id of CANNONS) {
+    const w = drone.weapon(id);
+    if (!w.functional) continue;
+    if (!w.ready || drone.aimError(id, p.x, p.y) > 1.2 || !drone.canFire(id, p.x, p.y)) return false;
+  }
+  return true;
+}
+
+function update() {
+  interceptThreat("M.H2");
+  interceptThreat("R.H1");
+  for (const f of drone.fires()) {
+    if (f.section == "front") drone.suppressFire("front");
+  }
+  const enemy = drone.nearestEnemy();
+  if (enemy == null) {
+    for (const id of CANNONS) drone.fire(id, false);
+    drone.ceaseFire("M.H3");
+    steerClear(0.5);
+    return;
+  }
+  const p = drone.lead(CANNONS[0], enemy) ?? enemy;
+  for (const id of CANNONS) drone.aimAt(id, p.x, p.y);
+  const volley = cannonsOnTarget(p) && enemy.distance < 1000 && drone.maxHeat() < 85;
+  for (const id of CANNONS) drone.fire(id, volley);
+  aimAtContact("M.H3", enemy);
+  drone.fire("M.H3", canFireAt("M.H3", enemy) && enemy.distance < 450);
+  // armor angling: present the front plate at ~30 degrees, switching side every 6 s
+  if (drone.elapsed("angle") > 6) {
+    angleSide = -angleSide;
+    drone.resetTimer("angle");
+  }
+  const err = angleDiff(drone.heading(), enemy.bearing + 30 * angleSide);
+  let throttle = enemy.distance > 650 ? 0.6 : enemy.distance < 350 ? -0.5 : 0;
+  if (throttle > 0 && drone.obstacleDetected("front", 120)) throttle = 0;
+  drone.drive(throttle, clamp(err / 20, -1, 1));
+}
+`;
+
 /** Example brains: one per example design, each opening in a different editor. */
 export const DEFAULT_BRAINS: { designId: string; id: string; code: string; view: 'blocks' | 'nodes' | 'code' }[] = [
   { designId: 'example-assault', id: 'brain-example-assault', code: ASSAULT_CODE, view: 'code' },
@@ -432,6 +786,12 @@ export const DEFAULT_BRAINS: { designId: string; id: string; code: string; view:
   { designId: 'example-skirmisher', id: 'brain-example-skirmisher', code: BRAWLER_CODE, view: 'nodes' },
   { designId: 'example-strider', id: 'brain-example-strider', code: STRIDER_CODE, view: 'blocks' },
   { designId: 'example-wisp', id: 'brain-example-wisp', code: WISP_CODE, view: 'blocks' },
+  { designId: 'example-pathfinder', id: 'brain-example-pathfinder', code: PATHFINDER_CODE, view: 'blocks' },
+  { designId: 'example-needle', id: 'brain-example-needle', code: NEEDLE_CODE, view: 'code' },
+  { designId: 'example-aegis', id: 'brain-example-aegis', code: AEGIS_CODE, view: 'nodes' },
+  { designId: 'example-mantis', id: 'brain-example-mantis', code: MANTIS_CODE, view: 'blocks' },
+  { designId: 'example-harrier', id: 'brain-example-harrier', code: HARRIER_CODE, view: 'nodes' },
+  { designId: 'example-bastion', id: 'brain-example-bastion', code: BASTION_CODE, view: 'code' },
 ];
 
 /** The example brains compiled to runnable programs (tests, headless tools). */

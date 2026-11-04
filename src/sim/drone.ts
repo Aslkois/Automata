@@ -1,11 +1,12 @@
 // Turns a DroneDesign into runtime simulation state, and maintains mass properties.
+import { droneSections, loadState, ratedMassOf } from './load';
 import { CHASSIS } from './content/chassis';
-import { integratedParts } from './content/integrated';
+import { INTEGRATED_MASS, integratedParts } from './content/integrated';
 import { FOOTPRINT } from './content/components';
-import { SECTION_CLASSES, SECTION_LETTER, SECTION_POSITIONS, type SectionPos } from './content/sections';
-import { layoutSections, listMounts, type DroneDesign } from './design';
+import { LAYOUTS, SECTION_CLASSES, SECTION_LETTER, SECTION_POSITIONS, type SectionPos } from './content/sections';
+import { layoutSections, listMounts, moduleStock, mountRating, type DroneDesign } from './design';
 import { cross, rotate, sub, type Vec2 } from './math';
-import type { Drone, RComponent, RigidBody, RSection } from './types';
+import type { Drone, RComponent, RigidBody, RSection, WeaponState } from './types';
 
 export function localToWorld(b: RigidBody, p: Vec2): Vec2 {
   const c = Math.cos(b.angle);
@@ -55,7 +56,7 @@ interface MassPart {
 export function recomputeMass(body: RigidBody, sections: RSection[], components: RComponent[], gearMass: number): void {
   const parts: MassPart[] = [];
   for (const s of sections) {
-    parts.push({ m: s.def.structureMass + s.armor * s.def.armorMassPerMm + 2 * gearMass, x: s.cx, y: 0, l: s.length, w: s.width });
+    parts.push({ m: s.def.structureMass + (s.extraMass ?? 0) + s.armor * s.def.armorMassPerMm + 2 * gearMass, x: s.cx, y: 0, l: s.length, w: s.width });
   }
   const secSet = new Set(sections.map((s) => s.pos));
   for (const c of components) {
@@ -115,6 +116,12 @@ export function buildDrone(design: DroneDesign, id: number, team: number, x: num
       maxHp: def.structureHp,
       attached: true,
       destroyed: false,
+      fire: 0,
+      fireFuel: 0,
+      fireSince: 0,
+      mountRating: mountRating(sd),
+      extraMass: (LAYOUTS[sd.class][sd.layout ?? 'medium'] ?? LAYOUTS[sd.class].medium).frameMass + (pos === 'middle' ? INTEGRATED_MASS : 0),
+      exposure: (LAYOUTS[sd.class][sd.layout ?? 'medium'] ?? LAYOUTS[sd.class].medium).exposure,
     };
   }
   const components: RComponent[] = [];
@@ -132,7 +139,7 @@ export function buildDrone(design: DroneDesign, id: number, team: number, x: num
       half: FOOTPRINT[def.size],
       facing: mt.facing,
       external: def.slot === 'hardpoint',
-      profile: def.profile,
+      profile: Math.min(0.95, def.profile * (def.slot === 'hardpoint' ? sections[mt.section].exposure : 1)),
       armor: def.armor,
       hp: def.hp,
       maxHp: def.hp,
@@ -140,23 +147,47 @@ export function buildDrone(design: DroneDesign, id: number, team: number, x: num
       heat: 0,
       damagedReported: false,
     };
-    if (def.weapon)
+    if (def.weapon) {
+      const w = def.weapon;
+      const interceptors = w.ammo.includes('interceptor') ? Math.max(0, Math.min(w.magazine, Math.round(mt.mount.interceptors ?? 0))) : 0;
+      const loaded: WeaponState['loaded'] = {};
+      if (interceptors) {
+        loaded.interceptor = interceptors;
+        if (w.magazine - interceptors > 0) loaded[w.ammo[0]] = w.magazine - interceptors;
+      } else loaded[w.ammo[0]] = w.magazine;
       c.weapon = {
         aim: mt.facing,
         targetWorld: null,
         trigger: false,
-        mag: def.weapon.magazine,
+        mag: w.magazine,
+        loaded,
+        selected: w.ammo[0],
+        mountStress: 0,
+        loadInterceptors: interceptors,
         reloading: false,
         reloadLeft: 0,
+        reloadTotal: w.reloadTime,
         cooldown: 0,
         overheated: false,
         shots: 0,
+        barrel: 0,
+        fireMode: mt.mount.fireMode === 'sync' && w.fireModes?.includes('sync') ? 'sync' : 'sequence',
+        spin: 0,
+        // the first round of a coilgun is charged before deployment; later ones must be charged in battle
+        charge: w.charge ? 1 : 0,
+        jitter: 0,
+        designated: null,
         blockReason: null,
         clamped: false,
       };
+    }
     if (def.shield) c.shield = { charge: def.shield.capacity, raised: true, facing: mt.facing, targetWorld: null, overloadLeft: 0, powered: true };
     if (def.power?.storage) c.battery = { charge: def.power.storage };
-    if (def.ammo) c.ammo = { rounds: def.ammo.rounds };
+    if (def.ammo) c.ammo = { stock: moduleStock(def, mt.mount) };
+    if (def.support?.heatBuffer) c.heatStore = 0;
+    if (def.support?.suppression) c.suppression = { charges: def.support.suppression.charges, auto: true };
+    if (def.support?.jointReinforcement) c.braces = mt.section === 'front' ? 'front' : mt.section === 'rear' ? 'rear' : (mt.mount.joint ?? 'front');
+    if (def.lidar) c.scan = { time: -1, rays: [] };
     components.push(c);
   }
   // Integrated systems: propulsion, CPU, power core, coolant loop, proximity sensors.
@@ -168,13 +199,13 @@ export function buildDrone(design: DroneDesign, id: number, team: number, x: num
       name: def.name,
       kind: def.kind,
       def,
-      section: 'middle',
-      x: sections.middle.cx + ip.x,
+      section: ip.section,
+      x: sections[ip.section].cx + ip.x,
       y: ip.y,
-      half: 2.2,
-      facing: 0,
-      external: false,
-      profile: 0,
+      half: def.rangefinder ? 1.2 : 2.2,
+      facing: ip.facing ?? 0,
+      external: !!ip.external,
+      profile: def.profile,
       armor: def.armor,
       hp: def.hp,
       maxHp: def.hp,
@@ -256,7 +287,15 @@ export function buildDrone(design: DroneDesign, id: number, team: number, x: num
     radius: boundingRadius(secList),
     seed,
     treadPhase: { left: 0, right: 0 },
+    ranges: [],
+    bumps: { front: { time: -1, impulse: 0 }, rear: { time: -1, impulse: 0 }, left: { time: -1, impulse: 0 }, right: { time: -1, impulse: 0 } },
+    shake: 0,
+    wreckAge: 0,
+    ratedMass: 0,
+    load: loadState(chassis, []),
   };
+  drone.ratedMass = ratedMassOf(drone);
+  drone.load = loadState(chassis, droneSections(drone));
   return drone;
 }
 
