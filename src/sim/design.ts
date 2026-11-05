@@ -21,6 +21,7 @@ import {
   type SlotDef,
 } from './content/sections';
 import { DEG, segmentBox, type Vec2 } from './math';
+import { ammoLabel, carried, installedModules, moduleSupplies, storageText, weaponAmmo } from './ammoCompat';
 
 /**
  * 1: original. 2: drive motors and control units integrated (removed from slots).
@@ -136,6 +137,20 @@ export function moduleStock(def: ComponentDef, mount: Pick<MountDesign, 'payload
   }
   const p = a.payloads.find((x) => x.type === mount?.payload) ?? a.payloads[0];
   return { [p.type]: p.rounds };
+}
+
+/**
+ * What a weapon's magazine holds when the drone deploys: a full magazine of its first family,
+ * with a rocket pod's configured interceptor share. The simulation loads weapons with this.
+ */
+export function initialLoad(w: NonNullable<ComponentDef['weapon']>, mount: Pick<MountDesign, 'interceptors'> | undefined): { loaded: Partial<Record<AmmoType, number>>; interceptors: number } {
+  const interceptors = w.ammo.includes('interceptor') ? Math.max(0, Math.min(w.magazine, Math.round(mount?.interceptors ?? 0))) : 0;
+  const loaded: Partial<Record<AmmoType, number>> = {};
+  if (interceptors) {
+    loaded.interceptor = interceptors;
+    if (w.magazine - interceptors > 0) loaded[w.ammo[0]] = w.magazine - interceptors;
+  } else loaded[w.ammo[0]] = w.magazine;
+  return { loaded, interceptors };
 }
 
 /** Cook-off energy per stored round of a type in a module. */
@@ -605,41 +620,42 @@ export function validateDesign(d: DroneDesign, stats = computeStats(d)): Issue[]
   }
   for (const [t, secs] of Object.entries(stats.ammoEndurance) as [AmmoType, number][])
     if (secs < 20)
-      issues.push({ severity: 'info', code: 'ammo-endurance', message: `${AMMO_TYPES[t].name}: about ${Math.round(secs)} s of continuous fire for every weapon using them, magazines and stores included.` });
+      issues.push({ severity: 'info', code: 'ammo-endurance', message: `${ammoLabel(t)}: about ${Math.round(secs)} s of continuous fire for every weapon using them, magazines and stores included.` });
   for (const w of stats.weapons) {
     if (w.usableFraction === 0)
       issues.push({ severity: 'warning', code: 'weapon-obstructed', message: `${w.mount} ${w.name}: entire firing arc is obstructed by taller sections.`, mount: w.mount });
     else if (w.usableFraction < 0.5)
       issues.push({ severity: 'warning', code: 'weapon-obstructed', message: `${w.mount} ${w.name}: ${Math.round((1 - w.usableFraction) * 100)}% of the firing arc is obstructed.`, mount: w.mount });
   }
-  for (const mt of mounts) {
-    const w = mt.def.weapon;
-    if (!w) continue;
-    const reserve = w.ammo.reduce((n, t) => n + stats.ammo[t], 0);
-    if (reserve <= 0) {
-      const store = w.ammo.includes('scatter')
-        ? 'a Medium-Calibre Magazine set to scatter shells'
-        : w.ammo.includes('penetrator')
-          ? 'a Shell Rack set to penetrators'
-          : w.ammo.includes('shell')
-            ? 'a Shell Rack set to cannon shells'
-            : w.ammo.includes('rocket')
-              ? 'a Rocket Cassette'
-              : w.ammo.includes('missile')
-                ? 'a Missile Reserve'
-                : w.ammo.includes('medium')
-                  ? 'a Medium-Calibre Magazine'
-                  : 'a Small-Calibre Magazine';
+  // ammunition: derived from the equipment data (see ammoCompat); warnings, never refusals
+  for (const st of weaponAmmo(d)) {
+    const w = st.def.weapon!;
+    if (st.status === 'loaded-only') {
+      const fix = st.misconfigured.length
+        ? ` ${st.misconfigured.map((x) => `${x.module.mount} ${x.module.def.name} is set to ${carried(x.module.def, x.module.config).map((c) => ammoLabel(c.type)).join(' and ') || 'nothing'}`).join('; ')}: set it to ${ammoLabel(st.misconfigured[0].needs)} to supply this weapon.`
+        : ` Install ${st.requirement.storage.map((o) => `a ${storageText(o)}`).filter((t, i, a) => a.indexOf(t) === i).join(' or ')} to enable reloads.`;
       issues.push({
         severity: 'warning',
         code: 'no-ammo-storage',
-        message: `${mt.id} ${mt.def.name}: no stored ${AMMO_TYPES[w.ammo[0]].plural}, so it can only fire what is loaded (${w.magazine}). Add ${store} in an internal bay.`,
-        mount: mt.id,
+        message: `${st.def.name} ${st.mount} has ${st.loadedTotal} ${st.loadedTotal === 1 ? 'round' : 'rounds'} loaded but no compatible reserve ammunition, so it cannot reload: it needs ${st.requirement.label}.${fix}`,
+        mount: st.mount,
       });
-    } else if (w.ammo.includes('missile') && reserve < w.magazine)
-      issues.push({ severity: 'info', code: 'low-missile-reserve', message: `${mt.id} ${mt.def.name}: only ${reserve} reserve missiles, less than one reload of ${w.magazine}.`, mount: mt.id });
-    if (w.ammo.includes('interceptor') && stats.ammo.interceptor + (mt.mount.interceptors ?? 0) <= 0)
-      issues.push({ severity: 'info', code: 'no-interceptors', message: `${mt.id} ${mt.def.name}: no interceptor rockets loaded or stored, so it cannot shoot down missiles. Set an interceptor split on the pod or a Rocket Cassette.`, mount: mt.id });
+    } else if (w.ammo.includes('missile') && st.reserveTotal < w.magazine)
+      issues.push({ severity: 'info', code: 'low-missile-reserve', message: `${st.mount} ${st.def.name}: only ${st.reserveTotal} reserve missiles, less than one reload of ${w.magazine}.`, mount: st.mount });
+    for (const t of st.unreplenished)
+      issues.push({ severity: 'info', code: 'unreplenished-ammo', message: `${st.mount} ${st.def.name}: starts with ${st.loaded[t]} ${AMMO_TYPES[t].plural} but none are stored, so reloads refill it with ${st.requirement.types.filter((x) => (st.reserve[x] ?? 0) > 0).map((x) => AMMO_TYPES[x].plural).join(' and ')} instead.`, mount: st.mount });
+    if (w.ammo.includes('interceptor') && (st.reserve.interceptor ?? 0) + (st.loaded.interceptor ?? 0) <= 0)
+      issues.push({ severity: 'info', code: 'no-interceptors', message: `${st.mount} ${st.def.name}: no interceptor rockets loaded or stored, so it cannot shoot down missiles. Set an interceptor split on the pod or a Rocket Cassette.`, mount: st.mount });
+  }
+  for (const mod of installedModules(d)) {
+    const { feeds, couldFeed } = moduleSupplies(d, mod.mount);
+    if (feeds.length) continue;
+    const holds = carried(mod.def, mod.config).map((c) => ammoLabel(c.type)).join(' and ') || 'nothing';
+    issues.push(
+      couldFeed.length
+        ? { severity: 'warning', code: 'ammo-misconfigured', message: `${mod.mount} ${mod.def.name} is set to ${holds}, which no installed weapon fires. ${couldFeed.map((x) => x.mount).join(', ')} ${couldFeed.length > 1 ? 'need' : 'needs'} ${ammoLabel(couldFeed[0].needs)}: change its payload to supply ${couldFeed.length > 1 ? 'them' : 'it'}.`, mount: mod.mount }
+        : { severity: 'info', code: 'ammo-unused', message: `${mod.mount} ${mod.def.name} (${holds}): no installed weapon uses this ammunition.`, mount: mod.mount },
+    );
   }
   for (const pos of SECTION_POSITIONS) {
     const here = mounts.filter((m) => m.section === pos);

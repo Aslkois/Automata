@@ -8,6 +8,8 @@ import { fmt, Icon, Meter, Prop } from '../common';
 import { PartIcon, PartPreview } from '../parts';
 import { KIND } from '../theme';
 import type { Selection } from './Stage';
+import { AmmoHeadline, ModuleAmmo, WeaponAmmo } from './Ammo';
+import { ammoLabel } from '../../sim/ammoCompat';
 
 interface Props {
   design: DroneDesign;
@@ -51,7 +53,7 @@ export function capabilities(def: ComponentDef): [string, string][] {
   if (w) {
     const barrels = w.barrels?.length ?? 1;
     const launcher = w.ammo.includes('rocket') || w.ammo.includes('missile');
-    rows.push(['Ammunition', w.ammo.map((t) => AMMO_TYPES[t].name).join(' · ')]);
+    rows.push(['Ammunition', w.ammo.map(ammoLabel).join(' · ')]);
     if (w.pellets) rows.push(['Per shell', `${w.pellets} pellets in a ${w.pelletConeDeg ?? 5}° cone`]);
     rows.push(['Penetration', `${w.penetration} mm${w.pellets ? ' per pellet' : ''}`], ['Damage', `${w.damage}${w.pellets ? ' per pellet' : ''}`]);
     const ex = w.projectiles ? Object.values(w.projectiles).find((x) => x?.explosive)?.explosive : undefined;
@@ -82,7 +84,7 @@ export function capabilities(def: ComponentDef): [string, string][] {
   if (s?.heatBuffer) rows.push(['Heat buffer', `${s.heatBuffer.capacity}, absorbs ${s.heatBuffer.absorbRate}/s, sheds ${s.heatBuffer.releaseRate}/s`]);
   if (s?.jointReinforcement) rows.push(['Joint damage', `−${Math.round(s.jointReinforcement * 100)}% on one adjacent joint`]);
   if (s?.suppression) rows.push(['Charges', `${s.suppression.charges}, automatic after ${s.suppression.delay} s`]);
-  if (def.ammo) rows.push(['Holds', def.ammo.split ? `${def.ammo.payloads[0].rounds} rockets, split offensive / interceptor` : def.ammo.payloads.map((p) => `${p.rounds} ${AMMO_TYPES[p.type].plural}`).join(' or ')]);
+  if (def.ammo) rows.push(['Payloads', def.ammo.split ? `${def.ammo.payloads[0].rounds} rockets, split ${def.ammo.split.map(ammoLabel).join(' / ')}` : def.ammo.payloads.map((p) => `${p.rounds} ${ammoLabel(p.type)}`).join(' or ') + (def.ammo.payloads.length > 1 ? ' (one at a time)' : '')]);
   return rows;
 }
 
@@ -144,7 +146,7 @@ function MountConfig({ def, mount, pos, set }: { def: ComponentDef; mount: Mount
         key="payload"
         label="Payload"
         value={(mount.payload ?? a.payloads[0].type) as AmmoType}
-        options={a.payloads.map((p) => ({ id: p.type, name: `${p.rounds} ${AMMO_TYPES[p.type].plural}`, hint: AMMO_TYPES[p.type].name }))}
+        options={a.payloads.map((p) => ({ id: p.type, name: `${p.rounds} ${AMMO_TYPES[p.type].plural}`, hint: ammoLabel(p.type) }))}
         onChange={(v) => set((m) => (m.payload = v))}
       />,
     );
@@ -173,7 +175,7 @@ function MountConfig({ def, mount, pos, set }: { def: ComponentDef; mount: Mount
           Carries{' '}
           {Object.entries(stock)
             .filter(([, n]) => (n ?? 0) > 0)
-            .map(([t, n]) => `${n} ${AMMO_TYPES[t as AmmoType].plural}`)
+            .map(([t, n]) => `${n} ${ammoLabel(t as AmmoType)}`)
             .join(' and ') || 'nothing'}
           .
         </p>
@@ -187,7 +189,7 @@ function MountConfig({ def, mount, pos, set }: { def: ComponentDef; mount: Mount
   );
 }
 
-function SlotProps({ design, stats, pos, slotId, update, install, onBrowse, onMove }: Props & { pos: SectionPos; slotId: string }) {
+function SlotProps({ design, stats, pos, slotId, update, install, onBrowse, onMove, onSelect }: Props & { pos: SectionPos; slotId: string }) {
   const sd = design.sections[pos];
   const slot = slotOf(sd, slotId);
   if (!slot) return <p className="muted">This slot does not exist on the section’s current layout.</p>;
@@ -220,6 +222,7 @@ function SlotProps({ design, stats, pos, slotId, update, install, onBrowse, onMo
               <p className="muted">{KIND[def.kind]?.label}</p>
             </div>
           </div>
+          {def.weapon && <AmmoHeadline design={design} mount={id} />}
           {def.slot === 'hardpoint' && (
             <div className="model-plate" aria-label={`${def.name}, top view`}>
               <PartPreview id={def.id} height={74} label={`${def.name}, top view`} />
@@ -227,6 +230,8 @@ function SlotProps({ design, stats, pos, slotId, update, install, onBrowse, onMo
           )}
           <p className="desc">{def.description}</p>
           {def.notes && <p className="desc muted small">{def.notes}</p>}
+          {def.weapon && <WeaponAmmo design={design} stats={stats} mount={id} onSelect={onSelect} />}
+          {def.ammo && <ModuleAmmo design={design} mount={id} def={def} onSelect={onSelect} />}
           <dl className="props-list">
             <Prop k={powerOf(def).label} v={powerOf(def).value} />
             <Prop k="Mass" v={fmt.kg(def.mass)} />

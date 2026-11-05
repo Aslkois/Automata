@@ -262,6 +262,30 @@ test('component artwork: own icons in the tray, models on the stage and in the s
   expect(empty).toBe(0);
 });
 
+test('ammunition: requirement on cards and the selected weapon, matching storage highlighted, warning without blocking', async ({ page }) => {
+  await page.getByTestId('drone-switcher').click();
+  await page.getByRole('button', { name: 'New drone' }).click();
+  await go(page, 'Construct');
+  const lib = page.getByRole('list', { name: 'Equipment library' });
+  // every weapon card states its ammunition before anything is installed
+  await expect(page.getByTestId('ammo-req-autocannon')).toContainText('Autocannon rounds (Medium)');
+  await expect(page.getByTestId('ammo-req-autocannon')).toContainText('Medium-Calibre Magazine');
+  await expect(page.getByTestId('ammo-req-coilgun')).toContainText('Shell Rack, penetrators payload');
+  await page.getByTestId('slot-F.H3').click();
+  await lib.getByRole('listitem', { name: 'Autocannon', exact: true }).click();
+  await page.getByTestId('slot-F.H3').click();
+  await expect(page.getByTestId('ammo-requires')).toHaveText('Autocannon rounds (Medium)');
+  await expect(page.getByTestId('ammo-storage')).toHaveText('Medium-Calibre Magazine');
+  await expect(page.getByTestId('ammo-state')).toContainText('No compatible reserve · 35 loaded');
+  // storage cards relate to the selected weapon in words
+  await page.getByRole('tab', { name: 'Ammunition' }).click();
+  await expect(page.getByTestId('ammo-match-ammo_medium')).toContainText('Feeds Autocannon');
+  await expect(page.getByTestId('ammo-match-shell_rack')).toContainText('Not for Autocannon');
+  // a caution, still deployable
+  await expect(page.getByTestId('issues-toggle')).toContainText('deployable');
+  await expect(page.getByRole('button', { name: 'Test' })).toBeEnabled();
+});
+
 test.describe('touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   test('every workspace is usable by touch', async ({ page }) => {
@@ -292,6 +316,18 @@ test.describe('touch phone', () => {
     await expect(page.getByTestId('inspector')).toHaveAttribute('data-sheet', /full|peek|half/);
     await page.getByRole('button', { name: 'Close diagnostics' }).tap();
     await expect(page.getByTestId('inspector')).toHaveCount(0);
+  });
+
+  test('ammunition requirement is the first thing shown for a weapon on a phone; slot-first install works', async ({ page }) => {
+    await page.getByTestId('drone-switcher').tap();
+    await page.getByRole('button', { name: 'New drone' }).tap();
+    await go(page, 'Construct');
+    await page.getByTestId('slot-F.H3').tap();
+    await page.getByRole('button', { name: 'Show compatible equipment' }).tap();
+    await page.getByRole('list', { name: 'Equipment library' }).getByRole('listitem', { name: 'Autocannon', exact: true }).tap();
+    await expect(page.getByTestId('ammo-requires')).toBeInViewport();
+    await expect(page.getByTestId('ammo-storage')).toHaveText('Medium-Calibre Magazine');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 
   test('a part can be moved to another slot by touch, and the drone stays visible', async ({ page }) => {

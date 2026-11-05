@@ -24,6 +24,9 @@ export function Construct({ active }: { active: boolean }) {
   /** a mounted part being moved to another slot */
   const [moving, setMoving] = useState<{ pos: SectionPos; id: string } | null>(null);
   const [trayOpen, setTrayOpen] = useStoredState('tray-open', true);
+  // phones: "Show compatible equipment" folds the properties sheet away so the tray underneath
+  // can be used, keeping the selected slot as the target; it comes back with the next change
+  const [browsing, setBrowsing] = useState(false);
   const [showArcs, setShowArcs] = useStoredState('arcs', true);
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [diagOpen, setDiagOpen] = useState(false);
@@ -42,6 +45,9 @@ export function Construct({ active }: { active: boolean }) {
     setArmed(null);
     setMoving(null);
   }, [designId]);
+
+  // a new selection or an edit (e.g. the part just installed) brings the properties sheet back
+  useEffect(() => setBrowsing(false), [sel, design]);
 
   const stats = useMemo(() => (design ? computeStats(design) : null), [design]);
   const issues = useMemo(() => (design && stats ? validateDesign(design, stats) : []), [design, stats]);
@@ -322,7 +328,7 @@ export function Construct({ active }: { active: boolean }) {
         </div>
       )}
 
-      {sel && !moving && <Properties design={design} stats={stats} sel={sel} update={update} install={install} onSelect={onSelect} onClose={() => setSel(null)} onBrowse={() => setTrayOpen(true)} onMove={(pos, id) => (setArmed(null), setMoving({ pos, id }))} />}
+      {sel && !moving && !(phone && browsing) && <Properties design={design} stats={stats} sel={sel} update={update} install={install} onSelect={onSelect} onClose={() => setSel(null)} onBrowse={() => (setTrayOpen(true), setBrowsing(true))} onMove={(pos, id) => (setArmed(null), setMoving({ pos, id }))} />}
 
       <Tray open={trayShown} setOpen={setTrayOpen} design={design} sel={sel} selSlot={selSlot} armed={armed} onPick={pickPart} />
     </div>

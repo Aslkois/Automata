@@ -77,7 +77,7 @@ export function Diagnostics({ design, stats }: { design: DroneDesign; stats: Des
       <section>
         <h3>Ammunition</h3>
         {(Object.entries(stats.ammoEndurance) as [AmmoType, number][]).map(([t, s]) => (
-          <Row key={t} k={AMMO_TYPES[t].name} v={`${Math.round(s)} s of continuous fire · ${stats.ammo[t]} stored`} tone={s < 20 ? 'warn' : undefined} hint="Every weapon of this family firing at once, magazines and stores together." />
+          <Row key={t} k={AMMO_TYPES[t].label} v={`${Math.round(s)} s of continuous fire · ${stats.ammo[t]} stored`} tone={s < 20 ? 'warn' : undefined} hint="Every weapon of this family firing at once, magazines and stores together." />
         ))}
         {Object.keys(stats.ammoEndurance).length === 0 && <p className="dg-note">No weapons.</p>}
       </section>

@@ -4,9 +4,9 @@ import { CHASSIS } from './content/chassis';
 import { INTEGRATED_MASS, integratedParts } from './content/integrated';
 import { FOOTPRINT } from './content/components';
 import { LAYOUTS, SECTION_CLASSES, SECTION_LETTER, SECTION_POSITIONS, type SectionPos } from './content/sections';
-import { layoutSections, listMounts, moduleStock, mountRating, type DroneDesign } from './design';
+import { initialLoad, layoutSections, listMounts, moduleStock, mountRating, type DroneDesign } from './design';
 import { cross, rotate, sub, type Vec2 } from './math';
-import type { Drone, RComponent, RigidBody, RSection, WeaponState } from './types';
+import type { Drone, RComponent, RigidBody, RSection } from './types';
 
 export function localToWorld(b: RigidBody, p: Vec2): Vec2 {
   const c = Math.cos(b.angle);
@@ -149,12 +149,7 @@ export function buildDrone(design: DroneDesign, id: number, team: number, x: num
     };
     if (def.weapon) {
       const w = def.weapon;
-      const interceptors = w.ammo.includes('interceptor') ? Math.max(0, Math.min(w.magazine, Math.round(mt.mount.interceptors ?? 0))) : 0;
-      const loaded: WeaponState['loaded'] = {};
-      if (interceptors) {
-        loaded.interceptor = interceptors;
-        if (w.magazine - interceptors > 0) loaded[w.ammo[0]] = w.magazine - interceptors;
-      } else loaded[w.ammo[0]] = w.magazine;
+      const { loaded, interceptors } = initialLoad(w, mt.mount);
       c.weapon = {
         aim: mt.facing,
         targetWorld: null,

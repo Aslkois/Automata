@@ -16,17 +16,23 @@ export interface AmmoTypeDef {
   name: string;
   /** short plural used in messages */
   plural: string;
+  /**
+   * What the interface calls it everywhere a requirement is shown. Calibre families carry
+   * their storage class, because it differs from the size of the hardpoint the gun sits on
+   * (an Autocannon is a small hardpoint that feeds on Medium rounds).
+   */
+  label: string;
 }
 
 export const AMMO_TYPES: Record<AmmoType, AmmoTypeDef> = {
-  small: { id: 'small', name: 'Small-calibre rounds', plural: 'small rounds' },
-  medium: { id: 'medium', name: 'Autocannon rounds', plural: 'autocannon rounds' },
-  scatter: { id: 'scatter', name: 'Scatter shells', plural: 'scatter shells' },
-  shell: { id: 'shell', name: 'Cannon shells', plural: 'cannon shells' },
-  penetrator: { id: 'penetrator', name: 'Coilgun penetrators', plural: 'penetrators' },
-  rocket: { id: 'rocket', name: 'Offensive rockets', plural: 'rockets' },
-  interceptor: { id: 'interceptor', name: 'Interceptor rockets', plural: 'interceptor rockets' },
-  missile: { id: 'missile', name: 'Guided heavy missiles', plural: 'missiles' },
+  small: { id: 'small', name: 'Small-calibre rounds', plural: 'small rounds', label: 'Small rounds' },
+  medium: { id: 'medium', name: 'Autocannon rounds', plural: 'autocannon rounds', label: 'Autocannon rounds (Medium)' },
+  scatter: { id: 'scatter', name: 'Scatter shells', plural: 'scatter shells', label: 'Scatter shells' },
+  shell: { id: 'shell', name: 'Cannon shells', plural: 'cannon shells', label: 'Cannon shells' },
+  penetrator: { id: 'penetrator', name: 'Coilgun penetrators', plural: 'penetrators', label: 'Coilgun penetrators' },
+  rocket: { id: 'rocket', name: 'Offensive rockets', plural: 'rockets', label: 'Offensive rockets' },
+  interceptor: { id: 'interceptor', name: 'Interceptor rockets', plural: 'interceptor rockets', label: 'Interceptor rockets' },
+  missile: { id: 'missile', name: 'Guided heavy missiles', plural: 'missiles', label: 'Guided heavy missiles' },
 };
 
 /** How a projectile moves and what it does on arrival. */

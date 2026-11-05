@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import { COMPONENT_MAP, COMPONENTS, type ComponentDef } from '../../sim/content/components';
 import type { SlotDef } from '../../sim/content/sections';
-import type { DroneDesign } from '../../sim/design';
+import { mountId, type DroneDesign } from '../../sim/design';
+import { CardAmmo, trayMatch } from './Ammo';
 import { fmt, Icon } from '../common';
 import { PartIcon, PartPreview } from '../parts';
 import { KIND } from '../theme';
@@ -40,7 +41,6 @@ function keyStat(def: ComponentDef): { k: string; v: number; unit: string } | nu
   if (s?.spallReduction) return { k: 'Spall caught', v: Math.round(s.spallReduction * 100), unit: '%' };
   if (s?.jointReinforcement) return { k: 'Joint relief', v: Math.round(s.jointReinforcement * 100), unit: '%' };
   if (s?.suppression) return { k: 'Charges', v: s.suppression.charges, unit: '' };
-  if (def.ammo) return { k: 'Rounds', v: def.ammo.payloads[0].rounds, unit: '' };
   return null;
 }
 
@@ -61,6 +61,9 @@ export function Tray({ open, setOpen, design, sel, selSlot, armed, onPick }: { o
   const [size, setSize] = useState<'S' | 'M' | 'L' | null>(null);
   const current = sel?.type === 'slot' ? design.sections[sel.pos].slots[sel.id] : null;
   const currentDef = current ? COMPONENT_MAP[current.component] : null;
+  // the part whose ammunition the tray compares against: the selected installed part, else the part in hand
+  const armedDef = armed ? COMPONENT_MAP[armed] : null;
+  const focus = currentDef && (currentDef.weapon || currentDef.ammo) && sel?.type === 'slot' ? { def: currentDef, mount: current!, id: mountId(sel.pos, sel.id) } : armedDef && (armedDef.weapon || armedDef.ammo) ? { def: armedDef } : null;
   const list = useMemo(() => {
     const c = CATS.find((x) => x.key === cat)!;
     const qq = q.trim().toLowerCase();
@@ -127,11 +130,13 @@ export function Tray({ open, setOpen, design, sel, selSlot, armed, onPick }: { o
             const cks = currentDef ? keyStat(currentDef) : null;
             const delta = currentDef && ks && cks && cks.k === ks.k && currentDef.id !== d.id ? ks.v - cks.v : null;
             const dm = currentDef && currentDef.id !== d.id ? d.mass - currentDef.mass : null;
+            const match = trayMatch(d, focus, design);
             return (
               <button
                 key={d.id}
                 role="listitem"
-                className={`part ${armed === d.id ? 'armed' : ''} ${fit === false ? 'nofit' : ''} ${fit ? 'fit' : ''} ${currentDef?.id === d.id ? 'current' : ''}`}
+                className={`part ${armed === d.id ? 'armed' : ''} ${fit === false ? 'nofit' : ''} ${fit ? 'fit' : ''} ${currentDef?.id === d.id ? 'current' : ''} ${match ? `ammo-${match.kind}` : ''}`}
+                data-ammo-match={match?.kind}
                 aria-label={d.name}
                 title={`${d.description}${fit === false ? ' — does not fit the selected slot' : ''}`}
                 draggable
@@ -146,6 +151,13 @@ export function Tray({ open, setOpen, design, sel, selSlot, armed, onPick }: { o
                   <PartIcon id={d.id} kind={d.kind} size={22} />
                   <span className="pname">{d.name}</span>
                 </span>
+                {match && (
+                  <span className={`pmatch ${match.kind}`} data-testid={`ammo-match-${d.id}`}>
+                    <Icon name={match.kind === 'supplies' ? 'check' : match.kind === 'reconfigure' ? 'wrench' : 'close'} size={13} />
+                    {match.text}
+                  </span>
+                )}
+                <CardAmmo def={d} />
                 {d.slot === 'hardpoint' && (
                   <span className="pmodel">
                     <PartPreview id={d.id} height={30} />
