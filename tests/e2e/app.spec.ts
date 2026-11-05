@@ -312,10 +312,26 @@ test('mirror layout: moves the real mount positions, keeps the parts, reverses o
   await mirror.click();
   await expect(mirror).toHaveAttribute('aria-pressed', 'false');
   expect(await cy('slot-F.H1')).toBeCloseTo(before.h1, 0);
-  // a symmetrical, empty layout cannot be mirrored into anything different
+  // a left/right-symmetrical layout mirrors front/back instead: its rear mount comes forward
+  await page.getByTestId('layout-pick-front').getByTestId('layout-medium').click();
+  const cx = async (id: string) => {
+    const b = (await page.getByTestId(id).boundingBox())!;
+    return b.x + b.width / 2;
+  };
+  const h3 = await cx('slot-F.H3');
+  const h1 = await cx('slot-F.H1');
+  expect(h3).toBeLessThan(h1);
+  await expect(mirror).toHaveAttribute('data-axis', 'front-back');
+  await expect(mirror).toContainText('Mirror front/back');
+  await mirror.click();
+  await expect(page.getByTestId('flipped-front')).toBeVisible();
+  expect(await cx('slot-F.H3')).toBeGreaterThan(await cx('slot-F.H1'));
+  await mirror.click();
+  expect(await cx('slot-F.H3')).toBeCloseTo(h3, 0);
+  // a layout symmetrical both ways cannot be mirrored into anything different
   await page.getByTestId('section-rear').click();
   await expect(page.getByTestId('mirror-rear')).toBeDisabled();
-  await expect(page.getByTestId('mirror-note-rear')).toContainText('already symmetrical');
+  await expect(page.getByTestId('mirror-note-rear')).toContainText('symmetrical both ways');
 });
 
 test.describe('touch phone', () => {

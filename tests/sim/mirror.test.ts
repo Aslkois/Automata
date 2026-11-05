@@ -2,8 +2,8 @@
 // axis, (x, y) → (x, −y), with the same slot ids, the mirrored facing, and the simulation
 // using the same geometry the constructor draws.
 import { describe, expect, it } from 'vitest';
-import { LAYOUT_IDS, LAYOUTS, SECTION_CLASSES, SLOT_HALF, layoutSymmetric, sectionSlots, type SectionClass } from '../../src/sim/content/sections';
-import { cloneDesign, computeStats, listMounts, mirrorEffect, mirrorSection, parseDesign, relocateSection, serializeDesign, slotsOf, validateDesign, type DroneDesign, type SectionDesign } from '../../src/sim/design';
+import { LAYOUT_IDS, LAYOUTS, SECTION_CLASSES, SLOT_HALF, layoutSymmetric, layoutSymmetricFrontBack, sectionSlots, type SectionClass } from '../../src/sim/content/sections';
+import { cloneDesign, computeStats, flipSection, listMounts, mirrorAxisFor, mirrorEffect, mirrorOn, mirrorSection, parseDesign, relocateSection, serializeDesign, slotsOf, validateDesign, type DroneDesign, type SectionDesign } from '../../src/sim/design';
 import { localToWorld } from '../../src/sim/drone';
 import type { SimEvent } from '../../src/sim/types';
 import { DEFAULT_DESIGNS } from '../../src/data/defaults';
@@ -229,6 +229,7 @@ describe('the mirror control', () => {
     const empty = (cls: SectionClass, layout: SectionDesign['layout']): SectionDesign => ({ class: cls, layout, armor: 0, slots: {} });
     // an empty symmetrical layout: the same drone either way
     expect(mirrorEffect(empty('medium', 'medium'))).toBe('none');
+    expect(mirrorEffect(empty('medium', 'medium'), 'front-back')).toBe('reshape');
     // parts on a symmetrical layout change sides
     expect(mirrorEffect({ ...empty('light', 'medium'), slots: { H1: m('mg'), H2: m('camera') } })).toBe('swap');
     // asymmetrical layouts reverse, even empty
@@ -237,5 +238,87 @@ describe('the mirror control', () => {
     // a centreline mount turned sideways still changes (its facing mirrors)
     expect(mirrorEffect({ ...empty('medium', 'medium'), slots: { H3: m('camera', 90) } })).toBe('swap');
     expect(mirrorEffect({ ...empty('medium', 'medium'), slots: { H3: m('camera', 0) } })).toBe('none');
+  });
+});
+
+describe('front/back mirroring for layouts that are already left/right symmetrical', () => {
+  const empty = (cls: SectionClass, layout: SectionDesign['layout']): SectionDesign => ({ class: cls, layout, armor: 0, slots: {} });
+
+  it('the control offers left/right for lopsided layouts and front/back for the others', () => {
+    const axes = Object.fromEntries(CLASSES.flatMap((c) => LAYOUT_IDS.map((l) => [`${c}/${l}`, mirrorAxisFor({ class: c, layout: l })])));
+    expect(axes).toEqual({
+      'light/max': 'left-right',
+      'light/medium': null, // both mounts on the centre line of the section: symmetrical both ways
+      'light/min': 'front-back',
+      'medium/max': 'left-right',
+      'medium/medium': 'front-back',
+      'medium/min': 'front-back',
+      'heavy/max': 'front-back',
+      'heavy/medium': 'left-right',
+      'heavy/min': 'front-back',
+    });
+    for (const [k, a] of Object.entries(axes)) {
+      const [c, l] = k.split('/') as [SectionClass, SectionDesign['layout']];
+      expect(a === null, k).toBe(layoutSymmetric(c, l) && layoutSymmetricFrontBack(c, l));
+    }
+  });
+
+  it('flips mounts (x, y) → (−x, y) inside the hull, keeps ids, parts, settings and facings, and undoes exactly', () => {
+    for (const cls of CLASSES)
+      for (const l of LAYOUT_IDS) {
+        const a = sectionSlots(cls, l).filter((s) => s.kind === 'hardpoint');
+        const b = sectionSlots(cls, l, false, true).filter((s) => s.kind === 'hardpoint');
+        const c = SECTION_CLASSES[cls];
+        for (let i = 0; i < a.length; i++) {
+          expect([b[i].id, b[i].size, b[i].y]).toEqual([a[i].id, a[i].size, a[i].y]);
+          expect(b[i].x).toBe(a[i].x === 0 ? 0 : -a[i].x);
+          expect(Math.abs(b[i].x) + SLOT_HALF[b[i].size]).toBeLessThanOrEqual(c.length / 2 + 1e-9);
+        }
+      }
+    const sd: SectionDesign = { class: 'heavy', layout: 'max', armor: 30, slots: { H1: m('heavy_cannon', 15), H2: { component: 'dual_autocannon', rotation: 0, fireMode: 'sync' }, H3: m('radar'), I1: m('shell_rack') } };
+    const f = flipSection(sd);
+    expect(f.flip).toBe(true);
+    expect(f.slots).toEqual(sd.slots);
+    expect(flipSection(f)).toEqual(sd);
+    // heavy Maximum: the two large mounts go to the rear, the medium one forward
+    const hp = slotsOf(f).filter((s) => s.kind === 'hardpoint');
+    expect(hp.find((s) => s.id === 'H1')!.x).toBeLessThan(0);
+    expect(hp.find((s) => s.id === 'H3')!.x).toBeGreaterThan(0);
+    expect(mirrorEffect(sd, 'front-back')).toBe('reshape');
+  });
+
+  it('the simulation and validation use the flipped positions', () => {
+    const d = design({
+      chassis: 'tracked',
+      sections: {
+        front: { class: 'heavy', layout: 'max', armor: 30, slots: { H1: m('mg'), H2: m('mg'), H3: m('camera'), I1: m('ammo_small') } },
+        middle: { class: 'medium', layout: 'medium', armor: 10, slots: {} },
+        rear: { class: 'light', layout: 'medium', armor: 5, slots: {} },
+      },
+    });
+    const f = cloneDesign(d);
+    f.sections.front = mirrorOn(f.sections.front, 'front-back');
+    const sim = makeSim([{ design: f, program: code('function update(){}'), team: 0, x: 500, y: 550, angle: 0 }]);
+    const dr = sim.drones[0];
+    for (const mt of listMounts(f)) expect([comp(dr, mt.id).x, comp(dr, mt.id).y], mt.id).toEqual([mt.x, mt.y]);
+    const a = listMounts(d).find((x) => x.id === 'F.H1')!;
+    const b = listMounts(f).find((x) => x.id === 'F.H1')!;
+    expect(b.x - (a.x - a.slot.x)).toBeCloseTo(-a.slot.x, 9);
+    expect(b.facing).toBe(a.facing);
+    expect(validateDesign(f).filter((i) => i.severity === 'error')).toEqual([]);
+  });
+
+  it('is saved (schema 6), survives export/import and layout changes, and older files load unflipped', () => {
+    const d = subject();
+    const f = cloneDesign(d);
+    f.sections.middle = flipSection(f.sections.middle);
+    const back = parseDesign(serializeDesign(f));
+    expect(back.sections.middle.flip).toBe(true);
+    expect(back.sections).toEqual(f.sections);
+    const old = JSON.parse(serializeDesign(f));
+    old.schema = 5;
+    expect(parseDesign(old).sections.middle.flip).toBeUndefined();
+    const ch = relocateSection(flipSection(subject().sections.front), 'heavy', 'max');
+    expect(ch.displaced).toEqual([]);
   });
 });

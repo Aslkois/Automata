@@ -51,7 +51,7 @@ npm run dev          # http://localhost:5173
      - Each chassis carries a rated load: wheeled ×1, tracked ×1.25, walking ×1.6, flying ×0.55.
      - Overloading a section costs traction, adds rolling resistance and running-gear wear, and on a flyer eats into lift and shared thrust.
      - Recoil above a mount's rating fatigues the mount and loads the joints.
-   - **Mirror layout** in a section's properties reflects its hardpoints left/right. Each section is independent, parts keep their slots, and a second press undoes it.
+   - **Mirror layout** in a section's properties reflects its hardpoints left/right, or front/back for layouts already symmetrical left to right. Each section is independent, parts keep their slots, and a second press undoes it.
    - Weapon cards say what ammunition they need and where it is stored, e.g. *Requires: Autocannon rounds (Medium) · Storage: Medium-Calibre Magazine*. Selecting a weapon marks the storage that feeds it; a weapon with no reserve gets a warning, never a block.
    - **Diagnostics** (the gauge button) shows mass and load per section, mobility, power, heat, ammunition endurance and recoil against each mount's rating, with the assumptions labelled.
    - The properties surface shows the part's model, power, mass, durability, mounting, facing, firing arc, mount stress and overheat time. It also has the part's own settings: fire mode, interceptor load, payload, braced joint. **Move…** relocates a part to another slot, swapping when both fit.
@@ -97,11 +97,11 @@ npm run dev          # http://localhost:5173
 
 **Saved data:** libraries from earlier versions migrate automatically. Each design gets the program it was clearly paired with. Any other program is kept under **Program → Recovered**, and the original data is backed up in `localStorage` as `automata.library.v1-backup`.
 
-When you load a design, it is migrated to schema 5:
+When you load a design, it is migrated to schema 6:
 - the AA Autocannon becomes the Autocannon;
 - designs from before layouts existed get the layout that matches their old slots: light → Medium, medium → Medium, heavy → Maximum;
 - schema 3 layouts map to the new table: medium Minimum → Medium, heavy Medium → Maximum, heavy Minimum → Medium;
-- every section starts unmirrored;
+- every section starts unmirrored and unflipped;
 - configuration fields are validated.
 
 The six new example drones are added to an existing library once. Drones you made or edited are never replaced, and a deleted example is not brought back.

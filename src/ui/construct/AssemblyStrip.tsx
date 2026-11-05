@@ -27,13 +27,18 @@ export function AssemblyStrip({ design, stats, sel, onSelect }: { design: DroneD
                 <i />
               </span>
             )}
-            <button className={`asm-seg ${on ? 'on' : ''}`} onClick={() => onSelect({ type: 'section', pos })} aria-pressed={on} data-testid={`section-${pos}`} aria-label={`${pos} section: ${cls.name}, ${sd.armor} mm armour, ${parts.length} parts${sd.mirror ? ', layout mirrored' : ''}`}>
+            <button className={`asm-seg ${on ? 'on' : ''}`} onClick={() => onSelect({ type: 'section', pos })} aria-pressed={on} data-testid={`section-${pos}`} aria-label={`${pos} section: ${cls.name}, ${sd.armor} mm armour, ${parts.length} parts${sd.mirror ? ', layout mirrored left/right' : ''}${sd.flip ? ', layout mirrored front/back' : ''}`}>
               <span className="asm-top">
                 <b className="letter">{SECTION_LETTER[pos]}</b>
                 <span className="cls">{cls.name}</span>
                 {sd.mirror && (
                   <span className="asm-mirror" title="Hardpoint layout mirrored left/right" data-testid={`mirrored-${pos}`}>
                     <Icon name="mirror" size={13} />
+                  </span>
+                )}
+                {sd.flip && (
+                  <span className="asm-mirror" title="Hardpoint layout mirrored front/back" data-testid={`flipped-${pos}`}>
+                    <Icon name="flip" size={13} />
                   </span>
                 )}
                 <span className="num armor">{sd.armor} mm</span>
