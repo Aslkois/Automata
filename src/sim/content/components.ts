@@ -12,28 +12,37 @@ export type Caliber = 'small' | 'medium' | 'large';
 export type AmmoType = 'small' | 'medium' | 'scatter' | 'shell' | 'penetrator' | 'rocket' | 'interceptor' | 'missile';
 
 export interface AmmoTypeDef {
+  /** internal id: saved designs, payload settings and the programming API use it */
   id: AmmoType;
+  /** conventional designation shown to the player, e.g. "25×137mm" */
   name: string;
-  /** short plural used in messages */
-  plural: string;
+  /** what one stored unit is called in a sentence ("rounds", "shells", "rockets", …) */
+  unit: string;
   /**
-   * What the interface calls it everywhere a requirement is shown. Calibre families carry
-   * their storage class, because it differs from the size of the hardpoint the gun sits on
-   * (an Autocannon is a small hardpoint that feeds on Medium rounds).
+   * Same as `name`: the label every interface surface shows. Kept as its own field so
+   * existing callers read one property everywhere.
    */
   label: string;
 }
 
+/**
+ * Ammunition families with conventional calibre designations. Real-world names where they fit
+ * (7.62×51mm, 25×137mm, 12-gauge, 70mm rockets); fictional specifications for the rest. The
+ * ids are unchanged, so saves, payload settings and programs keep working; only the names are new.
+ */
 export const AMMO_TYPES: Record<AmmoType, AmmoTypeDef> = {
-  small: { id: 'small', name: 'Small-calibre rounds', plural: 'small rounds', label: 'Small rounds' },
-  medium: { id: 'medium', name: 'Autocannon rounds', plural: 'autocannon rounds', label: 'Autocannon rounds (Medium)' },
-  scatter: { id: 'scatter', name: 'Scatter shells', plural: 'scatter shells', label: 'Scatter shells' },
-  shell: { id: 'shell', name: 'Cannon shells', plural: 'cannon shells', label: 'Cannon shells' },
-  penetrator: { id: 'penetrator', name: 'Coilgun penetrators', plural: 'penetrators', label: 'Coilgun penetrators' },
-  rocket: { id: 'rocket', name: 'Offensive rockets', plural: 'rockets', label: 'Offensive rockets' },
-  interceptor: { id: 'interceptor', name: 'Interceptor rockets', plural: 'interceptor rockets', label: 'Interceptor rockets' },
-  missile: { id: 'missile', name: 'Guided heavy missiles', plural: 'missiles', label: 'Guided heavy missiles' },
+  small: { id: 'small', name: '7.62×51mm', unit: 'rounds', label: '7.62×51mm' },
+  medium: { id: 'medium', name: '25×137mm', unit: 'rounds', label: '25×137mm' },
+  scatter: { id: 'scatter', name: '12-gauge Buckshot', unit: 'shells', label: '12-gauge Buckshot' },
+  shell: { id: 'shell', name: '120mm AP', unit: 'shells', label: '120mm AP' },
+  penetrator: { id: 'penetrator', name: '30mm Tungsten Penetrator', unit: 'penetrators', label: '30mm Tungsten Penetrator' },
+  rocket: { id: 'rocket', name: '70mm HE Rocket', unit: 'rockets', label: '70mm HE Rocket' },
+  interceptor: { id: 'interceptor', name: '70mm Interceptor', unit: 'interceptors', label: '70mm Interceptor' },
+  missile: { id: 'missile', name: '150mm Guided Missile', unit: 'missiles', label: '150mm Guided Missile' },
 };
+
+/** "400 × 25×137mm": a quantity of one family. */
+export const ammoCount = (n: number, t: AmmoType): string => `${n} × ${AMMO_TYPES[t].label}`;
 
 /** How a projectile moves and what it does on arrival. */
 export type ProjectileKind = 'bullet' | 'pellet' | 'slug' | 'rocket' | 'interceptor' | 'missile';
@@ -400,7 +409,7 @@ export const COMPONENTS: ComponentDef[] = [
     armor: 7,
     profile: 0.32,
     description: 'Fires ten physical pellets per shell in a 5° cone. Devastating up close; pellets miss small targets at range.',
-    notes: 'Each pellet: 13 mm, 4 damage, losing both quickly with distance. Strong recoil and heat per blast. Uses scatter shells (Medium-Calibre Magazine, scatter payload).',
+    notes: 'Each pellet: 13 mm penetration, 4 damage, losing both quickly with distance. Strong recoil and heat per blast.',
     weapon: W({ caliber: 'medium', ammo: ['scatter'], cycleTime: 0.5, muzzleVelocity: 650, penetration: 13, damage: 4, magazine: 8, reloadTime: 3.2, spreadDeg: 0.8, recoilImpulse: 5200, heatPerShot: 5, traverseRate: 240, arcDeg: 240, projectileLife: 0.62, drag: 1.1, projectileRadius: 0.5, pellets: 10, pelletConeDeg: 5, power: 2 }),
   },
   // ---------------- Weapons: medium hardpoints ----------------
@@ -415,7 +424,7 @@ export const COMPONENTS: ComponentDef[] = [
     armor: 9,
     profile: 0.4,
     description: 'Four barrels firing in a staggered sequence: 1800 rounds per minute combined. Built to shred light, fast targets.',
-    notes: 'Same 9 mm round as the MG. Burns 30 rounds/s and runs hot. Damage below half integrity jams two barrels.',
+    notes: 'Same 7.62×51mm as the MG. Burns 30 rounds/s and runs hot. Damage below half integrity jams two barrels.',
     weapon: W({ caliber: 'small', ammo: ['small'], cycleTime: 1 / 30, muzzleVelocity: 1050, penetration: 9, damage: 4.5, magazine: 240, reloadTime: 5, spreadDeg: 2, recoilImpulse: 560, heatPerShot: 0.55, traverseRate: 380, arcDeg: 280, projectileLife: 0.8, power: 5, barrels: [-2.1, -0.7, 0.7, 2.1], barrelOrder: [0, 2, 1, 3] }),
   },
   {
@@ -429,7 +438,7 @@ export const COMPONENTS: ComponentDef[] = [
     armor: 12,
     profile: 0.4,
     description: 'Multi-barrel medium cannon with a motor-driven barrel cluster. Spins up before firing; sustained fire needs cooling.',
-    notes: '0.7 s spin-up, 8 PU/s while spinning. 800 rounds per minute of 17 mm.',
+    notes: '0.7 s spin-up, 8 PU/s while spinning. 800 rounds per minute, 17 mm penetration.',
     weapon: W({ caliber: 'medium', ammo: ['medium'], cycleTime: 0.075, muzzleVelocity: 1050, penetration: 17, damage: 7, magazine: 120, reloadTime: 5, spreadDeg: 1.8, recoilImpulse: 1300, heatPerShot: 1.5, traverseRate: 150, arcDeg: 240, projectileLife: 0.9, power: 6, spinUp: 0.7, spinPower: 8 }),
   },
   {
@@ -457,7 +466,7 @@ export const COMPONENTS: ComponentDef[] = [
     armor: 8,
     profile: 0.4,
     description: 'Six tubes of unguided rockets. Offensive rockets explode on impact; interceptor rockets seek and detonate near incoming rockets and missiles.',
-    notes: 'Load split is set per mount; switch with drone.selectAmmo(). Offensive: 36 mm direct, 38 damage, 15 splash in 35 u. Interceptors: proximity-fuzed, 320 u seeker, can miss.',
+    notes: 'Load split is set per mount; switch with drone.selectAmmo(). 70mm HE: 36 mm penetration direct, 38 damage, 15 splash in 35 u. Interceptors: proximity-fuzed, 320 u seeker, can miss.',
     weapon: W({ caliber: 'medium', ammo: ['rocket', 'interceptor'], cycleTime: 0.4, muzzleVelocity: 420, penetration: 36, damage: 38, magazine: 6, reloadTime: 4.5, spreadDeg: 1.4, recoilImpulse: 900, heatPerShot: 3, traverseRate: 120, arcDeg: 270, projectileLife: 1.9, drag: 0, projectileRadius: 1.4, power: 3, barrels: [-2, -1.2, -0.4, 0.4, 1.2, 2], barrelOrder: [0, 5, 1, 4, 2, 3], projectiles: { rocket: ROCKET, interceptor: INTERCEPTOR }, rangeHint: 1050 }),
   },
   // ---------------- Weapons: large hardpoints ----------------
@@ -472,7 +481,7 @@ export const COMPONENTS: ComponentDef[] = [
     armor: 40,
     profile: 0.45,
     description: 'Large-calibre gun. Defeats heavy armor; slow to traverse and reload, heavy recoil.',
-    notes: '100 mm, 120 damage per shell, one shell per 3.2 s. The greatest conventional single-shot impact; its shells can be shot down.',
+    notes: '100 mm penetration, 120 damage per shell, one shell per 3.2 s. The greatest conventional single-shot impact; its shells can be shot down.',
     weapon: W({ caliber: 'large', ammo: ['shell'], cycleTime: 0.2, muzzleVelocity: 780, penetration: 100, damage: 120, magazine: 1, reloadTime: 3.2, spreadDeg: 0.3, recoilImpulse: 60000, heatPerShot: 20, traverseRate: 55, arcDeg: 150, projectileLife: 1.7, drag: 0.12, ricochetDeg: 72, interceptable: true, integrity: 4, projectileRadius: 1, power: 10 }),
   },
   {
@@ -486,7 +495,7 @@ export const COMPONENTS: ComponentDef[] = [
     armor: 32,
     profile: 0.42,
     description: 'Electromagnetic gun: a 5 s charge cycle drawing 34 PU/s, then a 2200 u/s penetrator. Precise, flat, lower recoil than a cannon.',
-    notes: 'Charging uses real power: generators, batteries and capacitors decide whether it completes. Interrupted charges bleed 15%/s. 92 mm, 95 damage. Uses coilgun penetrators (Shell Rack, penetrator payload).',
+    notes: 'Charging uses real power: generators, batteries and capacitors decide whether it completes. Interrupted charges bleed 15%/s. 92 mm penetration, 95 damage.',
     weapon: W({ caliber: 'large', ammo: ['penetrator'], cycleTime: 0.2, muzzleVelocity: 2200, penetration: 92, damage: 95, magazine: 1, reloadTime: 5, spreadDeg: 0.15, recoilImpulse: 22000, heatPerShot: 26, traverseRate: 65, arcDeg: 150, projectileLife: 0.65, drag: 0.05, ricochetDeg: 74, projectileRadius: 1.4, power: 4, charge: { power: 34, bleedPerSecond: 0.15 } }),
   },
   {
@@ -500,7 +509,7 @@ export const COMPONENTS: ComponentDef[] = [
     armor: 20,
     profile: 0.45,
     description: 'Four guided heavy missiles, one every 0.8 s, then a 14 s reload. Missiles follow the target the drone can see and home with their own seeker.',
-    notes: '65 mm direct, 75 damage, 24 splash in 40 u. 95°/s turn limit; vulnerable to point defense and interceptor rockets. A reload consumes Missile Reserve stock.',
+    notes: '65 mm penetration direct, 75 damage, 24 splash in 40 u. 95°/s turn limit; vulnerable to point defense and interceptors. A reload consumes Missile Reserve stock.',
     weapon: W({ caliber: 'large', ammo: ['missile'], cycleTime: 0.8, muzzleVelocity: 420, penetration: 65, damage: 75, magazine: 4, reloadTime: 14, spreadDeg: 0.5, recoilImpulse: 1500, heatPerShot: 4, traverseRate: 75, arcDeg: 200, projectileLife: 5.5, drag: 0, projectileRadius: 2.2, power: 8, barrels: [-2.4, -0.8, 0.8, 2.4], barrelOrder: [0, 3, 1, 2], projectiles: { missile: MISSILE }, rangeHint: 1800 }),
   },
   // ---------------- Sensors ----------------
@@ -733,7 +742,7 @@ export const COMPONENTS: ComponentDef[] = [
     hp: 30,
     armor: 0,
     profile: 0,
-    description: '1500 small-calibre rounds (MG, Quad MG, point defense).',
+    description: '1500 × 7.62×51mm for the Machine Gun, Quad Machine Gun and Point Defense Gun.',
     ammo: { payloads: [{ type: 'small', rounds: 1500, cookOffPerRound: 0.02 }] },
   },
   {
@@ -746,7 +755,7 @@ export const COMPONENTS: ComponentDef[] = [
     hp: 30,
     armor: 0,
     profile: 0,
-    description: '400 autocannon rounds (Autocannon, Rotary, Dual Autocannon) — or, as a scatter payload, 60 scatter shells.',
+    description: '400 × 25×137mm for the Autocannon, Rotary Cannon and Dual Autocannon — or, set to buckshot, 60 × 12-gauge Buckshot for the Scatter Cannon. One payload at a time.',
     ammo: { payloads: [{ type: 'medium', rounds: 400, cookOffPerRound: 0.12 }, { type: 'scatter', rounds: 60, cookOffPerRound: 0.5 }] },
   },
   {
@@ -759,7 +768,7 @@ export const COMPONENTS: ComponentDef[] = [
     hp: 45,
     armor: 0,
     profile: 0,
-    description: '20 heavy cannon shells — or, as a penetrator payload, 24 coilgun penetrators. Shells cook off when destroyed.',
+    description: '20 × 120mm AP for the Heavy Cannon — or, set to penetrators, 24 × 30mm Tungsten Penetrator for the Coilgun. One payload at a time. AP shells cook off when destroyed.',
     ammo: { payloads: [{ type: 'shell', rounds: 20, cookOffPerRound: 9 }, { type: 'penetrator', rounds: 24, cookOffPerRound: 0.5 }] },
   },
   {
@@ -772,7 +781,7 @@ export const COMPONENTS: ComponentDef[] = [
     hp: 30,
     armor: 0,
     profile: 0,
-    description: '12 rockets for Rocket Pods, split between offensive and interceptor rockets when installed.',
+    description: '12 rockets for Rocket Pods, split between 70mm HE Rocket and 70mm Interceptor when installed.',
     ammo: { payloads: [{ type: 'rocket', rounds: 12, cookOffPerRound: 5 }], split: ['rocket', 'interceptor'] },
   },
   {
@@ -785,7 +794,7 @@ export const COMPONENTS: ComponentDef[] = [
     hp: 50,
     armor: 0,
     profile: 0,
-    description: '8 guided heavy missiles for the Missile Launcher. Violent cook-off if destroyed.',
+    description: '8 × 150mm Guided Missile for the Heavy Missile Launcher. Violent cook-off if destroyed.',
     ammo: { payloads: [{ type: 'missile', rounds: 8, cookOffPerRound: 14 }] },
   },
 ];

@@ -1,7 +1,7 @@
 // Ammunition compatibility shown in the interface must be derived from the equipment data and
 // agree with what the simulation actually loads and reloads.
 import { describe, expect, it } from 'vitest';
-import { COMPONENTS, getComponent } from '../../src/sim/content/components';
+import { AMMO_TYPES, COMPONENTS, ammoCount, getComponent } from '../../src/sim/content/components';
 import { carried, payloadOptions, requirementOf, storageMatch, weaponAmmo, moduleSupplies, ammoLabel } from '../../src/sim/ammoCompat';
 import { ammoReserve } from '../../src/sim/systems';
 import { hasErrors, parseDesign, validateDesign, type MountDesign } from '../../src/sim/design';
@@ -13,17 +13,17 @@ const MODULES = COMPONENTS.filter((c) => c.ammo);
 
 /** Your table, checked against what the data produces (the UI shows the derived values). */
 const EXPECTED: Record<string, { requires: string; storage: string }> = {
-  mg: { requires: 'Small rounds', storage: 'Small-Calibre Magazine' },
-  autocannon: { requires: 'Autocannon rounds (Medium)', storage: 'Medium-Calibre Magazine' },
-  point_defense: { requires: 'Small rounds', storage: 'Small-Calibre Magazine' },
-  scatter: { requires: 'Scatter shells', storage: 'Medium-Calibre Magazine, scatter shells payload' },
-  quad_mg: { requires: 'Small rounds', storage: 'Small-Calibre Magazine' },
-  rotary_cannon: { requires: 'Autocannon rounds (Medium)', storage: 'Medium-Calibre Magazine' },
-  dual_autocannon: { requires: 'Autocannon rounds (Medium)', storage: 'Medium-Calibre Magazine' },
-  rocket_pod: { requires: 'Offensive rockets / Interceptor rockets', storage: 'Rocket Cassette' },
-  heavy_cannon: { requires: 'Cannon shells', storage: 'Shell Rack' },
-  coilgun: { requires: 'Coilgun penetrators', storage: 'Shell Rack, penetrators payload' },
-  missile_launcher: { requires: 'Guided heavy missiles', storage: 'Missile Reserve' },
+  mg: { requires: '7.62×51mm', storage: 'Small-Calibre Magazine' },
+  autocannon: { requires: '25×137mm', storage: 'Medium-Calibre Magazine' },
+  point_defense: { requires: '7.62×51mm', storage: 'Small-Calibre Magazine' },
+  scatter: { requires: '12-gauge Buckshot', storage: 'Medium-Calibre Magazine set to 12-gauge Buckshot' },
+  quad_mg: { requires: '7.62×51mm', storage: 'Small-Calibre Magazine' },
+  rotary_cannon: { requires: '25×137mm', storage: 'Medium-Calibre Magazine' },
+  dual_autocannon: { requires: '25×137mm', storage: 'Medium-Calibre Magazine' },
+  rocket_pod: { requires: '70mm HE Rocket / 70mm Interceptor', storage: 'Rocket Cassette' },
+  heavy_cannon: { requires: '120mm AP', storage: 'Shell Rack' },
+  coilgun: { requires: '30mm Tungsten Penetrator', storage: 'Shell Rack set to 30mm Tungsten Penetrator' },
+  missile_launcher: { requires: '150mm Guided Missile', storage: 'Missile Reserve' },
 };
 
 const front = (slots: Record<string, MountDesign>) =>
@@ -36,7 +36,7 @@ describe('labels come from the equipment data', () => {
       const r = requirementOf(w)!;
       expect(r.types, w.id).toEqual(w.weapon!.ammo);
       expect(r.label, w.id).toBe(EXPECTED[w.id].requires);
-      expect(r.storageShort, w.id).toBe(EXPECTED[w.id].storage);
+      expect(r.storageLabel, w.id).toBe(EXPECTED[w.id].storage);
     }
   });
 
@@ -55,10 +55,10 @@ describe('labels come from the equipment data', () => {
     ]);
   });
 
-  it('4. the Autocannon is a small hardpoint that is explicitly fed Medium ammunition', () => {
+  it('4. the Autocannon fires 25×137mm from a Medium-Calibre Magazine; internal ids are unchanged', () => {
     const ac = getComponent('autocannon');
-    expect(ac.size).toBe('S');
-    expect(requirementOf(ac)!.label).toBe('Autocannon rounds (Medium)');
+    expect(ac.weapon!.ammo).toEqual(['medium']);
+    expect(requirementOf(ac)!.label).toBe('25×137mm');
     expect(requirementOf(ac)!.storage.map((o) => o.def.id)).toEqual(['ammo_medium']);
   });
 });
@@ -115,8 +115,7 @@ describe('warnings, not restrictions', () => {
     const issues = validateDesign(d);
     const w = issues.find((i) => i.code === 'no-ammo-storage')!;
     expect(w.severity).toBe('warning');
-    expect(w.message).toContain('Autocannon F.H1 has 35 rounds loaded but no compatible reserve ammunition');
-    expect(w.message).toContain('Install a Medium-Calibre Magazine set to Autocannon rounds (Medium)');
+    expect(w.message).toBe('Autocannon F.H1 has 35 rounds loaded but no 25×137mm in reserve, so it cannot reload. Install a Medium-Calibre Magazine to enable reloads.');
     expect(hasErrors(issues)).toBe(false);
     // the simulation agrees: exactly the loaded magazine, then no reload
     const sim = makeSim([{ design: d, program: code(`function update(){ drone.aim('F.H1', 0); drone.fire('F.H1'); }`), team: 0, x: 300, y: 550, angle: 0 }]);
@@ -131,11 +130,29 @@ describe('warnings, not restrictions', () => {
   it('a magazine on the wrong payload is named, with the payload that would fix it', () => {
     const d = front({ H1: m('autocannon'), I1: { component: 'ammo_medium', rotation: 0, payload: 'scatter' } });
     const issues = validateDesign(d);
-    expect(issues.find((i) => i.code === 'no-ammo-storage')!.message).toContain('F.I1 Medium-Calibre Magazine is set to Scatter shells: set it to Autocannon rounds (Medium)');
+    expect(issues.find((i) => i.code === 'no-ammo-storage')!.message).toContain('F.I1 Medium-Calibre Magazine is set to 12-gauge Buckshot: set it to 25×137mm.');
     const mis = issues.find((i) => i.code === 'ammo-misconfigured')!;
     expect(mis.severity).toBe('warning');
-    expect(mis.message).toContain('F.H1 needs Autocannon rounds (Medium)');
+    expect(mis.message).toContain('F.H1 needs 25×137mm');
     expect(hasErrors(issues)).toBe(false);
+  });
+});
+
+describe('designations', () => {
+  it('every family has its conventional designation; ids, magazines and balance are untouched', () => {
+    expect(Object.fromEntries(Object.values(AMMO_TYPES).map((a) => [a.id, a.label]))).toEqual({
+      small: '7.62×51mm',
+      medium: '25×137mm',
+      scatter: '12-gauge Buckshot',
+      shell: '120mm AP',
+      penetrator: '30mm Tungsten Penetrator',
+      rocket: '70mm HE Rocket',
+      interceptor: '70mm Interceptor',
+      missile: '150mm Guided Missile',
+    });
+    expect(ammoCount(400, 'medium')).toBe('400 × 25×137mm');
+    expect(getComponent('ammo_medium').ammo!.payloads.map((p) => [p.type, p.rounds])).toEqual([['medium', 400], ['scatter', 60]]);
+    expect(getComponent('shell_rack').ammo!.payloads.map((p) => [p.type, p.rounds])).toEqual([['shell', 20], ['penetrator', 24]]);
   });
 });
 
@@ -164,6 +181,6 @@ describe('agrees with the simulation', () => {
     const back = parseDesign(JSON.parse(JSON.stringify(d)));
     expect(back.sections.front.slots).toEqual(d.sections.front.slots);
     for (const d0 of DEFAULT_DESIGNS) expect(parseDesign(JSON.parse(JSON.stringify(d0))).sections).toEqual(d0.sections);
-    expect(ammoLabel('medium')).toBe('Autocannon rounds (Medium)');
+    expect(ammoLabel('medium')).toBe('25×137mm');
   });
 });

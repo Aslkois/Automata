@@ -19,7 +19,7 @@ A drone is laid out along its forward axis as **rear | middle | front**. Section
 
 ### Hardpoint layouts
 
-Each section independently chooses one of three hardpoint layouts (design schema 4) and can mirror it: left/right (schema 5) or front/back (schema 6). Internal bays are the same in every layout. Smaller equipment fits larger mounts; each part occupies one mount.
+Each section independently chooses one of three hardpoint layouts (design schema 4) and can mirror it (schema 7). Internal bays are the same in every layout. Smaller equipment fits larger mounts; each part occupies one mount.
 
 | Class | Maximum | Medium | Minimum |
 | --- | --- | --- | --- |
@@ -39,17 +39,13 @@ Each section independently chooses one of three hardpoint layouts (design schema
 
 ### Mirroring
 
-**Mirror layout** (in the section's properties) reflects that section's hardpoints across the drone's long axis: (x, y) → (x, −y). Left and right swap; front and rear do not.
-- Each section mirrors independently. The setting is saved per section (`mirror: true`) and survives export, import and duplication. Designs from before schema 5 load unmirrored.
-- Every part keeps its slot id, component and settings, so programs that address `F.H1` keep working. Hardpoint facings are reflected (r → −r; dead ahead and astern stay), so a turret, sensor or shield faces the mirror direction.
+**Mirror layout** (in the section's properties) flips that section's hardpoint arrangement across the section's own vertical centreline: local (x, y) → (−x, y), or in drone coordinates x′ = 2 × section centre − x. On the construction stage, where the sections run rear → middle → front from left to right, the section's mounts swap left and right. For example, heavy Maximum's two large mounts move from the forward half to the aft half and its medium mount comes forward. Nothing moves up or down, and no other section changes.
+- Each section has its own toggle, saved per section (`mirror: true`) through export, import and duplication. Designs from before schema 7 load unmirrored.
+- Every part keeps its slot id, component, settings and facing, so programs that address `F.H1` keep working and a forward gun stays forward.
 - It is real geometry. The simulation places each mount from the same slot list the constructor draws (`sectionSlots`), so firing origins, arcs, recoil arms, centre of mass, hit locations, shields and sensors all move with it. Validation, obstruction and load are recomputed.
 - Pressing it again restores the section exactly.
-- The button mirrors left/right only for the layouts that are lopsided that way: light Maximum (M + S), medium Maximum (L + S) and heavy Medium (L + M + M).
-- **Front/back.** Every other layout is already its own left/right image, so the same button mirrors it front/back instead. It flips across the section's lateral axis, (x, y) → (−x, y), so forward mounts move to the rear and rear ones forward. This applies to light and medium Minimum, medium Medium, and heavy Maximum and Minimum. It is saved as `flip: true` (schema 6).
-  - Facings are kept: guns still point where they pointed. A strict reflection would turn every forward gun to face the rear.
-  - Slot ids and settings are unchanged, and a second press undoes it.
-- Light Medium (two mounts on the centre line) is symmetrical both ways; its button is disabled and says so.
-- After a layout change, a mirror left on the other axis stays and gets its own button, so it can be undone.
+- Light Medium has both mounts on the centreline; mirroring would change nothing, so its button is disabled and says so. Every other layout changes.
+- **Saves from schema 5 and 6** used two earlier mirrors. A schema-6 front/back flip was this same transformation and becomes `mirror`. The schema-5/6 long-axis mirror is undone on load, including the turret facings it had reflected.
 - Internal bays belong to the section class, not the layout, and do not move.
 
 ## Load ratings
@@ -131,11 +127,11 @@ Weapons, ammunition, recoil and heat are described in [WEAPONS.md](WEAPONS.md).
 | Spall Liner | M internal | 230 | −30% damage to internal equipment in its section after penetration and from blast fragments |
 | Reinforced Coupling | M internal | 180 | −35% damage to one adjacent joint (in the middle section: choose front or rear) |
 | Fire Suppression System | S internal | 75 | 3 charges; puts out fires in its own and adjacent sections after 0.5 s, or on `drone.suppressFire()` |
-| Small-Calibre Magazine | S internal | 110 | 1500 small rounds |
-| Medium-Calibre Magazine | S internal | 140 | 400 autocannon rounds **or** 60 scatter shells |
-| Shell Rack | M internal | 260 | 20 cannon shells **or** 24 coilgun penetrators |
-| Rocket Cassette | S internal | 110 | 12 rockets, split between offensive and interceptor |
-| Missile Reserve | M internal | 220 | 8 heavy missiles |
+| Small-Calibre Magazine | S internal | 110 | 1500 × 7.62×51mm |
+| Medium-Calibre Magazine | S internal | 140 | 400 × 25×137mm **or** 60 × 12-gauge Buckshot |
+| Shell Rack | M internal | 260 | 20 × 120mm AP **or** 24 × 30mm Tungsten Penetrator |
+| Rocket Cassette | S internal | 110 | 12 rockets, split between 70mm HE Rocket and 70mm Interceptor |
+| Missile Reserve | M internal | 220 | 8 × 150mm Guided Missile |
 
 ### Mount configuration
 
@@ -151,27 +147,26 @@ The properties surface shows only the settings that apply to the selected part:
 
 These settings are saved with the design.
 
-### Ammunition compatibility
+### Ammunition
 
-A weapon's hardpoint size and its ammunition family are different things: an Autocannon is a small hardpoint that feeds on Medium rounds. Every label below is generated from the equipment data: `WeaponStats.ammo`, the storage modules' payloads, and `AMMO_TYPES`.
+Each family has a conventional designation. The names come from `AMMO_TYPES` and the compatibility from `WeaponStats.ammo` and the storage modules' payloads. Internal ids (`small`, `medium`, …) are unchanged, so saves, payload settings and `drone.selectAmmo()` work as before.
 
-| Weapon | Requires | Storage |
+| Ammo | Weapons | Storage |
 | --- | --- | --- |
-| Machine Gun, Point Defense Gun, Quad Machine Gun | Small rounds | Small-Calibre Magazine |
-| Autocannon, Rotary Cannon, Dual Autocannon | Autocannon rounds (Medium) | Medium-Calibre Magazine (default payload) |
-| Scatter Cannon | Scatter shells | Medium-Calibre Magazine set to scatter shells |
-| Rocket Pod | Offensive rockets / Interceptor rockets | Rocket Cassette (configurable split) |
-| Heavy Cannon | Cannon shells | Shell Rack (default payload) |
-| Coilgun | Coilgun penetrators | Shell Rack set to penetrators |
-| Heavy Missile Launcher | Guided heavy missiles | Missile Reserve |
+| 7.62×51mm | Machine Gun, Point Defense Gun, Quad Machine Gun | Small-Calibre Magazine |
+| 25×137mm | Autocannon, Rotary Cannon, Dual Autocannon | Medium-Calibre Magazine |
+| 12-gauge Buckshot | Scatter Cannon | Medium-Calibre Magazine set to 12-gauge Buckshot |
+| 120mm AP | Heavy Cannon | Shell Rack |
+| 30mm Tungsten Penetrator | Coilgun | Shell Rack set to 30mm Tungsten Penetrator |
+| 70mm HE Rocket, 70mm Interceptor | Rocket Pod | Rocket Cassette (configurable split) |
+| 150mm Guided Missile | Heavy Missile Launcher | Missile Reserve |
 
-- A module holds one payload at a time. A Medium-Calibre Magazine set to scatter shells does not supply autocannons, and a Shell Rack set to penetrators does not supply the Heavy Cannon.
-- Every weapon deploys with a full magazine, reserve or not. Reserves are shared across the drone: any working module supplies every weapon that accepts its family. A reload starts only if some accepted family has reserve left.
-- Where it is shown:
-  - **Tray cards**: REQUIRES and STORAGE on weapons, HOLDS and FEEDS on storage.
-  - **Tray matching**: with a weapon or magazine selected, each card says whether it feeds it, would feed it with another payload, or never does, and which matching modules are installed. Each state differs by icon, outline and wording, not only colour.
-  - **Properties**: an installed weapon shows its requirement and supply state under its name, then its starting load, reserve, matching modules, the weapons sharing them, endurance and what to fix. A module shows what it holds now and which installed weapons that feeds.
-  - **Simulate**: the spectator lists each weapon's requirement and marks *no reserve* or *out of ammo*.
+Real-world names are used where they fit; the 120mm AP, 30mm Tungsten Penetrator and 150mm Guided Missile are fictional specifications. The penetration figures in weapon stats are armour penetration, not calibre.
+
+- A module holds one payload at a time. A Medium-Calibre Magazine set to buckshot does not supply 25×137mm, and a Shell Rack set to penetrators does not supply 120mm AP.
+- Every weapon deploys with a full magazine, reserve or not. Reserves are shared across the drone; a reload starts only if a compatible family has reserve left.
+- Tray cards show one line: *Ammo: 25×137mm* on weapons, *Holds: 400 × 25×137mm* on storage.
+- Weapon properties list the ammo, the storage module, what is loaded and what is in reserve. Storage properties show the configured payload and the installed weapons it feeds.
 
 ## Validation
 
@@ -188,7 +183,7 @@ A weapon's hardpoint size and its ammunition family are different things: an Aut
 - always-on or peak power demand above supply;
 - coilgun charging the power supply cannot meet;
 - firing arcs fully or partly obstructed;
-- a weapon with no compatible reserve: it fires what it is loaded with, then cannot reload. The message names the storage and payload it needs, or the installed module that would feed it if set to another payload;
+- a weapon with no compatible reserve: it fires what it is loaded with, then cannot reload. The message names the storage it needs, or the installed module set to another payload;
 - a magazine set to a payload no installed weapon fires, when another weapon needs a different payload from it;
 - a Reinforced Coupling in the middle section with no joint chosen;
 - recoil above the section's mount rating.

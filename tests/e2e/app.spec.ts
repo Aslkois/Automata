@@ -262,41 +262,40 @@ test('component artwork: own icons in the tray, models on the stage and in the s
   expect(empty).toBe(0);
 });
 
-test('ammunition: requirement on cards and the selected weapon, matching storage highlighted, warning without blocking', async ({ page }) => {
+test('ammunition: caliber designations on cards and in properties, storage named, warning without blocking', async ({ page }) => {
   await page.getByTestId('drone-switcher').click();
   await page.getByRole('button', { name: 'New drone' }).click();
   await go(page, 'Construct');
   const lib = page.getByRole('list', { name: 'Equipment library' });
-  // every weapon card states its ammunition before anything is installed
-  await expect(page.getByTestId('ammo-req-autocannon')).toContainText('Autocannon rounds (Medium)');
-  await expect(page.getByTestId('ammo-req-autocannon')).toContainText('Medium-Calibre Magazine');
-  await expect(page.getByTestId('ammo-req-coilgun')).toContainText('Shell Rack, penetrators payload');
+  // one understated line per card
+  await expect(page.getByTestId('ammo-req-autocannon')).toHaveText('Ammo: 25×137mm');
+  await expect(page.getByTestId('ammo-req-coilgun')).toHaveText('Ammo: 30mm Tungsten Penetrator');
+  await expect(page.getByTestId('ammo-feeds-ammo_medium')).toHaveText('Holds: 400 × 25×137mm');
   await page.getByTestId('slot-F.H3').click();
   await lib.getByRole('listitem', { name: 'Autocannon', exact: true }).click();
   await page.getByTestId('slot-F.H3').click();
-  await expect(page.getByTestId('ammo-requires')).toHaveText('Autocannon rounds (Medium)');
+  await expect(page.getByTestId('ammo-requires')).toHaveText('25×137mm');
   await expect(page.getByTestId('ammo-storage')).toHaveText('Medium-Calibre Magazine');
-  await expect(page.getByTestId('ammo-state')).toContainText('No compatible reserve · 35 loaded');
-  // storage cards relate to the selected weapon in words
+  await expect(page.getByTestId('ammo-reserve')).toHaveText('none');
   await page.getByRole('tab', { name: 'Ammunition' }).click();
-  await expect(page.getByTestId('ammo-match-ammo_medium')).toContainText('Feeds Autocannon');
-  await expect(page.getByTestId('ammo-match-shell_rack')).toContainText('Not for Autocannon');
+  await expect(page.getByTestId('ammo-match-ammo_medium')).toContainText('Holds 25×137mm');
   // a caution, still deployable
   await expect(page.getByTestId('issues-toggle')).toContainText('deployable');
   await expect(page.getByRole('button', { name: 'Test' })).toBeEnabled();
 });
 
-test('mirror layout: moves the real mount positions, keeps the parts, reverses on a second press', async ({ page }) => {
+test('mirror layout: flips the mounts across the section centreline, keeps the parts, other sections untouched', async ({ page }) => {
   await page.getByTestId('drone-switcher').click();
   await page.getByRole('button', { name: 'New drone' }).click();
   await go(page, 'Construct');
-  await page.getByTestId('section-front').click();
-  await page.getByTestId('layout-pick-front').getByTestId('layout-max').click();
-  const cy = async (id: string) => {
-    const b = (await page.getByTestId(id).boundingBox())!;
-    return b.y + b.height / 2;
+  // the mount footprint itself (a part's model overhangs it, so the slot's box is not centred)
+  const at = async (id: string) => {
+    const b = (await page.getByTestId(id).locator('.mount-ring, .body').first().boundingBox())!;
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
   };
-  const before = { h1: await cy('slot-F.H1'), h2: await cy('slot-F.H2') };
+  await page.getByTestId('section-front').click();
+  const ids = ['slot-F.H1', 'slot-F.H2', 'slot-F.H3', 'slot-M.H1', 'slot-M.H3'];
+  const before = Object.fromEntries(await Promise.all(ids.map(async (i) => [i, await at(i)] as const)));
   const mirror = page.getByTestId('mirror-front');
   await expect(mirror).toHaveAttribute('aria-pressed', 'false');
   // keyboard: the control is a button
@@ -304,34 +303,25 @@ test('mirror layout: moves the real mount positions, keeps the parts, reverses o
   await page.keyboard.press('Enter');
   await expect(mirror).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('mirrored-front')).toBeVisible();
-  const after = { h1: await cy('slot-F.H1'), h2: await cy('slot-F.H2') };
-  // the large mount and the small one change sides; the guns stay in their own slots
-  expect(Math.sign(after.h1 - after.h2)).toBe(-Math.sign(before.h1 - before.h2));
+  const after = Object.fromEntries(await Promise.all(ids.map(async (i) => [i, await at(i)] as const)));
+  // medium Medium front: [ M M ] forward, [ M ] aft — mirrored, the single mount is forward
+  expect(before['slot-F.H3'].x).toBeLessThan(before['slot-F.H1'].x);
+  expect(after['slot-F.H3'].x).toBeGreaterThan(after['slot-F.H1'].x);
+  // reflected about the section's own centre; nothing moves up or down
+  const centre = (before['slot-F.H1'].x + after['slot-F.H1'].x) / 2;
+  expect((before['slot-F.H3'].x + after['slot-F.H3'].x) / 2).toBeCloseTo(centre, 0);
+  for (const i of ['slot-F.H1', 'slot-F.H2', 'slot-F.H3']) expect(after[i].y).toBeCloseTo(before[i].y, 0);
+  // the middle section is untouched; the guns keep their slots
+  for (const i of ['slot-M.H1', 'slot-M.H3']) expect([after[i].x, after[i].y]).toEqual([before[i].x, before[i].y]);
   await expect(page.getByTestId('slot-F.H1')).toHaveAttribute('aria-label', /Machine Gun/);
   await expect(page.getByTestId('slot-F.H2')).toHaveAttribute('aria-label', /Machine Gun/);
   await mirror.click();
   await expect(mirror).toHaveAttribute('aria-pressed', 'false');
-  expect(await cy('slot-F.H1')).toBeCloseTo(before.h1, 0);
-  // a left/right-symmetrical layout mirrors front/back instead: its rear mount comes forward
-  await page.getByTestId('layout-pick-front').getByTestId('layout-medium').click();
-  const cx = async (id: string) => {
-    const b = (await page.getByTestId(id).boundingBox())!;
-    return b.x + b.width / 2;
-  };
-  const h3 = await cx('slot-F.H3');
-  const h1 = await cx('slot-F.H1');
-  expect(h3).toBeLessThan(h1);
-  await expect(mirror).toHaveAttribute('data-axis', 'front-back');
-  await expect(mirror).toContainText('Mirror front/back');
-  await mirror.click();
-  await expect(page.getByTestId('flipped-front')).toBeVisible();
-  expect(await cx('slot-F.H3')).toBeGreaterThan(await cx('slot-F.H1'));
-  await mirror.click();
-  expect(await cx('slot-F.H3')).toBeCloseTo(h3, 0);
-  // a layout symmetrical both ways cannot be mirrored into anything different
+  expect((await at('slot-F.H3')).x).toBeCloseTo(before['slot-F.H3'].x, 0);
+  // light Medium: both mounts on the centreline, nothing to mirror
   await page.getByTestId('section-rear').click();
   await expect(page.getByTestId('mirror-rear')).toBeDisabled();
-  await expect(page.getByTestId('mirror-note-rear')).toContainText('symmetrical both ways');
+  await expect(page.getByTestId('mirror-note-rear')).toContainText('already symmetrical');
 });
 
 test.describe('touch phone', () => {
@@ -366,14 +356,14 @@ test.describe('touch phone', () => {
     await expect(page.getByTestId('inspector')).toHaveCount(0);
   });
 
-  test('ammunition requirement is the first thing shown for a weapon on a phone; slot-first install works', async ({ page }) => {
+  test('slot-first install by touch, and the weapon shows its storage', async ({ page }) => {
     await page.getByTestId('drone-switcher').tap();
     await page.getByRole('button', { name: 'New drone' }).tap();
     await go(page, 'Construct');
     await page.getByTestId('slot-F.H3').tap();
     await page.getByRole('button', { name: 'Show compatible equipment' }).tap();
     await page.getByRole('list', { name: 'Equipment library' }).getByRole('listitem', { name: 'Autocannon', exact: true }).tap();
-    await expect(page.getByTestId('ammo-requires')).toBeInViewport();
+    await expect(page.getByTestId('properties')).toContainText('Autocannon');
     await expect(page.getByTestId('ammo-storage')).toHaveText('Medium-Calibre Magazine');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });

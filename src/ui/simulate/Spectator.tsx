@@ -199,7 +199,7 @@ export function Spectator({ sim, drone: d, onClose, onSelect, sheet = 'half', se
                         {mixed && (
                           <span className="muted small" title="Loaded by type; the selected type fires next">
                             {' '}
-                            · {w.ammo.map((t) => `${t === ws.selected ? '▸' : ''}${ws.loaded[t] ?? 0} ${AMMO_TYPES[t].plural}`).join(' ')}
+                            · {w.ammo.map((t) => `${t === ws.selected ? '▸' : ''}${ws.loaded[t] ?? 0} ${AMMO_TYPES[t].label}`).join(' ')}
                           </span>
                         )}
                         {w.fireModes && w.fireModes.length > 1 && <span className="muted small"> · {ws.fireMode}</span>}

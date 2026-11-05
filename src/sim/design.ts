@@ -1,6 +1,6 @@
 // Drone design schema (versioned), geometry layout, derived statistics and validation.
 // Designs are pure data; `buildDrone` (drone.ts) turns a design into runtime state.
-import { LEGACY_LAYOUT, SCHEMA3_LAYOUT, layoutSymmetric, layoutSymmetricFrontBack } from './content/sections';
+import { LEGACY_LAYOUT, SCHEMA3_LAYOUT, layoutSymmetric } from './content/sections';
 import { loadState, ratedEquipment as ratedEquipment_, type LoadState } from './load';
 import { CHASSIS, CHASSIS_TYPES, GRAVITY, type ChassisType } from './content/chassis';
 import { INTEGRATED_MASS, integratedParts } from './content/integrated';
@@ -21,13 +21,13 @@ import {
   type SlotDef,
 } from './content/sections';
 import { DEG, segmentBox, type Vec2 } from './math';
-import { ammoLabel, carried, installedModules, moduleSupplies, storageText, weaponAmmo } from './ammoCompat';
+import { ammoCount, ammoLabel, carried, installedModules, moduleSupplies, weaponAmmo } from './ammoCompat';
 
 /**
  * 1: original. 2: drive motors and control units integrated (removed from slots).
  * 3: hardpoint layouts per section, mount configuration, AA autocannon -> Autocannon.
  */
-export const DESIGN_SCHEMA_VERSION = 6;
+export const DESIGN_SCHEMA_VERSION = 7;
 
 export interface MountDesign {
   component: string;
@@ -50,15 +50,11 @@ export interface SectionDesign {
   armor: number;
   slots: Record<string, MountDesign | null>;
   /**
-   * The hardpoint layout is mirrored left/right (schema 5). Present only when true, so
-   * unmirrored designs serialise exactly as before.
+   * The hardpoint arrangement is mirrored across this section's vertical centreline:
+   * local (x, y) → (−x, y) (schema 7). Present only when true, so unmirrored designs
+   * serialise exactly as before.
    */
   mirror?: boolean;
-  /**
-   * The hardpoint layout is flipped front/back across the section's lateral axis (schema 6),
-   * offered for layouts that are already left/right symmetrical. Present only when true.
-   */
-  flip?: boolean;
 }
 
 export interface DroneDesign {
@@ -90,8 +86,8 @@ export function layoutSections(d: Pick<DroneDesign, 'sections'>): Record<Section
 }
 
 /** Slots of a section of a design (its class and hardpoint layout). */
-export const slotsOf = (sd: Pick<SectionDesign, 'class' | 'layout' | 'mirror' | 'flip'>): SlotDef[] => sectionSlots(sd.class, sd.layout ?? 'medium', !!sd.mirror, !!sd.flip);
-export const slotOf = (sd: Pick<SectionDesign, 'class' | 'layout' | 'mirror' | 'flip'>, id: string): SlotDef | undefined => slotsOf(sd).find((s) => s.id === id);
+export const slotsOf = (sd: Pick<SectionDesign, 'class' | 'layout' | 'mirror'>): SlotDef[] => sectionSlots(sd.class, sd.layout ?? 'medium', !!sd.mirror);
+export const slotOf = (sd: Pick<SectionDesign, 'class' | 'layout' | 'mirror'>, id: string): SlotDef | undefined => slotsOf(sd).find((s) => s.id === id);
 
 export interface MountInfo {
   /** e.g. "F.H1" */
@@ -630,7 +626,7 @@ export function validateDesign(d: DroneDesign, stats = computeStats(d)): Issue[]
   }
   for (const [t, secs] of Object.entries(stats.ammoEndurance) as [AmmoType, number][])
     if (secs < 20)
-      issues.push({ severity: 'info', code: 'ammo-endurance', message: `${ammoLabel(t)}: about ${Math.round(secs)} s of continuous fire for every weapon using them, magazines and stores included.` });
+      issues.push({ severity: 'info', code: 'ammo-endurance', message: `${ammoLabel(t)}: about ${Math.round(secs)} s of continuous fire for every weapon using it, magazines and stores included.` });
   for (const w of stats.weapons) {
     if (w.usableFraction === 0)
       issues.push({ severity: 'warning', code: 'weapon-obstructed', message: `${w.mount} ${w.name}: entire firing arc is obstructed by taller sections.`, mount: w.mount });
@@ -638,33 +634,34 @@ export function validateDesign(d: DroneDesign, stats = computeStats(d)): Issue[]
       issues.push({ severity: 'warning', code: 'weapon-obstructed', message: `${w.mount} ${w.name}: ${Math.round((1 - w.usableFraction) * 100)}% of the firing arc is obstructed.`, mount: w.mount });
   }
   // ammunition: derived from the equipment data (see ammoCompat); warnings, never refusals
+  const holdsText = (def: ComponentDef, config: MountDesign) => carried(def, config).map((c) => ammoLabel(c.type)).join(' and ') || 'nothing';
   for (const st of weaponAmmo(d)) {
     const w = st.def.weapon!;
     if (st.status === 'loaded-only') {
       const fix = st.misconfigured.length
-        ? ` ${st.misconfigured.map((x) => `${x.module.mount} ${x.module.def.name} is set to ${carried(x.module.def, x.module.config).map((c) => ammoLabel(c.type)).join(' and ') || 'nothing'}`).join('; ')}: set it to ${ammoLabel(st.misconfigured[0].needs)} to supply this weapon.`
-        : ` Install ${st.requirement.storage.map((o) => `a ${storageText(o)}`).filter((t, i, a) => a.indexOf(t) === i).join(' or ')} to enable reloads.`;
+        ? ` ${st.misconfigured.map((x) => `${x.module.mount} ${x.module.def.name} is set to ${holdsText(x.module.def, x.module.config)}`).join('; ')}: set it to ${ammoLabel(st.misconfigured[0].needs)}.`
+        : ` Install a ${st.requirement.storageLabel} to enable reloads.`;
       issues.push({
         severity: 'warning',
         code: 'no-ammo-storage',
-        message: `${st.def.name} ${st.mount} has ${st.loadedTotal} ${st.loadedTotal === 1 ? 'round' : 'rounds'} loaded but no compatible reserve ammunition, so it cannot reload: it needs ${st.requirement.label}.${fix}`,
+        message: `${st.def.name} ${st.mount} has ${st.loadedTotal} ${st.loadedTotal === 1 ? 'round' : 'rounds'} loaded but no ${st.requirement.label} in reserve, so it cannot reload.${fix}`,
         mount: st.mount,
       });
     } else if (w.ammo.includes('missile') && st.reserveTotal < w.magazine)
-      issues.push({ severity: 'info', code: 'low-missile-reserve', message: `${st.mount} ${st.def.name}: only ${st.reserveTotal} reserve missiles, less than one reload of ${w.magazine}.`, mount: st.mount });
+      issues.push({ severity: 'info', code: 'low-missile-reserve', message: `${st.mount} ${st.def.name}: only ${ammoCount(st.reserveTotal, 'missile')} in reserve, less than one reload of ${w.magazine}.`, mount: st.mount });
     for (const t of st.unreplenished)
-      issues.push({ severity: 'info', code: 'unreplenished-ammo', message: `${st.mount} ${st.def.name}: starts with ${st.loaded[t]} ${AMMO_TYPES[t].plural} but none are stored, so reloads refill it with ${st.requirement.types.filter((x) => (st.reserve[x] ?? 0) > 0).map((x) => AMMO_TYPES[x].plural).join(' and ')} instead.`, mount: st.mount });
+      issues.push({ severity: 'info', code: 'unreplenished-ammo', message: `${st.mount} ${st.def.name}: starts with ${ammoCount(st.loaded[t] ?? 0, t)} but none in storage, so reloads refill it with ${st.requirement.types.filter((x) => (st.reserve[x] ?? 0) > 0).map(ammoLabel).join(' and ')}.`, mount: st.mount });
     if (w.ammo.includes('interceptor') && (st.reserve.interceptor ?? 0) + (st.loaded.interceptor ?? 0) <= 0)
-      issues.push({ severity: 'info', code: 'no-interceptors', message: `${st.mount} ${st.def.name}: no interceptor rockets loaded or stored, so it cannot shoot down missiles. Set an interceptor split on the pod or a Rocket Cassette.`, mount: st.mount });
+      issues.push({ severity: 'info', code: 'no-interceptors', message: `${st.mount} ${st.def.name}: no ${ammoLabel('interceptor')} loaded or stored, so it cannot shoot down missiles. Set an interceptor split on the pod or a Rocket Cassette.`, mount: st.mount });
   }
   for (const mod of installedModules(d)) {
     const { feeds, couldFeed } = moduleSupplies(d, mod.mount);
     if (feeds.length) continue;
-    const holds = carried(mod.def, mod.config).map((c) => ammoLabel(c.type)).join(' and ') || 'nothing';
+    const holds = holdsText(mod.def, mod.config);
     issues.push(
       couldFeed.length
-        ? { severity: 'warning', code: 'ammo-misconfigured', message: `${mod.mount} ${mod.def.name} is set to ${holds}, which no installed weapon fires. ${couldFeed.map((x) => x.mount).join(', ')} ${couldFeed.length > 1 ? 'need' : 'needs'} ${ammoLabel(couldFeed[0].needs)}: change its payload to supply ${couldFeed.length > 1 ? 'them' : 'it'}.`, mount: mod.mount }
-        : { severity: 'info', code: 'ammo-unused', message: `${mod.mount} ${mod.def.name} (${holds}): no installed weapon uses this ammunition.`, mount: mod.mount },
+        ? { severity: 'warning', code: 'ammo-misconfigured', message: `${mod.mount} ${mod.def.name} is set to ${holds}, which no installed weapon fires. ${couldFeed.map((x) => x.mount).join(', ')} ${couldFeed.length > 1 ? 'need' : 'needs'} ${ammoLabel(couldFeed[0].needs)}.`, mount: mod.mount }
+        : { severity: 'info', code: 'ammo-unused', message: `${mod.mount} ${mod.def.name} (${holds}): no installed weapon uses it.`, mount: mod.mount },
     );
   }
   for (const pos of SECTION_POSITIONS) {
@@ -698,7 +695,7 @@ export interface LayoutChange {
 export function relocateSection(sd: SectionDesign, cls: SectionClass, layout: LayoutId): LayoutChange {
   const oldSlots = slotsOf(sd);
   // a mirrored section stays mirrored through class and layout changes
-  const newSlots = sectionSlots(cls, layout, !!sd.mirror, !!sd.flip);
+  const newSlots = sectionSlots(cls, layout, !!sd.mirror);
   const taken = new Set<string>();
   const out: Record<string, MountDesign | null> = {};
   const moved: [string, string][] = [];
@@ -729,62 +726,28 @@ export function relocateSection(sd: SectionDesign, cls: SectionClass, layout: La
   return { slots: out, moved, displaced };
 }
 
-/** A reflected facing (degrees, hull frame): left and right swap; dead ahead and astern stay. */
+/** A facing reflected across the drone's long axis (degrees): used only to undo the schema-5 mirror. */
 const reflectFacing = (deg: number) => (deg === 0 || Math.abs(deg) === 180 ? deg : -deg);
 
 /**
- * Mirror a section's hardpoint layout left/right, or undo it. Every part keeps its slot id,
- * component and settings; the slot moves to its mirror position and turrets, sensors and
- * shields on hardpoints get the mirror facing, so a mirrored section fires and sees as the
- * reflection of the original. Applying it twice restores the section exactly.
+ * Mirror a section's hardpoint arrangement across its vertical centreline, or undo it.
+ * Only the mount positions change (local x → −x); every part keeps its slot id, component,
+ * settings and facing — a forward gun stays forward. Applying it twice restores the section.
  */
 export function mirrorSection(sd: SectionDesign): SectionDesign {
-  const hard = new Set(sectionSlots(sd.class, sd.layout ?? 'medium').filter((s) => s.kind === 'hardpoint').map((s) => s.id));
-  const slots: Record<string, MountDesign | null> = {};
-  for (const [id, m] of Object.entries(sd.slots)) slots[id] = m && hard.has(id) ? { ...m, rotation: reflectFacing(m.rotation) } : m;
-  const out: SectionDesign = { ...sd, slots };
+  const out: SectionDesign = { ...sd, slots: { ...sd.slots } };
   if (sd.mirror) delete out.mirror;
   else out.mirror = true;
   return out;
 }
 
 /**
- * Flip a section's hardpoint layout front/back across its lateral axis, or undo it. Slot ids,
- * parts, settings and facings are unchanged: the mounts move, the guns still point where they
- * pointed (a strict reflection would turn every forward gun to face the rear). Applying it
- * twice restores the section exactly.
- */
-export function flipSection(sd: SectionDesign): SectionDesign {
-  const out: SectionDesign = { ...sd, slots: { ...sd.slots } };
-  if (sd.flip) delete out.flip;
-  else out.flip = true;
-  return out;
-}
-
-export type MirrorAxis = 'left-right' | 'front-back';
-
-/** Apply (or undo) the mirror on one axis. */
-export const mirrorOn = (sd: SectionDesign, axis: MirrorAxis): SectionDesign => (axis === 'left-right' ? mirrorSection(sd) : flipSection(sd));
-
-/**
- * The mirror the constructor offers for a layout: left/right, unless the layout is already
- * left/right symmetrical — then front/back, which still moves its mounts. A layout symmetrical
- * both ways (null) has nothing to mirror.
- */
-export function mirrorAxisFor(sd: Pick<SectionDesign, 'class' | 'layout'>): MirrorAxis | null {
-  const l = sd.layout ?? 'medium';
-  if (!layoutSymmetric(sd.class, l)) return 'left-right';
-  if (!layoutSymmetricFrontBack(sd.class, l)) return 'front-back';
-  return null;
-}
-
-/**
- * What mirroring a section on an axis would do, for the constructor's control:
- * - 'none': nothing would change;
- * - 'swap': the layout keeps its shape on that axis, but parts change places;
+ * What mirroring a section would do, for the constructor's control:
+ * - 'none': nothing would change (the layout is its own mirror image and its parts would not move);
+ * - 'swap': the layout keeps its shape, but parts change places;
  * - 'reshape': the arrangement reverses.
  */
-export function mirrorEffect(sd: SectionDesign, axis: MirrorAxis = 'left-right'): 'none' | 'swap' | 'reshape' {
+export function mirrorEffect(sd: SectionDesign): 'none' | 'swap' | 'reshape' {
   // the physical arrangement: every mount (size, place) and what sits on it (id, part, facing)
   const arrangement = (x: SectionDesign) =>
     slotsOf(x)
@@ -795,9 +758,8 @@ export function mirrorEffect(sd: SectionDesign, axis: MirrorAxis = 'left-right')
       })
       .sort()
       .join('|');
-  if (arrangement(sd) === arrangement(mirrorOn(sd, axis))) return 'none';
-  const l = sd.layout ?? 'medium';
-  return (axis === 'left-right' ? layoutSymmetric(sd.class, l) : layoutSymmetricFrontBack(sd.class, l)) ? 'swap' : 'reshape';
+  if (arrangement(sd) === arrangement(mirrorSection(sd))) return 'none';
+  return layoutSymmetric(sd.class, sd.layout ?? 'medium') ? 'swap' : 'reshape';
 }
 
 // ---------------------------------------------------------------- serialization
@@ -874,10 +836,20 @@ export function parseDesign(json: string | unknown): DroneDesign {
       slots[k] = m;
     }
     sections[pos] = { class: cls, layout, armor: typeof s.armor === 'number' ? s.armor : 0, slots };
-    // schema 5: per-section mirroring; anything earlier (or a missing flag) is unmirrored
-    if (schema >= 5 && s.mirror === true) sections[pos].mirror = true;
-    // schema 6: front/back flip
-    if (schema >= 6 && s.flip === true) sections[pos].flip = true;
+    if (schema >= 7) {
+      if (s.mirror === true) sections[pos].mirror = true;
+    } else {
+      // schema 5–6 had a different mirror: `mirror` reflected across the drone's long axis and
+      // reflected turret facings with it. That mirror no longer exists, so it is undone (the
+      // facings it changed are restored and the mounts return to the plain layout).
+      if (schema >= 5 && s.mirror === true)
+        for (const h of sectionSlots(cls, layout).filter((x) => x.kind === 'hardpoint')) {
+          const m = slots[h.id];
+          if (m) m.rotation = reflectFacing(m.rotation);
+        }
+      // schema 6's `flip` was exactly today's mirror: across the section's vertical centreline
+      if (schema >= 6 && s.flip === true) sections[pos].mirror = true;
+    }
   }
   return {
     schema: DESIGN_SCHEMA_VERSION,
