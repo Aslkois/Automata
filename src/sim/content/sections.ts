@@ -175,8 +175,24 @@ export const SCHEMA3_LAYOUT: Record<SectionClass, Record<LayoutId, LayoutId>> = 
 };
 
 /** All slots (layout hardpoints + class internal bays) for a section. */
-export function sectionSlots(cls: SectionClass, layout: LayoutId = 'medium'): SlotDef[] {
+/**
+ * A section's slots. `mirror` reflects the hardpoint layout across the drone's longitudinal
+ * axis, (x, y) → (x, −y): left and right swap, front and rear do not. Slot ids, sizes and
+ * the internal bays (fixed per class) are unchanged. Every consumer of mount positions —
+ * the simulation, validation, the constructor and the renderers — takes them from here.
+ */
+export function sectionSlots(cls: SectionClass, layout: LayoutId = 'medium', mirror = false): SlotDef[] {
   const c = SECTION_CLASSES[cls];
   const l = LAYOUTS[cls]?.[layout] ?? LAYOUTS[cls].medium;
-  return [...l.hardpoints, ...c.slots.filter((s) => s.kind === 'internal')];
+  const hard = mirror ? l.hardpoints.map((h) => ({ ...h, y: h.y === 0 ? 0 : -h.y })) : l.hardpoints;
+  return [...hard, ...c.slots.filter((s) => s.kind === 'internal')];
+}
+
+/** The layout is its own mirror image (same sizes at the same places, whichever ids sit there). */
+export function layoutSymmetric(cls: SectionClass, layout: LayoutId): boolean {
+  const hs = (LAYOUTS[cls]?.[layout] ?? LAYOUTS[cls].medium).hardpoints;
+  const key = (size: SlotSize, x: number, y: number) => `${size}:${x.toFixed(3)}:${y.toFixed(3)}`;
+  const a = hs.map((h) => key(h.size, h.x, h.y)).sort();
+  const b = hs.map((h) => key(h.size, h.x, h.y === 0 ? 0 : -h.y)).sort();
+  return a.every((k, i) => k === b[i]);
 }

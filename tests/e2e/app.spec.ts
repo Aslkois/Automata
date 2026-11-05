@@ -286,6 +286,38 @@ test('ammunition: requirement on cards and the selected weapon, matching storage
   await expect(page.getByRole('button', { name: 'Test' })).toBeEnabled();
 });
 
+test('mirror layout: moves the real mount positions, keeps the parts, reverses on a second press', async ({ page }) => {
+  await page.getByTestId('drone-switcher').click();
+  await page.getByRole('button', { name: 'New drone' }).click();
+  await go(page, 'Construct');
+  await page.getByTestId('section-front').click();
+  await page.getByTestId('layout-pick-front').getByTestId('layout-max').click();
+  const cy = async (id: string) => {
+    const b = (await page.getByTestId(id).boundingBox())!;
+    return b.y + b.height / 2;
+  };
+  const before = { h1: await cy('slot-F.H1'), h2: await cy('slot-F.H2') };
+  const mirror = page.getByTestId('mirror-front');
+  await expect(mirror).toHaveAttribute('aria-pressed', 'false');
+  // keyboard: the control is a button
+  await mirror.focus();
+  await page.keyboard.press('Enter');
+  await expect(mirror).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('mirrored-front')).toBeVisible();
+  const after = { h1: await cy('slot-F.H1'), h2: await cy('slot-F.H2') };
+  // the large mount and the small one change sides; the guns stay in their own slots
+  expect(Math.sign(after.h1 - after.h2)).toBe(-Math.sign(before.h1 - before.h2));
+  await expect(page.getByTestId('slot-F.H1')).toHaveAttribute('aria-label', /Machine Gun/);
+  await expect(page.getByTestId('slot-F.H2')).toHaveAttribute('aria-label', /Machine Gun/);
+  await mirror.click();
+  await expect(mirror).toHaveAttribute('aria-pressed', 'false');
+  expect(await cy('slot-F.H1')).toBeCloseTo(before.h1, 0);
+  // a symmetrical, empty layout cannot be mirrored into anything different
+  await page.getByTestId('section-rear').click();
+  await expect(page.getByTestId('mirror-rear')).toBeDisabled();
+  await expect(page.getByTestId('mirror-note-rear')).toContainText('already symmetrical');
+});
+
 test.describe('touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   test('every workspace is usable by touch', async ({ page }) => {
@@ -327,6 +359,18 @@ test.describe('touch phone', () => {
     await page.getByRole('list', { name: 'Equipment library' }).getByRole('listitem', { name: 'Autocannon', exact: true }).tap();
     await expect(page.getByTestId('ammo-requires')).toBeInViewport();
     await expect(page.getByTestId('ammo-storage')).toHaveText('Medium-Calibre Magazine');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test('mirror layout by touch', async ({ page }) => {
+    await page.getByTestId('drone-switcher').tap();
+    await page.getByRole('button', { name: 'New drone' }).tap();
+    await go(page, 'Construct');
+    await page.getByTestId('section-front').tap();
+    await page.getByTestId('layout-pick-front').getByTestId('layout-max').tap();
+    await page.getByTestId('mirror-front').tap();
+    await expect(page.getByTestId('mirror-front')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('mirrored-front')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 

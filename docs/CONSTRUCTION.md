@@ -19,7 +19,7 @@ A drone is laid out along its forward axis as **rear | middle | front**. Section
 
 ### Hardpoint layouts
 
-Each section independently chooses one of three hardpoint layouts (design schema 4). Internal bays are the same in every layout. Smaller equipment fits larger mounts; each part occupies one mount.
+Each section independently chooses one of three hardpoint layouts (design schema 4) and can mirror it (schema 5). Internal bays are the same in every layout. Smaller equipment fits larger mounts; each part occupies one mount.
 
 | Class | Maximum | Medium | Minimum |
 | --- | --- | --- | --- |
@@ -36,6 +36,17 @@ Each section independently chooses one of three hardpoint layouts (design schema
 
   Every target layout has the same mount ids at the same or larger size, so nothing is removed. A part that somehow did not fit would stay in the design, flagged, until you move it.
 - **Changing class or layout** in Construct keeps each part in its slot when it still fits, otherwise moves it to the nearest free compatible slot. Parts that fit nowhere are listed and you are asked first. Undo restores the previous version.
+
+### Mirroring
+
+**Mirror layout** (in the section's properties) reflects that section's hardpoints across the drone's long axis: (x, y) → (x, −y). Left and right swap; front and rear do not.
+- Each section mirrors independently. The setting is saved per section (`mirror: true`) and survives export, import and duplication. Designs from before schema 5 load unmirrored.
+- Every part keeps its slot id, component and settings, so programs that address `F.H1` keep working. Hardpoint facings are reflected (r → −r; dead ahead and astern stay), so a turret, sensor or shield faces the mirror direction.
+- It is real geometry. The simulation places each mount from the same slot list the constructor draws (`sectionSlots`), so firing origins, arcs, recoil arms, centre of mass, hit locations, shields and sensors all move with it. Validation, obstruction and load are recomputed.
+- Pressing it again restores the section exactly.
+- A layout that is its own mirror image (every Medium and Minimum layout, and heavy Maximum) keeps its shape; mirroring moves each part to the opposite side. When nothing would change (no part off the centreline and no part turned sideways), the control is disabled and says why.
+- The asymmetrical layouts are light Maximum (M + S), medium Maximum (L + S) and heavy Medium (L + M + M).
+- Internal bays belong to the section class, not the layout, and do not move.
 
 ## Load ratings
 
@@ -136,6 +147,28 @@ The properties surface shows only the settings that apply to the selected part:
 
 These settings are saved with the design.
 
+### Ammunition compatibility
+
+A weapon's hardpoint size and its ammunition family are different things: an Autocannon is a small hardpoint that feeds on Medium rounds. Every label below is generated from the equipment data: `WeaponStats.ammo`, the storage modules' payloads, and `AMMO_TYPES`.
+
+| Weapon | Requires | Storage |
+| --- | --- | --- |
+| Machine Gun, Point Defense Gun, Quad Machine Gun | Small rounds | Small-Calibre Magazine |
+| Autocannon, Rotary Cannon, Dual Autocannon | Autocannon rounds (Medium) | Medium-Calibre Magazine (default payload) |
+| Scatter Cannon | Scatter shells | Medium-Calibre Magazine set to scatter shells |
+| Rocket Pod | Offensive rockets / Interceptor rockets | Rocket Cassette (configurable split) |
+| Heavy Cannon | Cannon shells | Shell Rack (default payload) |
+| Coilgun | Coilgun penetrators | Shell Rack set to penetrators |
+| Heavy Missile Launcher | Guided heavy missiles | Missile Reserve |
+
+- A module holds one payload at a time. A Medium-Calibre Magazine set to scatter shells does not supply autocannons, and a Shell Rack set to penetrators does not supply the Heavy Cannon.
+- Every weapon deploys with a full magazine, reserve or not. Reserves are shared across the drone: any working module supplies every weapon that accepts its family. A reload starts only if some accepted family has reserve left.
+- Where it is shown:
+  - **Tray cards**: REQUIRES and STORAGE on weapons, HOLDS and FEEDS on storage.
+  - **Tray matching**: with a weapon or magazine selected, each card says whether it feeds it, would feed it with another payload, or never does, and which matching modules are installed. Each state differs by icon, outline and wording, not only colour.
+  - **Properties**: an installed weapon shows its requirement and supply state under its name, then its starting load, reserve, matching modules, the weapons sharing them, endurance and what to fix. A module shows what it holds now and which installed weapons that feeds.
+  - **Simulate**: the spectator lists each weapon's requirement and marks *no reserve* or *out of ammo*.
+
 ## Validation
 
 **Errors** (block deployment) are only for things that cannot physically be built or read:
@@ -151,7 +184,8 @@ These settings are saved with the design.
 - always-on or peak power demand above supply;
 - coilgun charging the power supply cannot meet;
 - firing arcs fully or partly obstructed;
-- a weapon with no storage for its ammunition family (the message names the store it needs);
+- a weapon with no compatible reserve: it fires what it is loaded with, then cannot reload. The message names the storage and payload it needs, or the installed module that would feed it if set to another payload;
+- a magazine set to a payload no installed weapon fires, when another weapon needs a different payload from it;
 - a Reinforced Coupling in the middle section with no joint chosen;
 - recoil above the section's mount rating.
 
@@ -161,6 +195,8 @@ These settings are saved with the design.
 - a weapon that would overheat within 12 s of continuous fire where it is mounted;
 - ammunition for less than 20 s of continuous fire;
 - a rocket pod with no interceptors;
+- a rocket pod that starts with interceptors but has none stored (reloads use offensive rockets);
+- ammunition storage that no installed weapon uses;
 - fewer reserve missiles than one launcher reload;
 - an idle or extra autoloader;
 - no weapons yet.

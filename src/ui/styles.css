@@ -2098,6 +2098,33 @@ input[type='range'] {
 .chip-btn.dashed {
   border-style: dashed;
 }
+.asm-mirror {
+  display: inline-flex;
+  opacity: 0.8;
+}
+.mirror-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 4px;
+}
+.mirror-row p {
+  margin: 0;
+  flex: 1;
+}
+.mirror-btn {
+  flex: none;
+  min-height: 40px;
+}
+.btn.mirror-btn.on,
+.btn.mirror-btn.on:hover:not(:disabled) {
+  background: var(--graphite);
+  color: var(--ivory);
+  border-color: var(--graphite);
+}
+.btn.mirror-btn.on:hover:not(:disabled) {
+  background: var(--carbon);
+}
 .ammo-line {
   display: block;
   font-size: 11px;

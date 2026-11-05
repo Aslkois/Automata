@@ -1,6 +1,6 @@
 // Drone design schema (versioned), geometry layout, derived statistics and validation.
 // Designs are pure data; `buildDrone` (drone.ts) turns a design into runtime state.
-import { LEGACY_LAYOUT, SCHEMA3_LAYOUT } from './content/sections';
+import { LEGACY_LAYOUT, SCHEMA3_LAYOUT, layoutSymmetric } from './content/sections';
 import { loadState, ratedEquipment as ratedEquipment_, type LoadState } from './load';
 import { CHASSIS, CHASSIS_TYPES, GRAVITY, type ChassisType } from './content/chassis';
 import { INTEGRATED_MASS, integratedParts } from './content/integrated';
@@ -27,7 +27,7 @@ import { ammoLabel, carried, installedModules, moduleSupplies, storageText, weap
  * 1: original. 2: drive motors and control units integrated (removed from slots).
  * 3: hardpoint layouts per section, mount configuration, AA autocannon -> Autocannon.
  */
-export const DESIGN_SCHEMA_VERSION = 4;
+export const DESIGN_SCHEMA_VERSION = 5;
 
 export interface MountDesign {
   component: string;
@@ -49,6 +49,11 @@ export interface SectionDesign {
   layout: LayoutId;
   armor: number;
   slots: Record<string, MountDesign | null>;
+  /**
+   * The hardpoint layout is mirrored left/right (schema 5). Present only when true, so
+   * unmirrored designs serialise exactly as before.
+   */
+  mirror?: boolean;
 }
 
 export interface DroneDesign {
@@ -80,8 +85,8 @@ export function layoutSections(d: Pick<DroneDesign, 'sections'>): Record<Section
 }
 
 /** Slots of a section of a design (its class and hardpoint layout). */
-export const slotsOf = (sd: Pick<SectionDesign, 'class' | 'layout'>): SlotDef[] => sectionSlots(sd.class, sd.layout ?? 'medium');
-export const slotOf = (sd: Pick<SectionDesign, 'class' | 'layout'>, id: string): SlotDef | undefined => slotsOf(sd).find((s) => s.id === id);
+export const slotsOf = (sd: Pick<SectionDesign, 'class' | 'layout' | 'mirror'>): SlotDef[] => sectionSlots(sd.class, sd.layout ?? 'medium', !!sd.mirror);
+export const slotOf = (sd: Pick<SectionDesign, 'class' | 'layout' | 'mirror'>, id: string): SlotDef | undefined => slotsOf(sd).find((s) => s.id === id);
 
 export interface MountInfo {
   /** e.g. "F.H1" */
@@ -687,7 +692,8 @@ export interface LayoutChange {
  */
 export function relocateSection(sd: SectionDesign, cls: SectionClass, layout: LayoutId): LayoutChange {
   const oldSlots = slotsOf(sd);
-  const newSlots = sectionSlots(cls, layout);
+  // a mirrored section stays mirrored through class and layout changes
+  const newSlots = sectionSlots(cls, layout, !!sd.mirror);
   const taken = new Set<string>();
   const out: Record<string, MountDesign | null> = {};
   const moved: [string, string][] = [];
@@ -716,6 +722,46 @@ export function relocateSection(sd: SectionDesign, cls: SectionClass, layout: La
     else displaced.push({ slot: id, mount: m });
   }
   return { slots: out, moved, displaced };
+}
+
+/** A reflected facing (degrees, hull frame): left and right swap; dead ahead and astern stay. */
+const reflectFacing = (deg: number) => (deg === 0 || Math.abs(deg) === 180 ? deg : -deg);
+
+/**
+ * Mirror a section's hardpoint layout left/right, or undo it. Every part keeps its slot id,
+ * component and settings; the slot moves to its mirror position and turrets, sensors and
+ * shields on hardpoints get the mirror facing, so a mirrored section fires and sees as the
+ * reflection of the original. Applying it twice restores the section exactly.
+ */
+export function mirrorSection(sd: SectionDesign): SectionDesign {
+  const hard = new Set(sectionSlots(sd.class, sd.layout ?? 'medium').filter((s) => s.kind === 'hardpoint').map((s) => s.id));
+  const slots: Record<string, MountDesign | null> = {};
+  for (const [id, m] of Object.entries(sd.slots)) slots[id] = m && hard.has(id) ? { ...m, rotation: reflectFacing(m.rotation) } : m;
+  const out: SectionDesign = { ...sd, slots };
+  if (sd.mirror) delete out.mirror;
+  else out.mirror = true;
+  return out;
+}
+
+/**
+ * What mirroring a section would do, for the constructor's control:
+ * - 'none': nothing would change (every mount and facing on the centreline);
+ * - 'swap': the layout is symmetrical, so its shape stays, but parts change sides;
+ * - 'reshape': an asymmetrical layout whose arrangement reverses.
+ */
+export function mirrorEffect(sd: SectionDesign): 'none' | 'swap' | 'reshape' {
+  // the physical arrangement: every mount (size, place) and what sits on it (id, part, facing)
+  const arrangement = (x: SectionDesign) =>
+    slotsOf(x)
+      .filter((s) => s.kind === 'hardpoint')
+      .map((s) => {
+        const m = x.slots[s.id];
+        return `${s.size}:${s.x.toFixed(3)}:${s.y.toFixed(3)}:${m ? `${s.id}/${m.component}/${m.rotation}` : ''}`;
+      })
+      .sort()
+      .join('|');
+  if (arrangement(sd) === arrangement(mirrorSection(sd))) return 'none';
+  return layoutSymmetric(sd.class, sd.layout ?? 'medium') ? 'swap' : 'reshape';
 }
 
 // ---------------------------------------------------------------- serialization
@@ -792,6 +838,8 @@ export function parseDesign(json: string | unknown): DroneDesign {
       slots[k] = m;
     }
     sections[pos] = { class: cls, layout, armor: typeof s.armor === 'number' ? s.armor : 0, slots };
+    // schema 5: per-section mirroring; anything earlier (or a missing flag) is unmirrored
+    if (schema >= 5 && s.mirror === true) sections[pos].mirror = true;
   }
   return {
     schema: DESIGN_SCHEMA_VERSION,

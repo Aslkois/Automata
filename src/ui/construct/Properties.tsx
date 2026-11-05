@@ -1,8 +1,8 @@
 // The properties surface: appears for a selected slot or section only.
 import { useEffect, useRef, useState } from 'react';
 import { AMMO_TYPES, COMPONENT_MAP, type AmmoType, type ComponentDef } from '../../sim/content/components';
-import { LAYOUT_IDS, LAYOUTS, SECTION_CLASSES, SECTION_LETTER, SLOT_HALF, type LayoutId, type SectionClass, type SectionPos } from '../../sim/content/sections';
-import { moduleStock, mountId, mountRating, mountRecoil, relocateSection, secondsToOverheat, slotOf, slotsOf, type DesignStats, type DroneDesign, type LayoutChange, type MountDesign } from '../../sim/design';
+import { LAYOUT_IDS, LAYOUTS, SECTION_CLASSES, SECTION_LETTER, SLOT_HALF, sectionSlots, type LayoutId, type SectionClass, type SectionPos } from '../../sim/content/sections';
+import { mirrorEffect, mirrorSection, moduleStock, mountId, mountRating, mountRecoil, relocateSection, secondsToOverheat, slotOf, slotsOf, type DesignStats, type DroneDesign, type LayoutChange, type MountDesign, type SectionDesign } from '../../sim/design';
 import { weaponRange } from '../../sim/ammo';
 import { fmt, Icon, Meter, Prop } from '../common';
 import { PartIcon, PartPreview } from '../parts';
@@ -314,9 +314,9 @@ function SlotProps({ design, stats, pos, slotId, update, install, onBrowse, onMo
 }
 
 /** Miniature of a section with a layout's hardpoints, drawn to scale. */
-function LayoutPreview({ cls, layout }: { cls: SectionClass; layout: LayoutId }) {
+function LayoutPreview({ cls, layout, mirror = false }: { cls: SectionClass; layout: LayoutId; mirror?: boolean }) {
   const c = SECTION_CLASSES[cls];
-  const L = LAYOUTS[cls][layout];
+  const L = { hardpoints: sectionSlots(cls, layout, mirror).filter((h) => h.kind === 'hardpoint') };
   const pad = 2;
   return (
     <svg className="layout-preview" viewBox={`${-c.length / 2 - pad} ${-c.width / 2 - pad} ${c.length + pad * 2} ${c.width + pad * 2}`} aria-hidden="true">
@@ -330,6 +330,37 @@ function LayoutPreview({ cls, layout }: { cls: SectionClass; layout: LayoutId })
         </g>
       ))}
     </svg>
+  );
+}
+
+/** Mirror the section's hardpoint layout left/right: one press, reversible, applied at once. */
+function MirrorControl({ sd, pos, update }: { sd: SectionDesign; pos: SectionPos; update: Props['update'] }) {
+  const effect = mirrorEffect(sd);
+  const on = !!sd.mirror;
+  const note =
+    effect === 'none'
+      ? 'This arrangement is already symmetrical: mirroring would give the same drone.'
+      : effect === 'swap'
+        ? 'Symmetrical layout: mirroring keeps its shape and moves each part to the opposite side.'
+        : on
+          ? 'Mirrored: the arrangement is reversed left to right.'
+          : 'Reverse the arrangement left to right.';
+  return (
+    <div className="mirror-row">
+      <button
+        className={`btn mirror-btn ${on ? 'on' : ''}`}
+        aria-pressed={on}
+        disabled={effect === 'none' && !on}
+        onClick={() => update((d) => (d.sections[pos] = mirrorSection(d.sections[pos])), `${on ? 'unmirror' : 'mirror'} ${pos} layout`)}
+        data-testid={`mirror-${pos}`}
+        title="Swap the left and right mounting positions. Parts keep their slots and settings; turrets get the mirrored facing."
+      >
+        <Icon name="mirror" /> {on ? 'Mirrored' : 'Mirror layout'}
+      </button>
+      <p className="muted small" data-testid={`mirror-note-${pos}`}>
+        {note}
+      </p>
+    </div>
   );
 }
 
@@ -348,7 +379,7 @@ function SectionProps({ design, stats, pos, update, onSelect }: Props & { pos: S
     update(
       (d) => {
         const s = d.sections[pos];
-        d.sections[pos] = { class: c, layout: l, armor: Math.min(s.armor, SECTION_CLASSES[c].maxArmor), slots: change.slots };
+        d.sections[pos] = { class: c, layout: l, armor: Math.min(s.armor, SECTION_CLASSES[c].maxArmor), slots: change.slots, ...(s.mirror ? { mirror: true } : {}) };
       },
       `${pos} section to ${SECTION_CLASSES[c].name.toLowerCase()}, ${LAYOUTS[c][l].name} layout`,
     );
@@ -388,7 +419,7 @@ function SectionProps({ design, stats, pos, update, onSelect }: Props & { pos: S
           const lost = lostFor(sd.class, l);
           return (
             <button key={l} role="radio" aria-checked={layout === l} className={layout === l ? 'on' : ''} onClick={() => change(sd.class, l)} data-testid={`layout-${l}`}>
-              <LayoutPreview cls={sd.class} layout={l} />
+              <LayoutPreview cls={sd.class} layout={l} mirror={!!sd.mirror} />
               <b>{L.name}</b>
               <small>{L.summary}</small>
               <small className="num">
@@ -400,6 +431,7 @@ function SectionProps({ design, stats, pos, update, onSelect }: Props & { pos: S
           );
         })}
       </div>
+      <MirrorControl sd={sd} pos={pos} update={update} />
       {pending && (
         <div className="confirm" role="alertdialog" aria-label="Parts that will not fit" data-testid="layout-confirm" ref={confirmRef}>
           <p>
