@@ -1,6 +1,6 @@
 // Drone design schema (versioned), geometry layout, derived statistics and validation.
 // Designs are pure data; `buildDrone` (drone.ts) turns a design into runtime state.
-import { LEGACY_LAYOUT, SCHEMA3_LAYOUT, layoutSymmetric } from './content/sections';
+import { LEGACY_LAYOUT, SCHEMA3_LAYOUT, layoutSymmetric, layoutSymmetricFrontBack } from './content/sections';
 import { loadState, ratedEquipment as ratedEquipment_, type LoadState } from './load';
 import { CHASSIS, CHASSIS_TYPES, GRAVITY, type ChassisType } from './content/chassis';
 import { INTEGRATED_MASS, integratedParts } from './content/integrated';
@@ -27,7 +27,7 @@ import { ammoLabel, carried, installedModules, moduleSupplies, storageText, weap
  * 1: original. 2: drive motors and control units integrated (removed from slots).
  * 3: hardpoint layouts per section, mount configuration, AA autocannon -> Autocannon.
  */
-export const DESIGN_SCHEMA_VERSION = 5;
+export const DESIGN_SCHEMA_VERSION = 6;
 
 export interface MountDesign {
   component: string;
@@ -54,6 +54,11 @@ export interface SectionDesign {
    * unmirrored designs serialise exactly as before.
    */
   mirror?: boolean;
+  /**
+   * The hardpoint layout is flipped front/back across the section's lateral axis (schema 6),
+   * offered for layouts that are already left/right symmetrical. Present only when true.
+   */
+  flip?: boolean;
 }
 
 export interface DroneDesign {
@@ -85,8 +90,8 @@ export function layoutSections(d: Pick<DroneDesign, 'sections'>): Record<Section
 }
 
 /** Slots of a section of a design (its class and hardpoint layout). */
-export const slotsOf = (sd: Pick<SectionDesign, 'class' | 'layout' | 'mirror'>): SlotDef[] => sectionSlots(sd.class, sd.layout ?? 'medium', !!sd.mirror);
-export const slotOf = (sd: Pick<SectionDesign, 'class' | 'layout' | 'mirror'>, id: string): SlotDef | undefined => slotsOf(sd).find((s) => s.id === id);
+export const slotsOf = (sd: Pick<SectionDesign, 'class' | 'layout' | 'mirror' | 'flip'>): SlotDef[] => sectionSlots(sd.class, sd.layout ?? 'medium', !!sd.mirror, !!sd.flip);
+export const slotOf = (sd: Pick<SectionDesign, 'class' | 'layout' | 'mirror' | 'flip'>, id: string): SlotDef | undefined => slotsOf(sd).find((s) => s.id === id);
 
 export interface MountInfo {
   /** e.g. "F.H1" */
@@ -693,7 +698,7 @@ export interface LayoutChange {
 export function relocateSection(sd: SectionDesign, cls: SectionClass, layout: LayoutId): LayoutChange {
   const oldSlots = slotsOf(sd);
   // a mirrored section stays mirrored through class and layout changes
-  const newSlots = sectionSlots(cls, layout, !!sd.mirror);
+  const newSlots = sectionSlots(cls, layout, !!sd.mirror, !!sd.flip);
   const taken = new Set<string>();
   const out: Record<string, MountDesign | null> = {};
   const moved: [string, string][] = [];
@@ -744,12 +749,42 @@ export function mirrorSection(sd: SectionDesign): SectionDesign {
 }
 
 /**
- * What mirroring a section would do, for the constructor's control:
- * - 'none': nothing would change (every mount and facing on the centreline);
- * - 'swap': the layout is symmetrical, so its shape stays, but parts change sides;
- * - 'reshape': an asymmetrical layout whose arrangement reverses.
+ * Flip a section's hardpoint layout front/back across its lateral axis, or undo it. Slot ids,
+ * parts, settings and facings are unchanged: the mounts move, the guns still point where they
+ * pointed (a strict reflection would turn every forward gun to face the rear). Applying it
+ * twice restores the section exactly.
  */
-export function mirrorEffect(sd: SectionDesign): 'none' | 'swap' | 'reshape' {
+export function flipSection(sd: SectionDesign): SectionDesign {
+  const out: SectionDesign = { ...sd, slots: { ...sd.slots } };
+  if (sd.flip) delete out.flip;
+  else out.flip = true;
+  return out;
+}
+
+export type MirrorAxis = 'left-right' | 'front-back';
+
+/** Apply (or undo) the mirror on one axis. */
+export const mirrorOn = (sd: SectionDesign, axis: MirrorAxis): SectionDesign => (axis === 'left-right' ? mirrorSection(sd) : flipSection(sd));
+
+/**
+ * The mirror the constructor offers for a layout: left/right, unless the layout is already
+ * left/right symmetrical — then front/back, which still moves its mounts. A layout symmetrical
+ * both ways (null) has nothing to mirror.
+ */
+export function mirrorAxisFor(sd: Pick<SectionDesign, 'class' | 'layout'>): MirrorAxis | null {
+  const l = sd.layout ?? 'medium';
+  if (!layoutSymmetric(sd.class, l)) return 'left-right';
+  if (!layoutSymmetricFrontBack(sd.class, l)) return 'front-back';
+  return null;
+}
+
+/**
+ * What mirroring a section on an axis would do, for the constructor's control:
+ * - 'none': nothing would change;
+ * - 'swap': the layout keeps its shape on that axis, but parts change places;
+ * - 'reshape': the arrangement reverses.
+ */
+export function mirrorEffect(sd: SectionDesign, axis: MirrorAxis = 'left-right'): 'none' | 'swap' | 'reshape' {
   // the physical arrangement: every mount (size, place) and what sits on it (id, part, facing)
   const arrangement = (x: SectionDesign) =>
     slotsOf(x)
@@ -760,8 +795,9 @@ export function mirrorEffect(sd: SectionDesign): 'none' | 'swap' | 'reshape' {
       })
       .sort()
       .join('|');
-  if (arrangement(sd) === arrangement(mirrorSection(sd))) return 'none';
-  return layoutSymmetric(sd.class, sd.layout ?? 'medium') ? 'swap' : 'reshape';
+  if (arrangement(sd) === arrangement(mirrorOn(sd, axis))) return 'none';
+  const l = sd.layout ?? 'medium';
+  return (axis === 'left-right' ? layoutSymmetric(sd.class, l) : layoutSymmetricFrontBack(sd.class, l)) ? 'swap' : 'reshape';
 }
 
 // ---------------------------------------------------------------- serialization
@@ -840,6 +876,8 @@ export function parseDesign(json: string | unknown): DroneDesign {
     sections[pos] = { class: cls, layout, armor: typeof s.armor === 'number' ? s.armor : 0, slots };
     // schema 5: per-section mirroring; anything earlier (or a missing flag) is unmirrored
     if (schema >= 5 && s.mirror === true) sections[pos].mirror = true;
+    // schema 6: front/back flip
+    if (schema >= 6 && s.flip === true) sections[pos].flip = true;
   }
   return {
     schema: DESIGN_SCHEMA_VERSION,

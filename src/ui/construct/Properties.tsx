@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AMMO_TYPES, COMPONENT_MAP, type AmmoType, type ComponentDef } from '../../sim/content/components';
 import { LAYOUT_IDS, LAYOUTS, SECTION_CLASSES, SECTION_LETTER, SLOT_HALF, sectionSlots, type LayoutId, type SectionClass, type SectionPos } from '../../sim/content/sections';
-import { mirrorEffect, mirrorSection, moduleStock, mountId, mountRating, mountRecoil, relocateSection, secondsToOverheat, slotOf, slotsOf, type DesignStats, type DroneDesign, type LayoutChange, type MountDesign, type SectionDesign } from '../../sim/design';
+import { mirrorAxisFor, mirrorEffect, mirrorOn, moduleStock, type MirrorAxis, mountId, mountRating, mountRecoil, relocateSection, secondsToOverheat, slotOf, slotsOf, type DesignStats, type DroneDesign, type LayoutChange, type MountDesign, type SectionDesign } from '../../sim/design';
 import { weaponRange } from '../../sim/ammo';
 import { fmt, Icon, Meter, Prop } from '../common';
 import { PartIcon, PartPreview } from '../parts';
@@ -314,9 +314,9 @@ function SlotProps({ design, stats, pos, slotId, update, install, onBrowse, onMo
 }
 
 /** Miniature of a section with a layout's hardpoints, drawn to scale. */
-function LayoutPreview({ cls, layout, mirror = false }: { cls: SectionClass; layout: LayoutId; mirror?: boolean }) {
+function LayoutPreview({ cls, layout, mirror = false, flip = false }: { cls: SectionClass; layout: LayoutId; mirror?: boolean; flip?: boolean }) {
   const c = SECTION_CLASSES[cls];
-  const L = { hardpoints: sectionSlots(cls, layout, mirror).filter((h) => h.kind === 'hardpoint') };
+  const L = { hardpoints: sectionSlots(cls, layout, mirror, flip).filter((h) => h.kind === 'hardpoint') };
   const pad = 2;
   return (
     <svg className="layout-preview" viewBox={`${-c.length / 2 - pad} ${-c.width / 2 - pad} ${c.length + pad * 2} ${c.width + pad * 2}`} aria-hidden="true">
@@ -333,34 +333,70 @@ function LayoutPreview({ cls, layout, mirror = false }: { cls: SectionClass; lay
   );
 }
 
-/** Mirror the section's hardpoint layout left/right: one press, reversible, applied at once. */
+const AXIS_TEXT: Record<MirrorAxis, { off: string; on: string; reshape: string; mirrored: string; swap: string; icon: 'mirror' | 'flip' }> = {
+  'left-right': {
+    off: 'Mirror left/right',
+    on: 'Mirrored left/right',
+    reshape: 'Reverse the arrangement left to right.',
+    mirrored: 'Mirrored: the arrangement is reversed left to right.',
+    swap: 'Mirroring keeps the shape and moves each part to the opposite side.',
+    icon: 'mirror',
+  },
+  'front-back': {
+    off: 'Mirror front/back',
+    on: 'Mirrored front/back',
+    reshape: 'This layout is already symmetrical left to right, so it mirrors front to back: forward mounts move to the rear and back. Parts keep their facing.',
+    mirrored: 'Mirrored front/back: forward and rear mounts are swapped. Parts keep their facing.',
+    swap: 'Mirroring front to back keeps the shape and moves each part to the other end.',
+    icon: 'flip',
+  },
+};
+
+/** Mirror the section's hardpoint layout: one press, reversible, applied at once. */
 function MirrorControl({ sd, pos, update }: { sd: SectionDesign; pos: SectionPos; update: Props['update'] }) {
-  const effect = mirrorEffect(sd);
-  const on = !!sd.mirror;
-  const note =
-    effect === 'none'
-      ? 'This arrangement is already symmetrical: mirroring would give the same drone.'
-      : effect === 'swap'
-        ? 'Symmetrical layout: mirroring keeps its shape and moves each part to the opposite side.'
-        : on
-          ? 'Mirrored: the arrangement is reversed left to right.'
-          : 'Reverse the arrangement left to right.';
+  const axis = mirrorAxisFor(sd);
+  const active = (a: MirrorAxis) => (a === 'left-right' ? !!sd.mirror : !!sd.flip);
+  // the layout's own axis, plus any mirror still set on the other one (so it can be undone)
+  const axes = (['left-right', 'front-back'] as MirrorAxis[]).filter((a) => a === axis || active(a));
+  if (!axes.length)
+    return (
+      <div className="mirror-row">
+        <button className="btn mirror-btn" disabled data-testid={`mirror-${pos}`} aria-pressed={false}>
+          <Icon name="mirror" /> Mirror layout
+        </button>
+        <p className="muted small" data-testid={`mirror-note-${pos}`}>
+          This layout is symmetrical both ways: mirroring would give the same drone.
+        </p>
+      </div>
+    );
   return (
-    <div className="mirror-row">
-      <button
-        className={`btn mirror-btn ${on ? 'on' : ''}`}
-        aria-pressed={on}
-        disabled={effect === 'none' && !on}
-        onClick={() => update((d) => (d.sections[pos] = mirrorSection(d.sections[pos])), `${on ? 'unmirror' : 'mirror'} ${pos} layout`)}
-        data-testid={`mirror-${pos}`}
-        title="Swap the left and right mounting positions. Parts keep their slots and settings; turrets get the mirrored facing."
-      >
-        <Icon name="mirror" /> {on ? 'Mirrored' : 'Mirror layout'}
-      </button>
-      <p className="muted small" data-testid={`mirror-note-${pos}`}>
-        {note}
-      </p>
-    </div>
+    <>
+      {axes.map((a) => {
+        const t = AXIS_TEXT[a];
+        const on = active(a);
+        const effect = mirrorEffect(sd, a);
+        const note = effect === 'none' && !on ? 'This arrangement is already symmetrical: mirroring would give the same drone.' : on ? t.mirrored : effect === 'swap' ? t.swap : t.reshape;
+        const main = a === axis;
+        return (
+          <div className="mirror-row" key={a}>
+            <button
+              className={`btn mirror-btn ${on ? 'on' : ''}`}
+              aria-pressed={on}
+              disabled={effect === 'none' && !on}
+              onClick={() => update((d) => (d.sections[pos] = mirrorOn(d.sections[pos], a)), `${on ? 'unmirror' : 'mirror'} ${pos} layout ${a}`)}
+              data-testid={main ? `mirror-${pos}` : `mirror-${pos}-${a}`}
+              data-axis={a}
+              title={a === 'left-right' ? 'Swap the left and right mounting positions. Parts keep their slots and settings; turrets get the mirrored facing.' : 'Swap the forward and rear mounting positions. Parts keep their slots, settings and facing.'}
+            >
+              <Icon name={t.icon} /> {on ? t.on : t.off}
+            </button>
+            <p className="muted small" data-testid={main ? `mirror-note-${pos}` : `mirror-note-${pos}-${a}`}>
+              {main ? note : `${note} This layout mirrors ${axis === 'left-right' ? 'left/right' : 'front/back'} by default.`}
+            </p>
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -379,7 +415,7 @@ function SectionProps({ design, stats, pos, update, onSelect }: Props & { pos: S
     update(
       (d) => {
         const s = d.sections[pos];
-        d.sections[pos] = { class: c, layout: l, armor: Math.min(s.armor, SECTION_CLASSES[c].maxArmor), slots: change.slots, ...(s.mirror ? { mirror: true } : {}) };
+        d.sections[pos] = { class: c, layout: l, armor: Math.min(s.armor, SECTION_CLASSES[c].maxArmor), slots: change.slots, ...(s.mirror ? { mirror: true } : {}), ...(s.flip ? { flip: true } : {}) };
       },
       `${pos} section to ${SECTION_CLASSES[c].name.toLowerCase()}, ${LAYOUTS[c][l].name} layout`,
     );
@@ -419,7 +455,7 @@ function SectionProps({ design, stats, pos, update, onSelect }: Props & { pos: S
           const lost = lostFor(sd.class, l);
           return (
             <button key={l} role="radio" aria-checked={layout === l} className={layout === l ? 'on' : ''} onClick={() => change(sd.class, l)} data-testid={`layout-${l}`}>
-              <LayoutPreview cls={sd.class} layout={l} mirror={!!sd.mirror} />
+              <LayoutPreview cls={sd.class} layout={l} mirror={!!sd.mirror} flip={!!sd.flip} />
               <b>{L.name}</b>
               <small>{L.summary}</small>
               <small className="num">

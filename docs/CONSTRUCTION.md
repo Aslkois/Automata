@@ -19,7 +19,7 @@ A drone is laid out along its forward axis as **rear | middle | front**. Section
 
 ### Hardpoint layouts
 
-Each section independently chooses one of three hardpoint layouts (design schema 4) and can mirror it (schema 5). Internal bays are the same in every layout. Smaller equipment fits larger mounts; each part occupies one mount.
+Each section independently chooses one of three hardpoint layouts (design schema 4) and can mirror it: left/right (schema 5) or front/back (schema 6). Internal bays are the same in every layout. Smaller equipment fits larger mounts; each part occupies one mount.
 
 | Class | Maximum | Medium | Minimum |
 | --- | --- | --- | --- |
@@ -44,8 +44,12 @@ Each section independently chooses one of three hardpoint layouts (design schema
 - Every part keeps its slot id, component and settings, so programs that address `F.H1` keep working. Hardpoint facings are reflected (r → −r; dead ahead and astern stay), so a turret, sensor or shield faces the mirror direction.
 - It is real geometry. The simulation places each mount from the same slot list the constructor draws (`sectionSlots`), so firing origins, arcs, recoil arms, centre of mass, hit locations, shields and sensors all move with it. Validation, obstruction and load are recomputed.
 - Pressing it again restores the section exactly.
-- A layout that is its own mirror image (every Medium and Minimum layout, and heavy Maximum) keeps its shape; mirroring moves each part to the opposite side. When nothing would change (no part off the centreline and no part turned sideways), the control is disabled and says why.
-- The asymmetrical layouts are light Maximum (M + S), medium Maximum (L + S) and heavy Medium (L + M + M).
+- The button mirrors left/right only for the layouts that are lopsided that way: light Maximum (M + S), medium Maximum (L + S) and heavy Medium (L + M + M).
+- **Front/back.** Every other layout is already its own left/right image, so the same button mirrors it front/back instead. It flips across the section's lateral axis, (x, y) → (−x, y), so forward mounts move to the rear and rear ones forward. This applies to light and medium Minimum, medium Medium, and heavy Maximum and Minimum. It is saved as `flip: true` (schema 6).
+  - Facings are kept: guns still point where they pointed. A strict reflection would turn every forward gun to face the rear.
+  - Slot ids and settings are unchanged, and a second press undoes it.
+- Light Medium (two mounts on the centre line) is symmetrical both ways; its button is disabled and says so.
+- After a layout change, a mirror left on the other axis stays and gets its own button, so it can be undone.
 - Internal bays belong to the section class, not the layout, and do not move.
 
 ## Load ratings
