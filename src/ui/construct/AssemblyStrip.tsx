@@ -6,6 +6,7 @@ import { SECTION_CLASSES, SECTION_LETTER, type SectionPos } from '../../sim/cont
 import type { DesignStats, DroneDesign } from '../../sim/design';
 import type { Selection } from './Stage';
 import { PartIcon } from '../parts';
+import { Icon } from '../common';
 
 const ORDER: SectionPos[] = ['rear', 'middle', 'front'];
 
@@ -26,10 +27,15 @@ export function AssemblyStrip({ design, stats, sel, onSelect }: { design: DroneD
                 <i />
               </span>
             )}
-            <button className={`asm-seg ${on ? 'on' : ''}`} onClick={() => onSelect({ type: 'section', pos })} aria-pressed={on} data-testid={`section-${pos}`} aria-label={`${pos} section: ${cls.name}, ${sd.armor} mm armour, ${parts.length} parts`}>
+            <button className={`asm-seg ${on ? 'on' : ''}`} onClick={() => onSelect({ type: 'section', pos })} aria-pressed={on} data-testid={`section-${pos}`} aria-label={`${pos} section: ${cls.name}, ${sd.armor} mm armour, ${parts.length} parts${sd.mirror ? ', layout mirrored' : ''}`}>
               <span className="asm-top">
                 <b className="letter">{SECTION_LETTER[pos]}</b>
                 <span className="cls">{cls.name}</span>
+                {sd.mirror && (
+                  <span className="asm-mirror" title="Hardpoint layout mirrored left/right" data-testid={`mirrored-${pos}`}>
+                    <Icon name="mirror" size={13} />
+                  </span>
+                )}
                 <span className="num armor">{sd.armor} mm</span>
               </span>
               <span className="asm-load" title={`Equipment ${Math.round(stats.equipmentMass[pos])} kg of ${Math.round(stats.ratedEquipment[pos])} kg rated on this chassis (${Math.round(load * 100)}%) — a rating, not a limit`}>

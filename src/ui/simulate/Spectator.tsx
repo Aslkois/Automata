@@ -5,6 +5,8 @@ import { irHash } from '../../program/brain/ir';
 import type { TraceEntry } from '../../program/interpreter';
 import { functional } from '../../sim/drone';
 import { ammoReserve } from '../../sim/systems';
+import { AMMO_TYPES } from '../../sim/content/components';
+import { requirementOf } from '../../sim/ammoCompat';
 import type { Drone, RComponent } from '../../sim/types';
 import { PartAnimator } from '../../render/parts/animator';
 import { MODELS } from '../../render/parts/models';
@@ -173,21 +175,31 @@ export function Spectator({ sim, drone: d, onClose, onSelect, sheet = 'half', se
                               ? 'firing'
                               : ws.mag > 0
                                 ? 'ready'
-                                : 'empty';
+                                : ammoReserve(d, w.ammo) > 0
+                                  ? 'empty'
+                                  : 'out of ammo';
+                  const reserve = ammoReserve(d, w.ammo);
                   const mixed = w.ammo.length > 1;
                   return (
                     <tr key={c.id} className={`${!ok ? 'dead' : ''} ${recent.has(c.id) ? 'static' : ''}`} title={ws.blockReason ?? ''}>
                       <td>
                         <code>{c.id}</code>
                       </td>
-                      <td className="name">{c.def!.name}</td>
+                      <td className="name">
+                        {c.def!.name}
+                        <span className="muted small ammo-line" data-testid={`spec-ammo-${c.id}`}>
+                          {requirementOf(c.def!)?.label}
+                        </span>
+                      </td>
                       <td className="num r">
                         {ws.mag}/{w.magazine}
-                        <span className="muted"> +{ammoReserve(d, w.ammo)}</span>
+                        <span className="muted" title={reserve > 0 ? 'Compatible rounds left in storage' : 'No compatible reserve: it cannot reload'}>
+                          {reserve > 0 ? ` +${reserve}` : ' · no reserve'}
+                        </span>
                         {mixed && (
                           <span className="muted small" title="Loaded by type; the selected type fires next">
                             {' '}
-                            · {w.ammo.map((t) => `${t === ws.selected ? '▸' : ''}${ws.loaded[t] ?? 0} ${t.slice(0, 4)}`).join(' ')}
+                            · {w.ammo.map((t) => `${t === ws.selected ? '▸' : ''}${ws.loaded[t] ?? 0} ${AMMO_TYPES[t].plural}`).join(' ')}
                           </span>
                         )}
                         {w.fireModes && w.fireModes.length > 1 && <span className="muted small"> · {ws.fireMode}</span>}
@@ -251,7 +263,12 @@ export function Spectator({ sim, drone: d, onClose, onSelect, sheet = 'half', se
                       <td>
                         <code>{c.id}</code>
                       </td>
-                      <td className="name">{c.def!.name}</td>
+                      <td className="name">
+                        {c.def!.name}
+                        <span className="muted small ammo-line" data-testid={`spec-ammo-${c.id}`}>
+                          {requirementOf(c.def!)?.label}
+                        </span>
+                      </td>
                       <td className="num r">
                         {c.def!.sensor!.arcDeg}° · {c.def!.sensor!.range} u
                       </td>

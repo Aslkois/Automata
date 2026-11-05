@@ -27,6 +27,7 @@
 - **Replay and timeline scrubbing** are not implemented. Restart re-simulates from the recorded configuration.
 - **Modes**: Duel, Sandbox and seven training courses exist. Team Battle, Fleet Battle, Challenges, Tournament and Replay Laboratory are not implemented. Sandbox already allows multi-drone, multi-team battles.
 - **Balance**: there is no points or weight budget. In straight duels the heavy starters beat the light ones most of the time, and about a quarter of starter duels end in a draw at 120 s (see [BALANCE.md](BALANCE.md)).
+- **Mirroring** reflects a section's hardpoint layout only. Internal bays are fixed per section class and keep their places, so a mirrored drone with heavy internals is not an exact reflection: its centre of mass shifts slightly differently. Turret models are not drawn reversed; a mirrored turret is the same machine on the opposite mount with the mirrored facing.
 - **Component models** are flat top-down drawings: there is no height, shading by light direction or 3D occlusion between parts.
   - The rotary cluster's depth is suggested by drawing order and tone.
   - Recoil is drawn as travel along the barrel; mounts and hulls do not shake.

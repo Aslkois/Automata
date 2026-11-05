@@ -262,6 +262,62 @@ test('component artwork: own icons in the tray, models on the stage and in the s
   expect(empty).toBe(0);
 });
 
+test('ammunition: requirement on cards and the selected weapon, matching storage highlighted, warning without blocking', async ({ page }) => {
+  await page.getByTestId('drone-switcher').click();
+  await page.getByRole('button', { name: 'New drone' }).click();
+  await go(page, 'Construct');
+  const lib = page.getByRole('list', { name: 'Equipment library' });
+  // every weapon card states its ammunition before anything is installed
+  await expect(page.getByTestId('ammo-req-autocannon')).toContainText('Autocannon rounds (Medium)');
+  await expect(page.getByTestId('ammo-req-autocannon')).toContainText('Medium-Calibre Magazine');
+  await expect(page.getByTestId('ammo-req-coilgun')).toContainText('Shell Rack, penetrators payload');
+  await page.getByTestId('slot-F.H3').click();
+  await lib.getByRole('listitem', { name: 'Autocannon', exact: true }).click();
+  await page.getByTestId('slot-F.H3').click();
+  await expect(page.getByTestId('ammo-requires')).toHaveText('Autocannon rounds (Medium)');
+  await expect(page.getByTestId('ammo-storage')).toHaveText('Medium-Calibre Magazine');
+  await expect(page.getByTestId('ammo-state')).toContainText('No compatible reserve · 35 loaded');
+  // storage cards relate to the selected weapon in words
+  await page.getByRole('tab', { name: 'Ammunition' }).click();
+  await expect(page.getByTestId('ammo-match-ammo_medium')).toContainText('Feeds Autocannon');
+  await expect(page.getByTestId('ammo-match-shell_rack')).toContainText('Not for Autocannon');
+  // a caution, still deployable
+  await expect(page.getByTestId('issues-toggle')).toContainText('deployable');
+  await expect(page.getByRole('button', { name: 'Test' })).toBeEnabled();
+});
+
+test('mirror layout: moves the real mount positions, keeps the parts, reverses on a second press', async ({ page }) => {
+  await page.getByTestId('drone-switcher').click();
+  await page.getByRole('button', { name: 'New drone' }).click();
+  await go(page, 'Construct');
+  await page.getByTestId('section-front').click();
+  await page.getByTestId('layout-pick-front').getByTestId('layout-max').click();
+  const cy = async (id: string) => {
+    const b = (await page.getByTestId(id).boundingBox())!;
+    return b.y + b.height / 2;
+  };
+  const before = { h1: await cy('slot-F.H1'), h2: await cy('slot-F.H2') };
+  const mirror = page.getByTestId('mirror-front');
+  await expect(mirror).toHaveAttribute('aria-pressed', 'false');
+  // keyboard: the control is a button
+  await mirror.focus();
+  await page.keyboard.press('Enter');
+  await expect(mirror).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('mirrored-front')).toBeVisible();
+  const after = { h1: await cy('slot-F.H1'), h2: await cy('slot-F.H2') };
+  // the large mount and the small one change sides; the guns stay in their own slots
+  expect(Math.sign(after.h1 - after.h2)).toBe(-Math.sign(before.h1 - before.h2));
+  await expect(page.getByTestId('slot-F.H1')).toHaveAttribute('aria-label', /Machine Gun/);
+  await expect(page.getByTestId('slot-F.H2')).toHaveAttribute('aria-label', /Machine Gun/);
+  await mirror.click();
+  await expect(mirror).toHaveAttribute('aria-pressed', 'false');
+  expect(await cy('slot-F.H1')).toBeCloseTo(before.h1, 0);
+  // a symmetrical, empty layout cannot be mirrored into anything different
+  await page.getByTestId('section-rear').click();
+  await expect(page.getByTestId('mirror-rear')).toBeDisabled();
+  await expect(page.getByTestId('mirror-note-rear')).toContainText('already symmetrical');
+});
+
 test.describe('touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   test('every workspace is usable by touch', async ({ page }) => {
@@ -292,6 +348,30 @@ test.describe('touch phone', () => {
     await expect(page.getByTestId('inspector')).toHaveAttribute('data-sheet', /full|peek|half/);
     await page.getByRole('button', { name: 'Close diagnostics' }).tap();
     await expect(page.getByTestId('inspector')).toHaveCount(0);
+  });
+
+  test('ammunition requirement is the first thing shown for a weapon on a phone; slot-first install works', async ({ page }) => {
+    await page.getByTestId('drone-switcher').tap();
+    await page.getByRole('button', { name: 'New drone' }).tap();
+    await go(page, 'Construct');
+    await page.getByTestId('slot-F.H3').tap();
+    await page.getByRole('button', { name: 'Show compatible equipment' }).tap();
+    await page.getByRole('list', { name: 'Equipment library' }).getByRole('listitem', { name: 'Autocannon', exact: true }).tap();
+    await expect(page.getByTestId('ammo-requires')).toBeInViewport();
+    await expect(page.getByTestId('ammo-storage')).toHaveText('Medium-Calibre Magazine');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test('mirror layout by touch', async ({ page }) => {
+    await page.getByTestId('drone-switcher').tap();
+    await page.getByRole('button', { name: 'New drone' }).tap();
+    await go(page, 'Construct');
+    await page.getByTestId('section-front').tap();
+    await page.getByTestId('layout-pick-front').getByTestId('layout-max').tap();
+    await page.getByTestId('mirror-front').tap();
+    await expect(page.getByTestId('mirror-front')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('mirrored-front')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 
   test('a part can be moved to another slot by touch, and the drone stays visible', async ({ page }) => {

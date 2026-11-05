@@ -1959,6 +1959,176 @@ input[type='range'] {
   font-size: 11.5px;
   opacity: 0.8;
 }
+/* ammunition: requirement first on every weapon card, supply on every storage card */
+.pammo {
+  display: grid;
+  gap: 2px;
+  padding: 5px 7px;
+  border-left: 2px solid var(--tint);
+  background: rgba(42, 39, 35, 0.05);
+  border-radius: 0 var(--r) var(--r) 0;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.pammo-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+}
+.pammo-row b {
+  font: 600 10.5px var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  padding-top: 1px;
+}
+.pammo-row.alt {
+  opacity: 0.75;
+}
+.part.armed .pammo,
+.part.current .pammo {
+  background: rgba(255, 252, 244, 0.08);
+}
+/* match with the selected weapon or magazine: words, icon and outline style, never colour alone */
+.pmatch {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.pmatch .glyph {
+  flex: none;
+  margin-top: 1px;
+}
+.part.ammo-supplies {
+  border: 2px solid var(--graphite);
+  padding: 11px 11px 9px;
+}
+.part.ammo-supplies .pmatch {
+  color: var(--ok);
+}
+.part.ammo-reconfigure {
+  border: 2px dashed var(--warn);
+  padding: 11px 11px 9px;
+}
+.part.ammo-reconfigure .pmatch {
+  color: var(--umber);
+}
+/* storage for the selected weapon stays legible even though it goes in a bay, not this hardpoint */
+.part.nofit.ammo-supplies,
+.part.nofit.ammo-reconfigure {
+  opacity: 1;
+}
+.part.ammo-none {
+  opacity: 0.45;
+  border-style: dotted;
+}
+.part.ammo-none .pmatch {
+  font-weight: 500;
+}
+.ammo-status {
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: rgba(255, 252, 244, 0.5);
+}
+.ammo-head {
+  margin: 10px 0 4px;
+  padding: 9px 12px 4px;
+  border-left: 3px solid var(--graphite);
+  background: rgba(42, 39, 35, 0.05);
+  border-radius: 0 var(--r) var(--r) 0;
+}
+.ammo-head .ammo-req {
+  margin-bottom: 6px;
+}
+.ammo-status .sub-h {
+  margin-top: 0;
+}
+.ammo-req {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 10px;
+  margin: 0 0 8px;
+}
+.ammo-req dt {
+  font: 600 11px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--iron);
+  padding-top: 2px;
+}
+.ammo-req dd {
+  margin: 0;
+  font-weight: 600;
+}
+.ammo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 13px;
+}
+.ammo-badge.ok {
+  border: 1.5px solid var(--ok);
+  color: var(--ok);
+}
+.ammo-badge.warn {
+  border: 1.5px dashed var(--warn);
+  color: var(--umber);
+}
+.ammo-links {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ammo-links .chip-btn {
+  min-height: 32px;
+  text-align: left;
+}
+.chip-btn.dashed {
+  border-style: dashed;
+}
+.asm-mirror {
+  display: inline-flex;
+  opacity: 0.8;
+}
+.mirror-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 4px;
+}
+.mirror-row p {
+  margin: 0;
+  flex: 1;
+}
+.mirror-btn {
+  flex: none;
+  min-height: 40px;
+}
+.btn.mirror-btn.on,
+.btn.mirror-btn.on:hover:not(:disabled) {
+  background: var(--graphite);
+  color: var(--ivory);
+  border-color: var(--graphite);
+}
+.btn.mirror-btn.on:hover:not(:disabled) {
+  background: var(--carbon);
+}
+.ammo-line {
+  display: block;
+  font-size: 11px;
+}
 
 /* ------------------------------------------------------------------ PROGRAM */
 .program {

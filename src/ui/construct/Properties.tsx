@@ -1,13 +1,15 @@
 // The properties surface: appears for a selected slot or section only.
 import { useEffect, useRef, useState } from 'react';
 import { AMMO_TYPES, COMPONENT_MAP, type AmmoType, type ComponentDef } from '../../sim/content/components';
-import { LAYOUT_IDS, LAYOUTS, SECTION_CLASSES, SECTION_LETTER, SLOT_HALF, type LayoutId, type SectionClass, type SectionPos } from '../../sim/content/sections';
-import { moduleStock, mountId, mountRating, mountRecoil, relocateSection, secondsToOverheat, slotOf, slotsOf, type DesignStats, type DroneDesign, type LayoutChange, type MountDesign } from '../../sim/design';
+import { LAYOUT_IDS, LAYOUTS, SECTION_CLASSES, SECTION_LETTER, SLOT_HALF, sectionSlots, type LayoutId, type SectionClass, type SectionPos } from '../../sim/content/sections';
+import { mirrorEffect, mirrorSection, moduleStock, mountId, mountRating, mountRecoil, relocateSection, secondsToOverheat, slotOf, slotsOf, type DesignStats, type DroneDesign, type LayoutChange, type MountDesign, type SectionDesign } from '../../sim/design';
 import { weaponRange } from '../../sim/ammo';
 import { fmt, Icon, Meter, Prop } from '../common';
 import { PartIcon, PartPreview } from '../parts';
 import { KIND } from '../theme';
 import type { Selection } from './Stage';
+import { AmmoHeadline, ModuleAmmo, WeaponAmmo } from './Ammo';
+import { ammoLabel } from '../../sim/ammoCompat';
 
 interface Props {
   design: DroneDesign;
@@ -51,7 +53,7 @@ export function capabilities(def: ComponentDef): [string, string][] {
   if (w) {
     const barrels = w.barrels?.length ?? 1;
     const launcher = w.ammo.includes('rocket') || w.ammo.includes('missile');
-    rows.push(['Ammunition', w.ammo.map((t) => AMMO_TYPES[t].name).join(' · ')]);
+    rows.push(['Ammunition', w.ammo.map(ammoLabel).join(' · ')]);
     if (w.pellets) rows.push(['Per shell', `${w.pellets} pellets in a ${w.pelletConeDeg ?? 5}° cone`]);
     rows.push(['Penetration', `${w.penetration} mm${w.pellets ? ' per pellet' : ''}`], ['Damage', `${w.damage}${w.pellets ? ' per pellet' : ''}`]);
     const ex = w.projectiles ? Object.values(w.projectiles).find((x) => x?.explosive)?.explosive : undefined;
@@ -82,7 +84,7 @@ export function capabilities(def: ComponentDef): [string, string][] {
   if (s?.heatBuffer) rows.push(['Heat buffer', `${s.heatBuffer.capacity}, absorbs ${s.heatBuffer.absorbRate}/s, sheds ${s.heatBuffer.releaseRate}/s`]);
   if (s?.jointReinforcement) rows.push(['Joint damage', `−${Math.round(s.jointReinforcement * 100)}% on one adjacent joint`]);
   if (s?.suppression) rows.push(['Charges', `${s.suppression.charges}, automatic after ${s.suppression.delay} s`]);
-  if (def.ammo) rows.push(['Holds', def.ammo.split ? `${def.ammo.payloads[0].rounds} rockets, split offensive / interceptor` : def.ammo.payloads.map((p) => `${p.rounds} ${AMMO_TYPES[p.type].plural}`).join(' or ')]);
+  if (def.ammo) rows.push(['Payloads', def.ammo.split ? `${def.ammo.payloads[0].rounds} rockets, split ${def.ammo.split.map(ammoLabel).join(' / ')}` : def.ammo.payloads.map((p) => `${p.rounds} ${ammoLabel(p.type)}`).join(' or ') + (def.ammo.payloads.length > 1 ? ' (one at a time)' : '')]);
   return rows;
 }
 
@@ -144,7 +146,7 @@ function MountConfig({ def, mount, pos, set }: { def: ComponentDef; mount: Mount
         key="payload"
         label="Payload"
         value={(mount.payload ?? a.payloads[0].type) as AmmoType}
-        options={a.payloads.map((p) => ({ id: p.type, name: `${p.rounds} ${AMMO_TYPES[p.type].plural}`, hint: AMMO_TYPES[p.type].name }))}
+        options={a.payloads.map((p) => ({ id: p.type, name: `${p.rounds} ${AMMO_TYPES[p.type].plural}`, hint: ammoLabel(p.type) }))}
         onChange={(v) => set((m) => (m.payload = v))}
       />,
     );
@@ -173,7 +175,7 @@ function MountConfig({ def, mount, pos, set }: { def: ComponentDef; mount: Mount
           Carries{' '}
           {Object.entries(stock)
             .filter(([, n]) => (n ?? 0) > 0)
-            .map(([t, n]) => `${n} ${AMMO_TYPES[t as AmmoType].plural}`)
+            .map(([t, n]) => `${n} ${ammoLabel(t as AmmoType)}`)
             .join(' and ') || 'nothing'}
           .
         </p>
@@ -187,7 +189,7 @@ function MountConfig({ def, mount, pos, set }: { def: ComponentDef; mount: Mount
   );
 }
 
-function SlotProps({ design, stats, pos, slotId, update, install, onBrowse, onMove }: Props & { pos: SectionPos; slotId: string }) {
+function SlotProps({ design, stats, pos, slotId, update, install, onBrowse, onMove, onSelect }: Props & { pos: SectionPos; slotId: string }) {
   const sd = design.sections[pos];
   const slot = slotOf(sd, slotId);
   if (!slot) return <p className="muted">This slot does not exist on the section’s current layout.</p>;
@@ -220,6 +222,7 @@ function SlotProps({ design, stats, pos, slotId, update, install, onBrowse, onMo
               <p className="muted">{KIND[def.kind]?.label}</p>
             </div>
           </div>
+          {def.weapon && <AmmoHeadline design={design} mount={id} />}
           {def.slot === 'hardpoint' && (
             <div className="model-plate" aria-label={`${def.name}, top view`}>
               <PartPreview id={def.id} height={74} label={`${def.name}, top view`} />
@@ -227,6 +230,8 @@ function SlotProps({ design, stats, pos, slotId, update, install, onBrowse, onMo
           )}
           <p className="desc">{def.description}</p>
           {def.notes && <p className="desc muted small">{def.notes}</p>}
+          {def.weapon && <WeaponAmmo design={design} stats={stats} mount={id} onSelect={onSelect} />}
+          {def.ammo && <ModuleAmmo design={design} mount={id} def={def} onSelect={onSelect} />}
           <dl className="props-list">
             <Prop k={powerOf(def).label} v={powerOf(def).value} />
             <Prop k="Mass" v={fmt.kg(def.mass)} />
@@ -309,9 +314,9 @@ function SlotProps({ design, stats, pos, slotId, update, install, onBrowse, onMo
 }
 
 /** Miniature of a section with a layout's hardpoints, drawn to scale. */
-function LayoutPreview({ cls, layout }: { cls: SectionClass; layout: LayoutId }) {
+function LayoutPreview({ cls, layout, mirror = false }: { cls: SectionClass; layout: LayoutId; mirror?: boolean }) {
   const c = SECTION_CLASSES[cls];
-  const L = LAYOUTS[cls][layout];
+  const L = { hardpoints: sectionSlots(cls, layout, mirror).filter((h) => h.kind === 'hardpoint') };
   const pad = 2;
   return (
     <svg className="layout-preview" viewBox={`${-c.length / 2 - pad} ${-c.width / 2 - pad} ${c.length + pad * 2} ${c.width + pad * 2}`} aria-hidden="true">
@@ -325,6 +330,37 @@ function LayoutPreview({ cls, layout }: { cls: SectionClass; layout: LayoutId })
         </g>
       ))}
     </svg>
+  );
+}
+
+/** Mirror the section's hardpoint layout left/right: one press, reversible, applied at once. */
+function MirrorControl({ sd, pos, update }: { sd: SectionDesign; pos: SectionPos; update: Props['update'] }) {
+  const effect = mirrorEffect(sd);
+  const on = !!sd.mirror;
+  const note =
+    effect === 'none'
+      ? 'This arrangement is already symmetrical: mirroring would give the same drone.'
+      : effect === 'swap'
+        ? 'Symmetrical layout: mirroring keeps its shape and moves each part to the opposite side.'
+        : on
+          ? 'Mirrored: the arrangement is reversed left to right.'
+          : 'Reverse the arrangement left to right.';
+  return (
+    <div className="mirror-row">
+      <button
+        className={`btn mirror-btn ${on ? 'on' : ''}`}
+        aria-pressed={on}
+        disabled={effect === 'none' && !on}
+        onClick={() => update((d) => (d.sections[pos] = mirrorSection(d.sections[pos])), `${on ? 'unmirror' : 'mirror'} ${pos} layout`)}
+        data-testid={`mirror-${pos}`}
+        title="Swap the left and right mounting positions. Parts keep their slots and settings; turrets get the mirrored facing."
+      >
+        <Icon name="mirror" /> {on ? 'Mirrored' : 'Mirror layout'}
+      </button>
+      <p className="muted small" data-testid={`mirror-note-${pos}`}>
+        {note}
+      </p>
+    </div>
   );
 }
 
@@ -343,7 +379,7 @@ function SectionProps({ design, stats, pos, update, onSelect }: Props & { pos: S
     update(
       (d) => {
         const s = d.sections[pos];
-        d.sections[pos] = { class: c, layout: l, armor: Math.min(s.armor, SECTION_CLASSES[c].maxArmor), slots: change.slots };
+        d.sections[pos] = { class: c, layout: l, armor: Math.min(s.armor, SECTION_CLASSES[c].maxArmor), slots: change.slots, ...(s.mirror ? { mirror: true } : {}) };
       },
       `${pos} section to ${SECTION_CLASSES[c].name.toLowerCase()}, ${LAYOUTS[c][l].name} layout`,
     );
@@ -383,7 +419,7 @@ function SectionProps({ design, stats, pos, update, onSelect }: Props & { pos: S
           const lost = lostFor(sd.class, l);
           return (
             <button key={l} role="radio" aria-checked={layout === l} className={layout === l ? 'on' : ''} onClick={() => change(sd.class, l)} data-testid={`layout-${l}`}>
-              <LayoutPreview cls={sd.class} layout={l} />
+              <LayoutPreview cls={sd.class} layout={l} mirror={!!sd.mirror} />
               <b>{L.name}</b>
               <small>{L.summary}</small>
               <small className="num">
@@ -395,6 +431,7 @@ function SectionProps({ design, stats, pos, update, onSelect }: Props & { pos: S
           );
         })}
       </div>
+      <MirrorControl sd={sd} pos={pos} update={update} />
       {pending && (
         <div className="confirm" role="alertdialog" aria-label="Parts that will not fit" data-testid="layout-confirm" ref={confirmRef}>
           <p>

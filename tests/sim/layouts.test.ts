@@ -171,7 +171,7 @@ describe('layout changes relocate equipment', () => {
   });
 });
 
-describe('design migration (schema 2 and 3 → 4)', () => {
+describe('design migration (schema 2 and 3 → current)', () => {
   const legacy = {
     schema: 2,
     id: 'old',
@@ -186,7 +186,7 @@ describe('design migration (schema 2 and 3 → 4)', () => {
 
   it('renames the AA autocannon, assigns the Medium layout and keeps positions', () => {
     const d = parseDesign(JSON.stringify(legacy));
-    expect(d.schema).toBe(4);
+    expect(d.schema).toBe(5);
     expect(d.sections.front.layout).toBe('medium');
     expect(d.sections.middle.layout).toBe('medium');
     expect(d.sections.front.slots.H1?.component).toBe('autocannon');
