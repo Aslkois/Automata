@@ -36,41 +36,43 @@ A heavy missile launcher (and, separately, a rocket pod or a heavy cannon) fires
 
 Every starter against every other starter with its own brain, Foundry Yard, 120 s limit, seeds 1, 2, 3; each pairing is played from both spawn sides. Cell = wins of the row drone over the column drone out of 6 games (draws are not wins).
 
-| vs | Pick | Gnat | Bull | Horn | Rapi | Kest | Cita | Long | Maul | Jack | Talo | Ward | Vipe | Para | Jugg |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **Picket** | · | 6 | 1 | 2 | 5 | 3 | 0 | 4 | 0 | 2 | 4 | 0 | 5 | 2 | 0 |
-| **Gnat** | 0 | · | 4 | 4 | 5 | 3 | 0 | 1 | 0 | 3 | 2 | 0 | 6 | 0 | 0 |
-| **Bulldog** | 3 | 2 | · | 4 | 5 | 3 | 0 | 0 | 0 | 4 | 0 | 0 | 2 | 0 | 0 |
-| **Hornet** | 2 | 2 | 0 | · | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 |
-| **Rapier** | 1 | 1 | 1 | 4 | · | 0 | 0 | 3 | 0 | 3 | 4 | 0 | 1 | 2 | 0 |
-| **Kestrel** | 3 | 3 | 3 | 4 | 6 | · | 0 | 3 | 0 | 2 | 4 | 0 | 1 | 0 | 0 |
-| **Citadel** | 6 | 6 | 6 | 6 | 6 | 6 | · | 0 | 4 | 6 | 4 | 0 | 6 | 6 | 0 |
-| **Longbow** | 1 | 2 | 0 | 5 | 1 | 2 | 0 | · | 2 | 5 | 4 | 0 | 6 | 0 | 0 |
-| **Mauler** | 6 | 6 | 6 | 6 | 6 | 6 | 2 | 4 | · | 6 | 5 | 4 | 6 | 1 | 0 |
-| **Jackal** | 4 | 3 | 2 | 2 | 3 | 4 | 0 | 0 | 0 | · | 1 | 1 | 1 | 0 | 0 |
-| **Talon** | 0 | 1 | 6 | 6 | 2 | 1 | 0 | 0 | 0 | 4 | · | 0 | 4 | 1 | 0 |
-| **Warden** | 4 | 5 | 4 | 6 | 6 | 3 | 0 | 6 | 2 | 4 | 6 | · | 4 | 2 | 0 |
-| **Viper** | 1 | 0 | 2 | 3 | 5 | 5 | 0 | 0 | 0 | 4 | 1 | 0 | · | 0 | 0 |
-| **Paragon** | 4 | 6 | 6 | 4 | 4 | 5 | 0 | 5 | 5 | 5 | 4 | 4 | 6 | · | 0 |
-| **Juggernaut** | 6 | 6 | 0 | 6 | 6 | 6 | 0 | 0 | 6 | 2 | 6 | 6 | 6 | 5 | · |
+| vs | Pick | Gnat | Bull | Horn | Rapi | Kest | Cita | Long | Maul | Jack | Talo | Ward | Vipe | Para | Jugg | Sove |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **Picket** | · | 6 | 1 | 2 | 5 | 3 | 0 | 4 | 0 | 2 | 4 | 0 | 5 | 2 | 0 | 0 |
+| **Gnat** | 0 | · | 4 | 4 | 5 | 3 | 0 | 1 | 0 | 3 | 2 | 0 | 6 | 0 | 0 | 0 |
+| **Bulldog** | 3 | 2 | · | 4 | 5 | 3 | 0 | 0 | 0 | 4 | 0 | 0 | 2 | 0 | 0 | 0 |
+| **Hornet** | 2 | 2 | 0 | · | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 |
+| **Rapier** | 1 | 1 | 1 | 4 | · | 0 | 0 | 3 | 0 | 3 | 4 | 0 | 1 | 2 | 0 | 0 |
+| **Kestrel** | 3 | 3 | 3 | 4 | 6 | · | 0 | 3 | 0 | 2 | 4 | 0 | 1 | 0 | 0 | 0 |
+| **Citadel** | 6 | 6 | 6 | 6 | 6 | 6 | · | 0 | 4 | 6 | 4 | 0 | 6 | 6 | 0 | 0 |
+| **Longbow** | 1 | 2 | 0 | 5 | 1 | 2 | 0 | · | 2 | 5 | 4 | 0 | 6 | 0 | 0 | 0 |
+| **Mauler** | 6 | 6 | 6 | 6 | 6 | 6 | 2 | 4 | · | 6 | 5 | 4 | 6 | 1 | 0 | 0 |
+| **Jackal** | 4 | 3 | 2 | 2 | 3 | 4 | 0 | 0 | 0 | · | 1 | 1 | 1 | 0 | 0 | 0 |
+| **Talon** | 0 | 1 | 6 | 6 | 2 | 1 | 0 | 0 | 0 | 4 | · | 0 | 4 | 1 | 0 | 0 |
+| **Warden** | 4 | 5 | 4 | 6 | 6 | 3 | 0 | 6 | 2 | 4 | 6 | · | 4 | 2 | 0 | 0 |
+| **Viper** | 1 | 0 | 2 | 3 | 5 | 5 | 0 | 0 | 0 | 4 | 1 | 0 | · | 0 | 0 | 0 |
+| **Paragon** | 4 | 6 | 6 | 4 | 4 | 5 | 0 | 5 | 5 | 5 | 4 | 4 | 6 | · | 0 | 0 |
+| **Juggernaut** | 6 | 6 | 0 | 6 | 6 | 6 | 0 | 0 | 6 | 2 | 6 | 6 | 6 | 5 | · | 0 |
+| **Sovereign** | 6 | 6 | 6 | 6 | 6 | 6 | 6 | 6 | 6 | 6 | 6 | 6 | 6 | 6 | 4 | · |
 
 | Starter | Wins | Losses | Draws | Win % | Brain runtime errors |
 |---|---|---|---|---|---|
-| Mauler | 64 | 19 | 1 | 76% | 0 |
-| Citadel | 62 | 2 | 20 | 74% | 0 |
-| Juggernaut | 61 | 0 | 23 | 73% | 0 |
-| Paragon | 58 | 19 | 7 | 69% | 0 |
-| Warden | 52 | 15 | 17 | 62% | 0 |
-| Picket | 34 | 41 | 9 | 40% | 0 |
-| Kestrel | 29 | 49 | 6 | 35% | 0 |
-| Gnat | 28 | 49 | 7 | 33% | 0 |
-| Longbow | 28 | 26 | 30 | 33% | 0 |
-| Talon | 25 | 45 | 14 | 30% | 0 |
-| Bulldog | 23 | 41 | 20 | 27% | 0 |
-| Jackal | 21 | 50 | 13 | 25% | 0 |
-| Viper | 21 | 56 | 7 | 25% | 0 |
-| Rapier | 20 | 61 | 3 | 24% | 0 |
-| Hornet | 9 | 62 | 13 | 11% | 0 |
+| Sovereign | 88 | 0 | 2 | 98% | 0 |
+| Mauler | 64 | 25 | 1 | 71% | 0 |
+| Citadel | 62 | 8 | 20 | 69% | 0 |
+| Juggernaut | 61 | 4 | 25 | 68% | 0 |
+| Paragon | 58 | 25 | 7 | 64% | 0 |
+| Warden | 52 | 21 | 17 | 58% | 0 |
+| Picket | 34 | 47 | 9 | 38% | 0 |
+| Kestrel | 29 | 55 | 6 | 32% | 0 |
+| Gnat | 28 | 55 | 7 | 31% | 0 |
+| Longbow | 28 | 32 | 30 | 31% | 0 |
+| Talon | 25 | 51 | 14 | 28% | 0 |
+| Bulldog | 23 | 47 | 20 | 26% | 0 |
+| Jackal | 21 | 56 | 13 | 23% | 0 |
+| Viper | 21 | 62 | 7 | 23% | 0 |
+| Rapier | 20 | 67 | 3 | 22% | 0 |
+| Hornet | 9 | 68 | 13 | 10% | 0 |
 
 ## 4. Starters on the training courses
 
@@ -93,8 +95,9 @@ Each starter alone (seed 1) with its own brain. Time = when the objective was me
 | Viper | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 73.5 s | — (1 of 3 targets knocked out in 180 s) | — (Did not survive: Viper: Disarmed) | 37.2 s | — (0 of 1 targets knocked out in 120 s) |
 | Paragon | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 73.0 s | — (2 of 3 targets knocked out in 180 s) | 51.5 s | 25.6 s | 38.3 s |
 | Juggernaut | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (0 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | 35.4 s | 28.5 s | — (0 of 1 targets knocked out in 120 s) |
+| Sovereign | — (Goal not reached within 240 s) | 40.6 s | 42.8 s | 29.5 s | 5.6 s | 19.6 s | 3.1 s |
 
-_Generated by `npx vite-node scripts/balance.ts` in 186 s._
+_Generated by `npx vite-node scripts/balance.ts` in 218 s._
 <!-- measurements:end -->
 
 ## Findings
@@ -117,16 +120,18 @@ These were written after reading the tables above. The "before" numbers come fro
   - A single point-defense gun stopped 44% of offensive rockets, 22% of heavy-cannon shells and 13% of heavy missiles.
   - A rocket pod firing interceptor rockets stopped 94% of missiles, spending 45 interceptors on 32 missiles.
   - Interceptors are the hard counter to missiles but use up a medium hardpoint and storage. Point defense is a partial counter to everything.
-- **Starters: heavy designs still win most straight duels.** The roster was replaced by fifteen new starters (see [STARTERS.md](STARTERS.md)); the fuller measurement — three arenas, three starting positions, categories, 2 v 2, 1 v 2 and Configure — is in [EVALUATION.md](EVALUATION.md). On Foundry Yard alone:
-  - Mauler (76%), Citadel (74%), Juggernaut (73%, never beaten: 61 wins, 23 draws) and Paragon (69%) win most of their games; Warden is at 62% after its offence was cut to one autocannon.
-  - Hornet (11%), Rapier (24%), Viper (25%) and Jackal (25%) lose most of theirs. Every starter still wins at least once against every opponent category (EVALUATION.md §3).
-  - 15% of games (95 of 630) are draws at the 120 s limit, mostly involving the slow walkers that hold position (Longbow is in 30 of them, Juggernaut 23, Citadel 20).
+- **Starters: heavy designs still win most straight duels.** The roster was replaced by fifteen balanced starters and one boss, Sovereign (see [STARTERS.md](STARTERS.md)); the fuller measurement — three arenas, three starting positions, categories, 2 v 2, 1 v 2, Configure and the Sovereign trials — is in [EVALUATION.md](EVALUATION.md). On Foundry Yard alone (720 games):
+  - Sovereign wins 88 of its 90 games (98%) and loses none; both draws are against Juggernaut. Every balanced starter also plays it, so each balanced win rate below includes six losses or draws against it; the results between the fifteen balanced starters are exactly those of the previous recording.
+  - Among the balanced starters, Mauler (71%), Citadel (69%), Juggernaut (68%; it loses only to Sovereign: 61 wins, 4 losses, 25 draws) and Paragon (64%) win most of their games; Warden is at 58% after its offence was cut to one autocannon.
+  - Hornet (10%), Rapier (22%), Viper (23%) and Jackal (23%) lose most of theirs. Every starter still wins at least once against every opponent category (EVALUATION.md §3).
+  - 13% of games (97 of 720) are draws at the 120 s limit, mostly involving the slow walkers that hold position (Longbow is in 30 of them, Juggernaut 25, Citadel 20).
   - As before: a 1-on-1 between unequal masses favours mass and armour, and armour being one thickness per section rewards keeping the front plate toward the enemy.
 - **Training.**
-  - No new starter is built for the goal courses: none reaches the maze goal, and only Mauler (33.8 s) and Warden (56.6 s) finish the obstacle course. The retired Pathfinder brain still solves the maze in the unit tests, so the course itself is solvable with sensors alone.
-  - No starter knocks out all three armour-test plates within 180 s (Picket, Mauler, Jackal and Paragon get two).
-  - Every starter completes the missile test; only Paragon (51.5 s) and Juggernaut (35.4 s) survive the interception test.
+  - No new starter is built for the goal courses: none reaches the maze goal, and only Mauler (33.8 s), Warden (56.6 s) and Sovereign (40.6 s) finish the obstacle course. The retired Pathfinder brain still solves the maze in the unit tests, so the course itself is solvable with sensors alone.
+  - No balanced starter knocks out all three armour-test plates within 180 s (Picket, Mauler, Jackal and Paragon get two).
+  - Every starter completes the missile test; only Paragon (51.5 s), Juggernaut (35.4 s) and Sovereign (5.6 s) complete the interception test.
   - Rapier (12.1 s), Paragon, Talon, Longbow and Mauler finish the cooling and power stress course.
+  - Sovereign completes every course except the maze, including the weapon range (42.8 s) and the cooling and power stress course (3.1 s), and is the only starter to knock out all three armour-test plates (29.5 s). Its search pattern is built to find enemies, not to solve mazes.
 
 ### What changed since the previous recording, and why
 
@@ -184,5 +189,5 @@ None of the numbers fixed in the brief changed. Unchanged values include:
 ### Not resolved
 
 - Light starters lose most straight duels against heavy ones. There is no points or weight budget to make unequal builds fair; that would be a game-mode decision.
-- Juggernaut is not beaten by any single starter on Foundry Yard (it lost once in 252 duels across all three arenas in EVALUATION.md). Reducing its plate and shield did not change that; its weak sides and rear are rarely reached because the walker turns on the spot.
+- Juggernaut is not beaten by any balanced starter on Foundry Yard, and lost once in 252 duels across all three arenas in EVALUATION.md; only the boss, Sovereign, beats it (four wins and two draws in six here). Reducing its plate and shield did not change that; its weak sides and rear are rarely reached because the walker turns on the spot.
 - About one duel in seven ends in a draw at 120 s, mostly against the walkers, whose brains hold their ground rather than hunt.
