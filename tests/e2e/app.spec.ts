@@ -204,16 +204,16 @@ test('construct: hardpoint layouts relocate parts, ask before removing any, and 
   await expect(page.getByTestId('diagnostics')).toContainText('Rated mass on this chassis');
   await expect(page.getByTestId('diagnostics')).toContainText('Recoil and mounts');
   await page.getByTestId('diagnostics-toggle').click();
-  // moving a part: point defense from F.H3 onto M.H3, which holds the rear quad machine gun
+  // moving a part: point defense from F.H3 onto M.H3, which holds the tail machine gun
   await page.getByTestId('slot-F.H3').click();
   await page.getByTestId('move-part').click();
   await expect(page.locator('.hint')).toContainText('Moving Point Defense');
   await page.getByRole('radio', { name: 'Internal bays' }).click();
   await page.getByRole('radio', { name: 'Hardpoints' }).click();
   await page.getByTestId('slot-M.H3').click();
-  // the heavy Maximum F.H3 mount is medium-size, so the quad gun fits there and the two swap
+  // the heavy Maximum F.H3 mount is medium-size, so the tail gun fits there and the two swap
   await expect(page.getByTestId('notice')).toContainText('Swapped');
-  await expect(page.getByTestId('slot-F.H3')).toHaveAttribute('aria-label', /Quad/);
+  await expect(page.getByTestId('slot-F.H3')).toHaveAttribute('aria-label', /Machine Gun/);
   await expect(page.getByTestId('slot-M.H3')).toHaveAttribute('aria-label', /Point Defense/);
   // and a part that cannot fit back is refused with a reason: the heavy cannon onto a medium mount
   await page.getByTestId('slot-F.H1').click();

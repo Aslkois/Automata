@@ -108,7 +108,7 @@ export const HORNET_CODE = `// Hornet — intermediate. A flying rocket boat: si
 // in a turn; it remembers where it saw it last. The tail gun covers the break-away.
 const POD = "F.H1";
 const GUN = "R.H1";
-let state = "search";
+let state = "";          // attack · break · return · search (logged on the first decision)
 let side = 1;
 let last = null;           // last sighting {x, y, vx, vy, t}
 let brokeAt = -99;
@@ -143,7 +143,7 @@ function update() {
     brokeAt = drone.time();
     setState("break");
   } else if (state == "break" && loaded && drone.time() - brokeAt > 2.5) setState("return");
-  else if (state == "search" || state == "return") setState(loaded || pod.ammo > 2 ? (enemy != null ? "attack" : "return") : "break");
+  else if (state == "" || state == "search" || state == "return") setState(loaded || pod.ammo > 2 ? (enemy != null ? "attack" : "return") : "break");
 
   if (state == "search") {
     drone.fire(POD, false);
@@ -186,7 +186,7 @@ const MG = "F.H2";
 // search: a loop of waypoints over the arena (fractions of its width and height)
 const PATROL = [[0.3, 0.3], [0.7, 0.3], [0.7, 0.7], [0.3, 0.7]];
 let wp = 0;
-let state = "search";     // search · close · duel · reload
+let state = ""; // search · close · duel · reload
 
 function setState(s) {
   if (s == state) return;
@@ -369,7 +369,7 @@ const MGS = ["R.H1", "R.H2"];
 const FAR = 850;
 const NEAR = 400;
 let last = null;           // last sighting: {x, y, vx, vy, t}
-let state = "seek";        // seek · advance · aim · watch · step back
+let state = ""; // seek · advance · aim · watch · step back
 
 function setState(s) {
   if (s == state) return;
@@ -457,7 +457,7 @@ const CANNON = "F.H1";
 const ROTARY = "F.H2";
 let shuffle = 1;
 let lastShot = -10;
-let state = "seek";
+let state = "";          // logged on the first decision
 
 function setState(s) {
   if (s == state) return;
@@ -525,7 +525,7 @@ const AC = "F.H1";
 const GUNS = ["F.H2", "F.H3"];
 const STRIKE = 230;
 let last = null;           // last sighting {x, y, vx, vy, t}
-let state = "hunt";
+let state = "";          // logged on the first decision
 
 function setState(s) {
   if (s == state) return;
@@ -615,7 +615,7 @@ export const TALON_CODE = `// Talon — advanced artillery. Four guided missiles
 const LAUNCHER = "F.H1";
 const MGS = ["M.H3", "R.H1"];
 let tracked = null;        // {id, since}
-let state = "search";
+let state = "";          // logged on the first decision
 let moveTo = null;
 
 function setState(s) {
@@ -693,7 +693,7 @@ const AC = "F.H1";
 const POD = "F.H2";
 const PD = ["F.H3", "M.H2"];
 let source = null;         // {bearing, t}: where incoming fire came from
-let state = "patrol";
+let state = "";          // logged on the first decision
 
 function setState(s) {
   if (s == state) return;
@@ -779,7 +779,7 @@ const SIDE_GUNS = ["M.H1", "M.H2"];
 const STRIKE = 300;        // attack distance once behind it
 const WIDE = 480;          // radius for going round its front
 let side = 1;
-let state = "search";
+let state = "";          // logged on the first decision
 let last = null;           // last sighting {x, y, vx, vy, t}
 
 function setState(s) {
@@ -866,7 +866,7 @@ const MG = "R.H1";
 
 let memory = [];          // {id, x, y, vx, vy, size, heading, seen, first}
 let target = null;
-let tactic = "search";
+let tactic = "";
 let health = 1;
 let hurtAt = -99;
 let stuckFor = 0;
@@ -1099,7 +1099,7 @@ const SHIELD = "M.H2";
 const TAIL = "M.H3";
 let nextCannon = 0;
 let last = null;           // last sighting {x, y, vx, vy, t}
-let state = "advance";
+let state = "";          // logged on the first decision
 
 function setState(s, why) {
   if (s == state) return;
