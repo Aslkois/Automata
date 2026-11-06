@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LEGACY_DEFAULT_PROGRAMS } from '../../src/data/defaults';
+import { LEGACY_DEFAULT_PROGRAMS } from '../../src/data/legacy';
 import { compileBlocks } from '../../src/program/legacy/blocks';
 import { compileNodes } from '../../src/program/legacy/nodes';
 import { BLOCK_DEFS } from '../../src/program/legacy/blockDefs';

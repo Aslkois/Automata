@@ -54,7 +54,7 @@ export const API_DOCS: ApiDoc[] = [
   { group: 'Weapons', name: 'canFire', sig: 'drone.canFire(id, x, y)', returns: 'boolean', doc: 'Point within traverse arc, not obstructed by own sections, weapon loaded, cool and functional.' },
   { group: 'Weapons', name: 'inArc', sig: 'drone.inArc(id, x, y)', returns: 'boolean', doc: 'Point within traverse arc and not obstructed (ignores ammunition state).' },
   { group: 'Weapons', name: 'aimError', sig: 'drone.aimError(id, x, y)', returns: 'degrees', doc: 'Angle between the current turret direction and a point.' },
-  { group: 'Weapons', name: 'lead', sig: 'drone.lead(id, contact)', returns: '{x, y, t} | null', doc: 'Intercept point for a contact using its observed velocity and the weapon muzzle velocity.' },
+  { group: 'Weapons', name: 'lead', sig: 'drone.lead(id, contact)', returns: '{x, y, t} | null', doc: 'Where to aim a weapon to hit a contact: solved from the contact\'s observed velocity, your own velocity (rounds leave the muzzle carrying it) and the weapon\'s muzzle velocity.' },
   { group: 'Shields', name: 'shields', sig: 'drone.shields()', returns: 'Shield[]', doc: 'Own shields: charge, capacity, raised, powered, overloaded, facing, arc.' },
   { group: 'Shields', name: 'raiseShield', sig: 'drone.raiseShield(id, on = true)', returns: '', doc: 'Raise or lower a shield (lowered shields still recharge).' },
   { group: 'Shields', name: 'shieldFace', sig: 'drone.shieldFace(id, angle)', returns: '', doc: 'Rotate a directional shield to a world angle.' },

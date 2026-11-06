@@ -120,10 +120,8 @@ export const ICON: Record<string, string> = {
   wrench: 'M15 4a5 5 0 0 0-5.8 6.5L4 15.7L8.3 20l5.2-5.2A5 5 0 0 0 20 9l-3 3l-3-1l-1-3z',
   warn: 'M12 4l9 16H3zM12 10v4M12 17v.5',
   check: 'M5 12l5 5l9-10',
-  // reflection across the drone's long axis (horizontal on the stage): a part and its mirror image
-  mirror: 'M3 12h3M9 12h2M14 12h2M19 12h2M7 9.5l5-6l5 6zM7 14.5l5 6l5-6z',
-  // reflection across the lateral axis (vertical on the stage): front and rear swap
-  flip: 'M12 3v3M12 9v2M12 14v2M12 19v2M9.5 7l-6 5l6 5zM14.5 7l6 5l-6 5z',
+  // reflection across a section's vertical centreline (as on the stage): a part and its mirror image
+  mirror: 'M12 3v3M12 9v2M12 14v2M12 19v2M9.5 7l-6 5l6 5zM14.5 7l6 5l-6 5z',
   dot: 'M12 10a2 2 0 1 0 0 4a2 2 0 1 0 0-4',
   arrange: 'M4 5h7v5H4zM13 14h7v5h-7zM7.5 10v4h9',
   undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',

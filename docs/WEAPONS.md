@@ -24,15 +24,17 @@ All values come from `src/sim/content/components.ts`. Rates are **per mount**: a
 
 Each weapon accepts one family, except the rocket pod, which takes two. Magazines reload from **storage modules** in internal bays, from any section, while the store and the weapon both work.
 
-| Family | Used by | Stored in |
-| --- | --- | --- |
-| Small-calibre rounds | MG, Quad MG, Point Defense | Small-Calibre Magazine: 1500 |
-| Autocannon rounds | Autocannon, Rotary, Dual Autocannon | Medium-Calibre Magazine (payload "medium"): 400 |
-| Scatter shells | Scatter Cannon | Medium-Calibre Magazine (payload "scatter"): 60 |
-| Cannon shells | Heavy Cannon | Shell Rack (payload "shell"): 20 |
-| Coilgun penetrators | Coilgun | Shell Rack (payload "penetrator"): 24 |
-| Offensive and interceptor rockets | Rocket Pod | Rocket Cassette: 12, with a configurable interceptor split |
-| Guided heavy missiles | Heavy Missile Launcher | Missile Reserve: 8 |
+| Ammo | Id | Used by | Stored in |
+| --- | --- | --- | --- |
+| 7.62×51mm | `small` | MG, Quad MG, Point Defense | Small-Calibre Magazine: 1500 |
+| 25×137mm | `medium` | Autocannon, Rotary, Dual Autocannon | Medium-Calibre Magazine (payload `medium`): 400 |
+| 12-gauge Buckshot | `scatter` | Scatter Cannon | Medium-Calibre Magazine (payload `scatter`): 60 |
+| 120mm AP | `shell` | Heavy Cannon | Shell Rack (payload `shell`): 20 |
+| 30mm Tungsten Penetrator | `penetrator` | Coilgun | Shell Rack (payload `penetrator`): 24 |
+| 70mm HE Rocket / 70mm Interceptor | `rocket` / `interceptor` | Rocket Pod | Rocket Cassette: 12, with a configurable interceptor split |
+| 150mm Guided Missile | `missile` | Heavy Missile Launcher | Missile Reserve: 8 |
+
+The id is what programs and saved designs use (e.g. `drone.selectAmmo('F.H1', 'interceptor')`).
 
 A Medium-Calibre Magazine or a Shell Rack holds **one** payload at a time, chosen on the mount in Construct. Every store cooks off when destroyed, releasing energy in proportion to what is still inside. Shells and missiles are the most violent.
 

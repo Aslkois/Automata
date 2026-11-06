@@ -13,8 +13,9 @@ import { initialLoad, listMounts, moduleStock, type DesignStats, type DroneDesig
 
 type Stock = Partial<Record<AmmoType, number>>;
 
-/** The family's display name, e.g. "Autocannon rounds (Medium)". */
+/** The family's designation, e.g. "25×137mm". */
 export const ammoLabel = (t: AmmoType): string => AMMO_TYPES[t].label;
+export { ammoCount } from './content/components';
 
 /** Families a weapon accepts, in the order it prefers them. */
 export const acceptedAmmo = (def: ComponentDef | null | undefined): AmmoType[] => def?.weapon?.ammo ?? [];
@@ -50,21 +51,22 @@ export function storageFor(type: AmmoType): StorageOption[] {
   return out;
 }
 
-/** "Medium-Calibre Magazine", "Shell Rack set to Coilgun penetrators", "Rocket Cassette". */
+/**
+ * "Medium-Calibre Magazine", "Medium-Calibre Magazine set to 12-gauge Buckshot", "Rocket Cassette":
+ * the payload is named only when it is not the module's default.
+ */
 export function storageText(o: StorageOption): string {
-  return o.payloadChoice ? `${o.def.name} set to ${ammoLabel(o.type)}` : o.def.name;
+  return o.payloadChoice && !o.isDefault ? `${o.def.name} set to ${ammoLabel(o.type)}` : o.def.name;
 }
 
 /** A weapon's requirement, ready to show: families and the storage for each. */
 export interface AmmoRequirement {
   types: AmmoType[];
-  /** "Autocannon rounds (Medium)"; a rocket pod lists both families */
+  /** "25×137mm"; a rocket pod lists both families */
   label: string;
   storage: StorageOption[];
-  /** one line naming the storage, e.g. "Medium-Calibre Magazine" or "Rocket Cassette" */
+  /** the storage, e.g. "Medium-Calibre Magazine" or "Shell Rack set to 30mm Tungsten Penetrator" */
   storageLabel: string;
-  /** the same for a compact card: the payload is named only when it is not the module's default */
-  storageShort: string;
 }
 
 export function requirementOf(def: ComponentDef): AmmoRequirement | null {
@@ -77,12 +79,7 @@ export function requirementOf(def: ComponentDef): AmmoRequirement | null {
     const n = o.split ? o.def.name : storageText(o);
     if (!names.includes(n)) names.push(n);
   }
-  const short: string[] = [];
-  for (const o of storage) {
-    const n = o.payloadChoice && !o.isDefault ? `${o.def.name}, ${AMMO_TYPES[o.type].plural} payload` : o.def.name;
-    if (!short.includes(n)) short.push(n);
-  }
-  return { types, label: types.map(ammoLabel).join(' / '), storage, storageLabel: names.join(' or '), storageShort: short.join(' or ') };
+  return { types, label: types.map(ammoLabel).join(' / '), storage, storageLabel: names.join(' or ') };
 }
 
 /** Catalogue weapons that fire any of the given families. */

@@ -6,12 +6,16 @@ import { freshIds } from '../program/brain/ir';
 import { applyEdit, codeDocFor, irFromCode, newBrain, validateBrain, type Brain, type ViewDocs, type ViewKind } from '../program/brain/model';
 import type { ProgramSource } from '../program/types';
 import { cloneDesign, newDesign, parseDesign, type DroneDesign } from '../sim/design';
+import { STARTER_SET } from '../data/defaults';
+import { applyConfig, configStatus, refreshForHardware, storeSettings, type BrainConfig } from '../program/configure';
 import { defaultLibrary, ensureBrains, LIBRARY_VERSION, migrateLibrary, recoveredFromBrain, type Library, type RecoveredProgram } from './migrate';
 
 export type { Library, RecoveredProgram };
 
 export const KEY = 'automata.library';
 export const BACKUP_KEY = 'automata.library.v1-backup';
+/** the library as it was before the starter roster was replaced (set 3) */
+export const ROSTER_BACKUP_KEY = 'automata.library.before-roster-3';
 
 let migrationNotes: string[] = [];
 
@@ -36,12 +40,13 @@ function load(): Library {
     return defaultLibrary();
   }
   const version = (raw as { version?: number })?.version;
-  if (version !== LIBRARY_VERSION) {
-    try {
-      if (!globalThis.localStorage?.getItem(BACKUP_KEY)) globalThis.localStorage?.setItem(BACKUP_KEY, s);
-    } catch {
-      /* storage full: the migrated library still carries every program in `recovered` */
-    }
+  const starters = (raw as { starters?: number })?.starters ?? 1;
+  try {
+    if (version !== LIBRARY_VERSION && !globalThis.localStorage?.getItem(BACKUP_KEY)) globalThis.localStorage?.setItem(BACKUP_KEY, s);
+    // the roster replacement retires untouched old examples: keep the library exactly as it was
+    if (starters < STARTER_SET && !globalThis.localStorage?.getItem(ROSTER_BACKUP_KEY)) globalThis.localStorage?.setItem(ROSTER_BACKUP_KEY, s);
+  } catch {
+    /* storage full: the migrated library still carries every program in `recovered` */
   }
   const m = migrateLibrary(raw);
   if (!m) return defaultLibrary();
@@ -101,7 +106,31 @@ export const library = {
     const designs = state.designs.slice();
     if (i >= 0) designs[i] = d;
     else designs.push(d);
-    set(ensureBrains({ ...state, designs }));
+    // a brain that is still exactly its Configure settings follows the hardware (it refers to
+    // mounts by id); a customised or hand-written brain is never touched
+    const brains = state.brains.map((b) => (b.designId === d.id ? refreshForHardware(b, d) : b));
+    set(ensureBrains({ ...state, designs, brains }));
+  },
+  /**
+   * Configure: generate the brain from settings. When the brain is not currently what its
+   * settings generate (hand-written, or edited in another editor since), the program it has
+   * now is kept under Recovered programs first — regenerating never loses anything.
+   */
+  configureBrain(designId: string, data: BrainConfig): { recovered: boolean } {
+    const b = library.brainFor(designId);
+    const d = state.designs.find((x) => x.id === designId);
+    if (!b || !d) return { recovered: false };
+    const status = configStatus(b, d);
+    const keep = status === 'none' || status === 'customized';
+    const recovered = keep ? [...state.recovered, recoveredFromBrain(b, status === 'none' ? 'The hand-written brain, kept when Configure generated a new one.' : 'The customised brain, kept when Configure regenerated it.', `${d.name} brain (before Configure)`)] : state.recovered;
+    const next = { ...applyConfig(b, d, data), view: b.view };
+    set({ ...state, brains: state.brains.map((x) => (x.id === b.id ? next : x)), recovered });
+    return { recovered: keep };
+  },
+  /** Configure: keep settings without regenerating (the brain stays as the player edited it). */
+  storeConfigSettings(designId: string, data: BrainConfig) {
+    const b = library.brainFor(designId);
+    if (b) library.saveBrain(storeSettings(b, data));
   },
   /** A new design always gets exactly one brain. */
   createDesign(name = 'New drone'): DroneDesign {

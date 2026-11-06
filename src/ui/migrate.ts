@@ -5,9 +5,10 @@
 // brain. Migration never discards a program: the program clearly associated with a design
 // becomes its brain; every other program is kept in `recovered`, from where the player can
 // load it into any drone (the replaced brain is itself kept as a recovered entry).
-import { DEFAULT_BRAINS, DEFAULT_DESIGNS, LEGACY_DEFAULT_PAIRS, STARTER_SET, STARTER_SETS } from '../data/defaults';
-import { irHash } from '../program/brain/ir';
-import { BRAIN_SCHEMA, codeDocFor, newBrain, STARTER_CODE, validateBrain, type Brain } from '../program/brain/model';
+import { DEFAULT_BRAINS, DEFAULT_DESIGNS, STARTER_SET, STARTER_SETS } from '../data/defaults';
+import { LEGACY_BRAINS, LEGACY_DEFAULT_PAIRS, LEGACY_DESIGNS } from '../data/legacy';
+import { irHash, semanticHash } from '../program/brain/ir';
+import { BRAIN_SCHEMA, codeDocFor, irFromCode, newBrain, STARTER_CODE, validateBrain, type Brain } from '../program/brain/model';
 import { parseBrain } from '../program/brain/parse';
 import { legacyToCode } from '../program/legacy/migrate';
 import type { LegacyProgram } from '../program/legacy/types';
@@ -45,17 +46,72 @@ export function defaultLibrary(): Library {
   return { version: LIBRARY_VERSION, designs, brains, recovered: [], starters: STARTER_SET };
 }
 
+/** A design's content, for telling whether it is still exactly a shipped example. */
+function designShape(d: DroneDesign): string {
+  const p = parseDesign(d);
+  return JSON.stringify({ name: p.name, chassis: p.chassis, sections: p.sections });
+}
+
+let legacyHashes: Map<string, { design: string; brain: string }> | null = null;
+/** What each retired example looked like as shipped (design content and program hash). */
+function legacyShapes(): Map<string, { design: string; brain: string }> {
+  if (!legacyHashes) {
+    legacyHashes = new Map();
+    for (const d of LEGACY_DESIGNS) {
+      const b = LEGACY_BRAINS.find((x) => x.designId === d.id);
+      if (b) legacyHashes.set(d.id, { design: designShape(d), brain: semanticHash(irFromCode(b.code)) });
+    }
+  }
+  return legacyHashes;
+}
+
+/**
+ * Starter set 3 replaced the whole example roster. A retired example is removed from a
+ * library only when it is recognisably untouched: the design is exactly as shipped and its
+ * brain is exactly the shipped program (ignoring editor layout and node ids). Its program is
+ * still kept under Recovered programs. An example the player changed in any way — or whose
+ * state cannot be told for certain — stays, as the player's own drone.
+ */
+export function retireLegacyExamples(lib: Library, notes: string[]): Library {
+  const shapes = legacyShapes();
+  const retired = new Set<string>();
+  const kept: string[] = [];
+  const recovered = [...lib.recovered];
+  for (const d of lib.designs) {
+    const shipped = shapes.get(d.id);
+    if (!shipped) continue;
+    const b = lib.brains.find((x) => x.designId === d.id);
+    let sameDesign = false;
+    try {
+      sameDesign = designShape(d) === shipped.design;
+    } catch {
+      sameDesign = false;
+    }
+    const sameBrain = !!b && !b.config && semanticHash(b.ir) === shipped.brain;
+    if (sameDesign && sameBrain && b) {
+      retired.add(d.id);
+      recovered.push(recoveredFromBrain(b, `The retired example drone "${d.name}", unchanged when the starter roster was replaced. Load it into any drone if you want it back.`, `${d.name} (retired example)`));
+    } else kept.push(d.name);
+  }
+  if (retired.size) notes.push(`The old example drones were replaced by a new starter roster. ${retired.size} unchanged example${retired.size === 1 ? ' was' : 's were'} retired; their programs are kept under Recovered programs.`);
+  if (kept.length) notes.push(`Kept because you changed them: ${kept.join(', ')}.`);
+  if (!retired.size) return lib;
+  return { ...lib, designs: lib.designs.filter((d) => !retired.has(d.id)), brains: lib.brains.filter((b) => !retired.has(b.designId)), recovered };
+}
+
 /**
  * Example drones introduced after a library was created are added to it once. A player's
  * own drones and edited examples are never touched; a newer example whose id is already
- * taken is skipped, and an example the player deletes later is not brought back.
+ * taken is skipped, and an example the player deletes later is not brought back. Moving to
+ * set 3 first retires the untouched examples of the old roster (see retireLegacyExamples).
  */
 export function addNewStarters(lib: Library, notes: string[]): { library: Library; changed: boolean } {
   const have = lib.starters ?? 1;
   if (have >= STARTER_SET) return { library: lib, changed: false };
-  const ids = new Set(lib.designs.map((d) => d.id));
-  const designs = [...lib.designs];
-  const brains = [...lib.brains];
+  const base = have < 3 ? retireLegacyExamples(lib, notes) : lib;
+  const ids = new Set(base.designs.map((d) => d.id));
+  const designs = [...base.designs];
+  const brains = [...base.brains];
   const added: string[] = [];
   for (const set of STARTER_SETS) {
     if (set.set <= have) continue;
@@ -71,7 +127,7 @@ export function addNewStarters(lib: Library, notes: string[]): { library: Librar
     }
   }
   if (added.length) notes.push(`New example drones added: ${added.join(', ')}`);
-  return { library: { ...lib, designs, brains, starters: STARTER_SET }, changed: true };
+  return { library: { ...base, designs, brains, starters: STARTER_SET }, changed: true };
 }
 
 const norm = (s: string) =>

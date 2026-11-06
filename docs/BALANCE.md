@@ -36,33 +36,41 @@ A heavy missile launcher (and, separately, a rocket pod or a heavy cannon) fires
 
 Every starter against every other starter with its own brain, Foundry Yard, 120 s limit, seeds 1, 2, 3; each pairing is played from both spawn sides. Cell = wins of the row drone over the column drone out of 6 games (draws are not wins).
 
-| vs | Assa Plat | AA Dest | Skir | Stri | Wisp | Path | Need | Aegi | Mant | Harr | Bast |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| **Assault Platform** | · | 6 | 6 | 6 | 6 | 6 | 6 | 0 | 6 | 6 | 3 |
-| **AA Destroyer** | 0 | · | 2 | 3 | 0 | 6 | 3 | 1 | 6 | 5 | 0 |
-| **Skirmisher** | 0 | 0 | · | 0 | 0 | 6 | 0 | 0 | 2 | 6 | 0 |
-| **Strider** | 0 | 0 | 0 | · | 0 | 6 | 2 | 0 | 1 | 6 | 0 |
-| **Wisp** | 0 | 0 | 0 | 0 | · | 1 | 0 | 0 | 0 | 0 | 0 |
-| **Pathfinder** | 0 | 0 | 0 | 0 | 1 | · | 0 | 0 | 0 | 4 | 0 |
-| **Needle** | 0 | 0 | 0 | 1 | 4 | 6 | · | 0 | 6 | 2 | 0 |
-| **Aegis** | 4 | 1 | 0 | 6 | 6 | 6 | 6 | · | 6 | 6 | 0 |
-| **Mantis** | 0 | 0 | 2 | 0 | 6 | 6 | 0 | 0 | · | 6 | 0 |
-| **Harrier** | 0 | 0 | 0 | 0 | 4 | 1 | 0 | 0 | 0 | · | 0 |
-| **Bastion** | 3 | 3 | 6 | 6 | 6 | 6 | 6 | 0 | 6 | 6 | · |
+| vs | Pick | Gnat | Bull | Horn | Rapi | Kest | Cita | Long | Maul | Jack | Talo | Ward | Vipe | Para | Jugg |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **Picket** | · | 6 | 1 | 2 | 5 | 3 | 0 | 4 | 0 | 2 | 4 | 0 | 5 | 2 | 0 |
+| **Gnat** | 0 | · | 4 | 4 | 5 | 3 | 0 | 1 | 0 | 3 | 2 | 0 | 6 | 0 | 0 |
+| **Bulldog** | 3 | 2 | · | 4 | 5 | 3 | 0 | 0 | 0 | 4 | 0 | 0 | 2 | 0 | 0 |
+| **Hornet** | 2 | 2 | 0 | · | 1 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 |
+| **Rapier** | 1 | 1 | 1 | 4 | · | 0 | 0 | 3 | 0 | 3 | 4 | 0 | 1 | 2 | 0 |
+| **Kestrel** | 3 | 3 | 3 | 4 | 6 | · | 0 | 3 | 0 | 2 | 4 | 0 | 1 | 0 | 0 |
+| **Citadel** | 6 | 6 | 6 | 6 | 6 | 6 | · | 0 | 4 | 6 | 4 | 0 | 6 | 6 | 0 |
+| **Longbow** | 1 | 2 | 0 | 5 | 1 | 2 | 0 | · | 2 | 5 | 4 | 0 | 6 | 0 | 0 |
+| **Mauler** | 6 | 6 | 6 | 6 | 6 | 6 | 2 | 4 | · | 6 | 5 | 4 | 6 | 1 | 0 |
+| **Jackal** | 4 | 3 | 2 | 2 | 3 | 4 | 0 | 0 | 0 | · | 1 | 1 | 1 | 0 | 0 |
+| **Talon** | 0 | 1 | 6 | 6 | 2 | 1 | 0 | 0 | 0 | 4 | · | 0 | 4 | 1 | 0 |
+| **Warden** | 4 | 5 | 4 | 6 | 6 | 3 | 0 | 6 | 2 | 4 | 6 | · | 4 | 2 | 0 |
+| **Viper** | 1 | 0 | 2 | 3 | 5 | 5 | 0 | 0 | 0 | 4 | 1 | 0 | · | 0 | 0 |
+| **Paragon** | 4 | 6 | 6 | 4 | 4 | 5 | 0 | 5 | 5 | 5 | 4 | 4 | 6 | · | 0 |
+| **Juggernaut** | 6 | 6 | 0 | 6 | 6 | 6 | 0 | 0 | 6 | 2 | 6 | 6 | 6 | 5 | · |
 
 | Starter | Wins | Losses | Draws | Win % | Brain runtime errors |
 |---|---|---|---|---|---|
-| Assault Platform | 51 | 7 | 2 | 85% | 0 |
-| Bastion | 48 | 3 | 9 | 80% | 0 |
-| Aegis | 41 | 1 | 18 | 68% | 0 |
-| AA Destroyer | 26 | 10 | 24 | 43% | 0 |
-| Mantis | 20 | 33 | 7 | 33% | 0 |
-| Needle | 19 | 23 | 18 | 32% | 0 |
-| Strider | 15 | 22 | 23 | 25% | 0 |
-| Skirmisher | 14 | 16 | 30 | 23% | 0 |
-| Pathfinder | 5 | 50 | 5 | 8% | 0 |
-| Harrier | 5 | 47 | 8 | 8% | 0 |
-| Wisp | 1 | 33 | 26 | 2% | 0 |
+| Mauler | 64 | 19 | 1 | 76% | 0 |
+| Citadel | 62 | 2 | 20 | 74% | 0 |
+| Juggernaut | 61 | 0 | 23 | 73% | 0 |
+| Paragon | 58 | 19 | 7 | 69% | 0 |
+| Warden | 52 | 15 | 17 | 62% | 0 |
+| Picket | 34 | 41 | 9 | 40% | 0 |
+| Kestrel | 29 | 49 | 6 | 35% | 0 |
+| Gnat | 28 | 49 | 7 | 33% | 0 |
+| Longbow | 28 | 26 | 30 | 33% | 0 |
+| Talon | 25 | 45 | 14 | 30% | 0 |
+| Bulldog | 23 | 41 | 20 | 27% | 0 |
+| Jackal | 21 | 50 | 13 | 25% | 0 |
+| Viper | 21 | 56 | 7 | 25% | 0 |
+| Rapier | 20 | 61 | 3 | 24% | 0 |
+| Hornet | 9 | 62 | 13 | 11% | 0 |
 
 ## 4. Starters on the training courses
 
@@ -70,19 +78,23 @@ Each starter alone (seed 1) with its own brain. Time = when the objective was me
 
 | Starter | Basic maze | Obstacle course | Weapon range | Armor test | Interception test | Missile test | Cooling and power stress |
 |---|---|---|---|---|---|---|---|
-| Assault Platform | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (2 of 4 targets knocked out in 150 s) | — (2 of 3 targets knocked out in 180 s) | 16.9 s | — (1 of 2 targets knocked out in 180 s) | 13.7 s |
-| AA Destroyer | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 39.1 s | — (1 of 3 targets knocked out in 180 s) | 37.3 s | — (1 of 2 targets knocked out in 180 s) | — (0 of 1 targets knocked out in 120 s) |
-| Skirmisher | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (3 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | 35.4 s | 72.6 s | — (0 of 1 targets knocked out in 120 s) |
-| Strider | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 51.3 s | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Strider: Disarmed) | 65.7 s | — (0 of 1 targets knocked out in 120 s) |
-| Wisp | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (1 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Wisp: Disarmed) | — (1 of 2 targets knocked out in 180 s) | — (0 of 1 targets knocked out in 120 s) |
-| Pathfinder | 136.3 s | 128.2 s | — (3 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Pathfinder: Disarmed) | 60.5 s | — (0 of 1 targets knocked out in 120 s) |
-| Needle | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (3 of 4 targets knocked out in 150 s) | — (1 of 3 targets knocked out in 180 s) | — (Did not survive: Needle: Disarmed) | — (1 of 2 targets knocked out in 180 s) | 51.3 s |
-| Aegis | — (Goal not reached within 240 s) | 72.1 s | 72.5 s | — (2 of 3 targets knocked out in 180 s) | 14.1 s | 66.9 s | 12.0 s |
-| Mantis | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 81.7 s | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Mantis: Disarmed) | 65.4 s | — (0 of 1 targets knocked out in 120 s) |
-| Harrier | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (2 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Harrier: Disarmed) | — (1 of 2 targets knocked out in 180 s) | — (0 of 1 targets knocked out in 120 s) |
-| Bastion | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (2 of 4 targets knocked out in 150 s) | — (1 of 3 targets knocked out in 180 s) | — (Did not survive: Bastion: Disarmed) | — (1 of 2 targets knocked out in 180 s) | 10.9 s |
+| Picket | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 72.1 s | — (2 of 3 targets knocked out in 180 s) | — (Did not survive: Picket: Disarmed) | 66.1 s | — (0 of 1 targets knocked out in 120 s) |
+| Gnat | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 96.7 s | — (1 of 3 targets knocked out in 180 s) | — (Did not survive: Gnat: Disarmed) | 52.0 s | — (0 of 1 targets knocked out in 120 s) |
+| Bulldog | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (3 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Bulldog: Disarmed) | 93.5 s | — (0 of 1 targets knocked out in 120 s) |
+| Hornet | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (0 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Hornet: Disabled) | 88.8 s | — (0 of 1 targets knocked out in 120 s) |
+| Rapier | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 76.9 s | — (1 of 3 targets knocked out in 180 s) | — (Did not survive: Rapier: Disarmed) | 41.6 s | 12.1 s |
+| Kestrel | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 55.2 s | — (1 of 3 targets knocked out in 180 s) | — (Did not survive: Kestrel: Disarmed) | 38.7 s | — (0 of 1 targets knocked out in 120 s) |
+| Citadel | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (3 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | — (Did not survive: Citadel: Disabled) | 29.4 s | — (0 of 1 targets knocked out in 120 s) |
+| Longbow | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (3 of 4 targets knocked out in 150 s) | — (1 of 3 targets knocked out in 180 s) | — (Did not survive: Longbow: Disabled) | 72.5 s | 51.3 s |
+| Mauler | — (Goal not reached within 240 s) | 33.8 s | — (3 of 4 targets knocked out in 150 s) | — (2 of 3 targets knocked out in 180 s) | — (Did not survive: Mauler: Disarmed) | 40.2 s | 80.7 s |
+| Jackal | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 88.5 s | — (2 of 3 targets knocked out in 180 s) | — (Did not survive: Jackal: Disarmed) | 46.5 s | — (0 of 1 targets knocked out in 120 s) |
+| Talon | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (2 of 4 targets knocked out in 150 s) | — (1 of 3 targets knocked out in 180 s) | — (Did not survive: Talon: Disabled) | 52.4 s | 36.4 s |
+| Warden | — (Goal not reached within 240 s) | 56.6 s | — (3 of 4 targets knocked out in 150 s) | — (1 of 3 targets knocked out in 180 s) | — (Did not survive: Warden: Disarmed) | 71.8 s | — (0 of 1 targets knocked out in 120 s) |
+| Viper | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 73.5 s | — (1 of 3 targets knocked out in 180 s) | — (Did not survive: Viper: Disarmed) | 37.2 s | — (0 of 1 targets knocked out in 120 s) |
+| Paragon | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | 73.0 s | — (2 of 3 targets knocked out in 180 s) | 51.5 s | 25.6 s | 38.3 s |
+| Juggernaut | — (Goal not reached within 240 s) | — (Goal not reached within 150 s) | — (0 of 4 targets knocked out in 150 s) | — (0 of 3 targets knocked out in 180 s) | 35.4 s | 28.5 s | — (0 of 1 targets knocked out in 120 s) |
 
-_Generated by `npx vite-node scripts/balance.ts` in 148 s._
+_Generated by `npx vite-node scripts/balance.ts` in 186 s._
 <!-- measurements:end -->
 
 ## Findings
@@ -105,17 +117,16 @@ These were written after reading the tables above. The "before" numbers come fro
   - A single point-defense gun stopped 44% of offensive rockets, 22% of heavy-cannon shells and 13% of heavy missiles.
   - A rocket pod firing interceptor rockets stopped 94% of missiles, spending 45 interceptors on 32 missiles.
   - Interceptors are the hard counter to missiles but use up a medium hardpoint and storage. Point defense is a partial counter to everything.
-- **Starters: heavy designs win straight duels.**
-  - The Assault Platform (85%), Bastion (80%) and Aegis (68%) are rarely beaten.
-  - Wisp (2%), Pathfinder (8%) and Harrier (8%) lose most of their games.
-  - About a quarter of games (85 of 330) are draws at the 120 s limit.
-  - Aegis is the only design the Assault Platform cannot beat (0 of 6).
-  - Bastion and the Assault Platform split their games 3–3.
-  - Read this as "a 1-on-1 between unequal masses favours mass and armor", not as a ladder. Nothing equalises cost or weight. The light starters are built to teach: navigation (Pathfinder), flying (Wisp), hit-and-run (Harrier).
+- **Starters: heavy designs still win most straight duels.** The roster was replaced by fifteen new starters (see [STARTERS.md](STARTERS.md)); the fuller measurement — three arenas, three starting positions, categories, 2 v 2, 1 v 2 and Configure — is in [EVALUATION.md](EVALUATION.md). On Foundry Yard alone:
+  - Mauler (76%), Citadel (74%), Juggernaut (73%, never beaten: 61 wins, 23 draws) and Paragon (69%) win most of their games; Warden is at 62% after its offence was cut to one autocannon.
+  - Hornet (11%), Rapier (24%), Viper (25%) and Jackal (25%) lose most of theirs. Every starter still wins at least once against every opponent category (EVALUATION.md §3).
+  - 15% of games (95 of 630) are draws at the 120 s limit, mostly involving the slow walkers that hold position (Longbow is in 30 of them, Juggernaut 23, Citadel 20).
+  - As before: a 1-on-1 between unequal masses favours mass and armour, and armour being one thickness per section rewards keeping the front plate toward the enemy.
 - **Training.**
-  - Pathfinder is the only starter whose brain navigates: maze in 136.3 s, obstacle course in 128.2 s. The others have no navigation logic and never reach a goal, which is the point of the course.
-  - No starter knocks out all three armor-test plates within 180 s. The brains target the nearest contact and keep firing at plates that are already knocked out but not disabled. That is a programming lesson, not a bug.
-  - The heavy, cannon-armed starters (Bastion 10.9 s, Aegis 12.0 s, Assault Platform 13.7 s) finish the stress course. Designs built around sustained small-calibre fire do not.
+  - No new starter is built for the goal courses: none reaches the maze goal, and only Mauler (33.8 s) and Warden (56.6 s) finish the obstacle course. The retired Pathfinder brain still solves the maze in the unit tests, so the course itself is solvable with sensors alone.
+  - No starter knocks out all three armour-test plates within 180 s (Picket, Mauler, Jackal and Paragon get two).
+  - Every starter completes the missile test; only Paragon (51.5 s) and Juggernaut (35.4 s) survive the interception test.
+  - Rapier (12.1 s), Paragon, Talon, Longbow and Mauler finish the cooling and power stress course.
 
 ### What changed since the previous recording, and why
 
@@ -173,4 +184,5 @@ None of the numbers fixed in the brief changed. Unchanged values include:
 ### Not resolved
 
 - Light starters lose most straight duels against heavy ones. There is no points or weight budget to make unequal builds fair; that would be a game-mode decision.
-- About a quarter of duels still end in a draw at 120 s, mostly against Aegis and Bastion, whose brains hold position rather than hunt.
+- Juggernaut is not beaten by any single starter on Foundry Yard (it lost once in 252 duels across all three arenas in EVALUATION.md). Reducing its plate and shield did not change that; its weak sides and rear are rarely reached because the walker turns on the spot.
+- About one duel in seven ends in a draw at 120 s, mostly against the walkers, whose brains hold their ground rather than hunt.

@@ -1,23 +1,27 @@
-// Runs a duel headlessly and prints a summary. Usage: npm run sim:headless -- [seed] [seconds]
-import { AA_DESTROYER, AA_PROGRAM, ASSAULT_PLATFORM, ASSAULT_PROGRAM, BRAWLER_PROGRAM, SKIRMISHER } from '../src/data/defaults';
+// Runs a duel between two starters headlessly and prints a summary.
+// Usage: npm run sim:headless -- [seed] [seconds] [rapier-vs-kestrel]
+import { DEFAULT_BRAINS, DEFAULT_DESIGNS } from '../src/data/defaults';
+import { compileBrain } from '../src/program/brain/compile';
+import { irFromCode } from '../src/program/brain/model';
 import { computeStats, validateDesign } from '../src/sim/design';
 import { defaultArena, Simulation } from '../src/sim/world';
 
 const seed = Number(process.argv[2] ?? 1);
 const seconds = Number(process.argv[3] ?? 120);
-const which = process.argv[4] ?? 'assault-vs-aa';
-
-for (const d of [ASSAULT_PLATFORM, AA_DESTROYER, SKIRMISHER]) {
+const which = (process.argv[4] ?? 'rapier-vs-kestrel').toLowerCase().split('-vs-');
+const pick = (name: string) => {
+  const d = DEFAULT_DESIGNS.find((x) => x.name.toLowerCase() === name);
+  if (!d) throw new Error(`unknown starter "${name}" — one of: ${DEFAULT_DESIGNS.map((x) => x.name.toLowerCase()).join(', ')}`);
+  const b = DEFAULT_BRAINS.find((x) => x.designId === d.id)!;
+  return [d, compileBrain(irFromCode(b.code), b.id, `${d.name} brain`).program] as const;
+};
+const [d0, p0] = pick(which[0]);
+const [d1, p1] = pick(which[1] ?? 'kestrel');
+for (const d of [d0, d1]) {
   const s = computeStats(d);
   console.log(`${d.name}: mass ${s.mass.toFixed(0)} kg, top ${s.topSpeed.toFixed(0)} u/s, accel ${s.maxAccel.toFixed(1)}, gen ${s.powerGeneration}, peak ${s.peakDemand}`);
   for (const i of validateDesign(d, s)) console.log(`  [${i.severity}] ${i.message}`);
 }
-const pairs: Record<string, [typeof ASSAULT_PLATFORM, typeof ASSAULT_PROGRAM, typeof ASSAULT_PLATFORM, typeof ASSAULT_PROGRAM]> = {
-  'assault-vs-aa': [ASSAULT_PLATFORM, ASSAULT_PROGRAM, AA_DESTROYER, AA_PROGRAM],
-  'skirm-vs-aa': [SKIRMISHER, BRAWLER_PROGRAM, AA_DESTROYER, AA_PROGRAM],
-  'assault-vs-skirm': [ASSAULT_PLATFORM, ASSAULT_PROGRAM, SKIRMISHER, BRAWLER_PROGRAM],
-};
-const [d0, p0, d1, p1] = pairs[which];
 const sim = new Simulation({ seed, arena: defaultArena(), mode: 'duel', timeLimit: seconds, decisionHz: 10, drones: [{ design: d0, program: p0, team: 0 }, { design: d1, program: p1, team: 1 }] });
 const t0 = performance.now();
 let shots = 0;

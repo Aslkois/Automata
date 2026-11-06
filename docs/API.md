@@ -118,7 +118,7 @@ Limits: call depth 64; arrays and strings up to 10 000 elements or characters.
 | `drone.canFire(id, x, y)` | `boolean` | Point within traverse arc, not obstructed by own sections, weapon loaded, cool and functional. |
 | `drone.inArc(id, x, y)` | `boolean` | Point within traverse arc and not obstructed (ignores ammunition state). |
 | `drone.aimError(id, x, y)` | `degrees` | Angle between the current turret direction and a point. |
-| `drone.lead(id, contact)` | `{x, y, t} \| null` | Intercept point for a contact using its observed velocity and the weapon muzzle velocity. |
+| `drone.lead(id, contact)` | `{x, y, t} \| null` | Where to aim the weapon to hit the contact: solved from the contact's observed velocity, your own velocity (rounds leave the muzzle carrying it) and the weapon's muzzle velocity. For a moving shooter this point is not where the target will be. |
 
 ### Shields
 
@@ -185,7 +185,7 @@ A drone's brain is one AutoScript program; Blocks and Nodes are other ways of sh
   - `canFireAt(weapon, contact)`
   - `itemAt(list, position)` (1-based)
   - `openDistance(side)`: a distance reading you can compare. Nothing in range counts as 500; a sensor that does not work counts as 0.
-  - `steerClear(throttle = 1)`: drive on and turn toward the more open side; back out when the front bumper touches.
+  - `steerClear(throttle = 1)`: drive on and turn toward the more open side; back out when the front bumper touches or the way is blocked within 45 u.
   - `widestGap()`: relative angle of the longest clear LIDAR ray, or `null`.
   - `interceptThreat(weapon)`: aim at the soonest radar threat with lead and fire inside 350 u.
 
