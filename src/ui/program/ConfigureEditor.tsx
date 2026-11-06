@@ -53,6 +53,8 @@ export function ConfigureEditor({ design, brain, onOpenCode, onTest, canTest }: 
     intercept: hw.hasRadar && (hw.pd.length > 0 || hw.interceptors > 0),
     shields: hw.shields.length > 0,
   };
+  const mv = ex.plan.c.movementRule;
+  const orbits = mv === 'orbit' || mv === 'adaptive';
 
   const commit = (next: BrainConfig) => {
     setDraft(next);
@@ -148,8 +150,8 @@ export function ConfigureEditor({ design, brain, onOpenCode, onTest, canTest }: 
               <Optional label="Furthest distance" unit="u" auto="from range" value={draft.advanced.rangeMax} min={50} max={2000} step={10} fallback={ex.plan.band[1]} onChange={(v) => adv('rangeMax', v)} />
               <Doctrinal label="Pursuit" value={draft.advanced.pursuit} resolved={ex.plan.c.pursuit} min={0} max={1} step={0.05} show={pct} hint="0: never chase · 1: chase hard and long" onChange={(v) => adv('pursuit', v)} />
               <Doctrinal label="Retreat below" value={draft.advanced.retreatAt} resolved={ex.plan.c.retreatAt} min={0} max={0.9} step={0.05} show={(v) => (v === 0 ? 'never' : `${pct(v)} structure`)} onChange={(v) => adv('retreatAt', v)} />
-              <Select label="Orbit direction" value={draft.advanced.orbit} options={[['alternate', 'Alternate'], ['cw', 'Clockwise'], ['ccw', 'Anticlockwise']]} onChange={(v) => adv('orbit', v)} />
-              <Select label="Flank side" value={draft.advanced.flank} options={[['auto', 'Away from its guns'], ['left', 'Left'], ['right', 'Right']]} onChange={(v) => adv('flank', v)} />
+              <Select label="Orbit direction" value={draft.advanced.orbit} disabled={!orbits && 'only when it orbits'} options={[['alternate', 'Alternate'], ['cw', 'Clockwise'], ['ccw', 'Anticlockwise']]} onChange={(v) => adv('orbit', v)} />
+              <Select label="Flank side" value={draft.advanced.flank} disabled={mv !== 'flank' && 'only when it flanks'} options={[['auto', 'Away from its guns'], ['left', 'Left'], ['right', 'Right']]} onChange={(v) => adv('flank', v)} />
               <Select label="When nothing is in sight" value={draft.advanced.search} options={[['lastKnown', 'Go where it was last seen'], ['sweep', 'Sweep the arena'], ['patrol', 'Patrol the start area'], ['hold', 'Hold and turn']]} onChange={(v) => adv('search', v)} />
               <Slider label="Remember lost contacts" value={draft.advanced.memory} min={1} max={30} step={1} show={(v) => `${v} s`} onChange={(v) => adv('memory', v)} />
               <Slider label="Top speed" value={draft.advanced.speed} min={0.3} max={1} step={0.05} show={pct} onChange={(v) => adv('speed', v)} />
@@ -195,7 +197,6 @@ export function ConfigureEditor({ design, brain, onOpenCode, onTest, canTest }: 
               <Toggle label="Keep fighting when immobilised" value={draft.advanced.fightImmobilized} onChange={(v) => adv('fightImmobilized', v)} />
             </Section>
             <Section title="Adaptive behaviour">
-              <Toggle label="Switch ammunition to suit the target" value={draft.advanced.adaptAmmo} onChange={(v) => adv('adaptAmmo', v)} />
               <Toggle label="Shorten the range as weapons are lost" value={draft.advanced.adaptRange} onChange={(v) => adv('adaptRange', v)} />
               <Toggle label="Slow down and hold when running gear is damaged" value={draft.advanced.adaptPropulsion} onChange={(v) => adv('adaptPropulsion', v)} />
               <Toggle label="Avoid repeating a failed route" value={draft.advanced.avoidRepeats} onChange={(v) => adv('avoidRepeats', v)} />

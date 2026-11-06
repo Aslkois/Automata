@@ -19,6 +19,8 @@ import { BlockEditor, type EditorHandle } from './BlockEditor';
 import { designIds } from './blockTypes';
 import { CodeEditor, type CodeHandle } from './CodeEditor';
 import { ConfigureEditor } from './ConfigureEditor';
+import { brainState, titleCase } from './brainState';
+import type { TraceLoc } from '../../program/interpreter';
 import { NodeEditor } from './NodeEditor';
 import { SymbolBar } from './SymbolBar';
 
@@ -390,6 +392,8 @@ function DebugDrawer({ designId, onReveal, onClose }: { designId: string; onReve
   const ctrl = d ? sim!.controllers.get(d.id) : undefined;
   const rec = ctrl ? (pinned !== null ? ctrl.history.find((h) => h.tick === pinned) : undefined) ?? ctrl.history[ctrl.history.length - 1] : undefined;
   const dep = deployed.get(designId);
+  const bs = ctrl ? brainState(pinned !== null && rec ? ctrl.history.filter((h) => h.tick <= rec.tick) : ctrl.history, rec?.time ?? sim!.time) : null;
+  const lineOf = (loc: TraceLoc) => (loc.kind === 'line' ? dep?.lineIds[loc.line] ?? null : loc.kind === 'block' || loc.kind === 'node' ? loc.id : null);
   return (
     <Drawer title="Debug" side="right" label="Debug" onClose={onClose}>
       {!d ? (
@@ -413,6 +417,34 @@ function DebugDrawer({ designId, onReveal, onClose }: { designId: string; onReve
           <p className="muted small num">
             {d.status.label} · brain {ctrl!.state.replace('-', ' ')} · t {sim!.time.toFixed(1)} s{runner.playing ? ' · running' : ' · paused'}
           </p>
+          {bs && (
+            <div className="brain-state" data-testid="brain-state">
+              {bs.state && (
+                <p>
+                  <span className="muted small">State</span> <strong>{titleCase(bs.state)}</strong> <span className="muted small num">for {(sim!.time - bs.since).toFixed(1)} s</span>
+                  {lineOf(bs.loc) && (
+                    <button className="src" onClick={() => onReveal(lineOf(bs.loc)!)} title="Show the code that set this state">
+                      Show
+                    </button>
+                  )}
+                </p>
+              )}
+              {bs.activity.length > 0 && (
+                <ul>
+                  {bs.activity.map((a) => (
+                    <li key={a.text}>
+                      {titleCase(a.text)}
+                      {lineOf(a.loc) && (
+                        <button className="src" onClick={() => onReveal(lineOf(a.loc)!)}>
+                          Show
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           {ctrl!.lastError && <p className="error-text">{ctrl!.lastError}</p>}
           <div className="tick-strip" aria-label="Decision history">
             {ctrl!.history.slice(-60).map((h) => (

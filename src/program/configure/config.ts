@@ -67,7 +67,6 @@ export interface AdvancedConfig {
   weaponLoss: 'adapt' | 'retreat';
   fightImmobilized: boolean;
   // ── adaptation
-  adaptAmmo: boolean;
   adaptRange: boolean;
   adaptPropulsion: boolean;
   avoidRepeats: boolean;
@@ -180,7 +179,6 @@ export function defaultAdvanced(): AdvancedConfig {
     sensorLoss: 'close',
     weaponLoss: 'adapt',
     fightImmobilized: true,
-    adaptAmmo: true,
     adaptRange: true,
     adaptPropulsion: true,
     avoidRepeats: true,
@@ -252,7 +250,6 @@ export function parseConfig(raw: unknown): BrainConfig {
       sensorLoss: pick(a.sensorLoss, ['close', 'hold', 'retreat'] as const, da.sensorLoss),
       weaponLoss: pick(a.weaponLoss, ['adapt', 'retreat'] as const, da.weaponLoss),
       fightImmobilized: bool(a.fightImmobilized, da.fightImmobilized),
-      adaptAmmo: bool(a.adaptAmmo, da.adaptAmmo),
       adaptRange: bool(a.adaptRange, da.adaptRange),
       adaptPropulsion: bool(a.adaptPropulsion, da.adaptPropulsion),
       avoidRepeats: bool(a.avoidRepeats, da.avoidRepeats),

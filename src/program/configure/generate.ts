@@ -478,7 +478,7 @@ function decide() {
   if (c.doctrine === 'harassment' || a.reloadDisengage) {
     lines.push(`  // hit and run: the main weapon is empty or reloading → withdraw until it is ready
   const pw = PRIMARY == null ? null : drone.weapon(PRIMARY);
-  if (pw != null && pw.functional && (pw.reloading || pw.ammo == 0) && pw.magazine > 1) return setMode("withdrawing");`);
+  if (pw != null && pw.functional && (pw.reloading || pw.ammo == 0) && pw.magazine > 1) return setMode("reloading");`);
   }
   if (area) lines.push(`  // area control: do not chase far from the ground we hold
   if (anchor != null && Math.hypot(target.x - anchor.x, target.y - anchor.y) > RANGE_MAX + 350) return setMode("guarding");`);
@@ -634,7 +634,7 @@ function move() {${a.stuckRecovery ? `
   if (mode == "closing") return close();
   if (mode == "engaging") return engageMove();
   if (mode == "kiting") return kite(drone.angleTo(target.x, target.y));
-  if (mode == "withdrawing" || mode == "retreating" || mode == "evading") return withdraw();
+  if (mode == "reloading" || mode == "retreating" || mode == "evading") return withdraw();
   if (mode == "immobilized" || mode == "turtle") return drive(0, 0);
   search();
 }`);
@@ -657,8 +657,10 @@ function aimPoint(id, m) {
 
 // heat: a weapon above HEAT_LIMIT holds fire until it has cooled 25 below it
 function cool(w) {
-  if (w.heat > HEAT_LIMIT) cooling[w.id] = true;
-  else if (w.heat < HEAT_LIMIT - 25) cooling[w.id] = false;
+  if (w.heat > HEAT_LIMIT && cooling[w.id] != true) {
+    cooling[w.id] = true;
+    drone.log("cooling " + w.id);
+  } else if (w.heat < HEAT_LIMIT - 25) cooling[w.id] = false;
   return cooling[w.id] != true;
 }
 
@@ -871,7 +873,7 @@ function managePower() {
   let prop = ${f(p, 2)};
   let weap = ${f(w, 2)};
   let shld = ${f(s, 2)};
-  if (mode == "retreating" || mode == "withdrawing" || mode == "evading") prop = prop * 2;${hw.weapons.some((x) => x.role === 'coilgun') ? `
+  if (mode == "retreating" || mode == "reloading" || mode == "evading") prop = prop * 2;${hw.weapons.some((x) => x.role === 'coilgun') ? `
   for (const w of drone.weapons()) if (w.type == "coilgun" && w.charging) weap = weap * 2;   // feed the charge` : ''}${hw.shields.length ? `
   if (threats.length > 0) shld = shld * 1.5;` : ''}${a.emergencyPower ? `
   const pw = drone.power();

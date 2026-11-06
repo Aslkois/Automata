@@ -4641,3 +4641,64 @@ select.nf {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.mode button {
+  position: relative;
+}
+@media (max-width: 720px) {
+  .mode button {
+    padding: 0 4px;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+  }
+  .mode .cfg-dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    margin: 0;
+  }
+  .cfg .banner {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+  }
+  .cfg .banner > svg {
+    flex: none;
+    margin-top: 2px;
+  }
+  .cfg .banner .btn {
+    flex: none;
+  }
+}
+@media (max-width: 380px) {
+  .mode button {
+    font-size: 11px;
+    letter-spacing: 0.02em;
+  }
+}
+.tbtool:disabled {
+  opacity: 0.4;
+}
+.brain-state {
+  margin: 6px 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--vellum);
+}
+.brain-state p {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.brain-state strong {
+  font: 600 18px/1.1 var(--display);
+}
+.brain-state ul {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  font-size: 12.5px;
+}
+.brain-state .src {
+  margin-left: 6px;
+}

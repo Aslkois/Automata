@@ -1,6 +1,7 @@
 // The spectator card: everything about the followed drone, from real simulation state.
 // It sits on the right edge over the field; sections expand on demand.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { brainState, titleCase } from '../program/brainState';
 import { irHash } from '../../program/brain/ir';
 import type { TraceEntry } from '../../program/interpreter';
 import { functional } from '../../sim/drone';
@@ -57,6 +58,7 @@ export function Spectator({ sim, drone: d, onClose, onSelect, sheet = 'half', se
   useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
   const recent = recentFailures(d, sim.time);
   const rec = ctrl.history[ctrl.history.length - 1];
+  const bstate = brainState(ctrl.history, sim.time);
   const commands = rec?.entries.filter((e) => e.kind === 'command').map((e) => e.text) ?? [];
   const p = d.power;
   const maxHeat = d.components.reduce((m, c) => (functional(d, c) ? Math.max(m, c.heat) : m), 0);
@@ -75,6 +77,12 @@ export function Spectator({ sim, drone: d, onClose, onSelect, sheet = 'half', se
           <h2 data-testid="inspected-name">{d.name}</h2>
           <p className="muted">
             {team.name} · unit #{d.id}
+            {bstate?.state ? (
+              <>
+                {' · '}
+                <span data-testid="inspected-brain-state">{titleCase(bstate.state)}</span>
+              </>
+            ) : null}
           </p>
         </div>
         <span className={`state-pill ${tone}`} data-testid="inspected-status">
