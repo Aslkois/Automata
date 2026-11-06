@@ -362,6 +362,7 @@ test('configure: generate a brain from tactics; edits elsewhere make it customis
   await page.getByRole('button', { name: 'Recovered' }).click();
   await expect(page.getByRole('complementary', { name: /Recovered/ })).toContainText('before Configure');
   // survives a reload
+  await expect(page.locator('.brain-bar .save')).toHaveText('Saved');
   await page.reload();
   await go(page, 'Program');
   await expect(page.getByTestId('cfg-status')).toContainText('generated from these settings');

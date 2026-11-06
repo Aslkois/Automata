@@ -225,3 +225,21 @@ describe('library: starter roster replacement', () => {
     expect(r.library.designs.find((d) => d.id === DEFAULT_DESIGNS[0].id)!.name).toBe('My Picket');
   });
 });
+
+describe('library: restore examples', () => {
+  it('brings back the current starters, keeping any replaced brain under Recovered programs', async () => {
+    const { library } = await import('../../src/ui/store');
+    const talon = library.get().designs.find((d) => d.id === 'starter-talon');
+    if (talon) library.deleteDesign('starter-talon');
+    expect(library.get().designs.some((d) => d.id === 'starter-talon')).toBe(false);
+    const mine = library.createDesign('Mine');
+    const before = library.get().recovered.length;
+    library.restoreExamples();
+    const ids = library.get().designs.map((d) => d.id);
+    for (const d of DEFAULT_DESIGNS) expect(ids).toContain(d.id);
+    expect(ids).toContain(mine.id);
+    // the starters' current brains were kept before being replaced
+    expect(library.get().recovered.length).toBeGreaterThan(before);
+    library.deleteDesign(mine.id);
+  });
+});
