@@ -1479,7 +1479,8 @@ let planSince = -99;
 let planHealth = 1;
 let reach = "mid";        // fighting distance for the current target: close · mid · long
 
-const REACH = { close: 260, mid: 450, long: 720 };
+// fighting distance: "mid" = fire from where we are (up to 850 u); the others are fallbacks
+const REACH = { close: 260, mid: 600, long: 760 };
 
 function nearCount(r) {
   let n = 0;
@@ -1628,7 +1629,8 @@ function heavyGuns() {
     if (!clear) blocked = blocked + 1;
     if (err < tol * 2.5) settle = true;
     const st = drone.stability();
-    const steady = e.coil ? st.shake < 0.4 && Math.abs(drone.speed()) < 25 : st.shake < 0.9 && (Math.abs(drone.speed()) < 45 || d < 450);
+    // the lead already allows for our own motion: at gunfight ranges a moving hull may fire
+    const steady = e.coil ? st.shake < 0.4 && Math.abs(drone.speed()) < 25 : st.shake < 0.9 && (Math.abs(drone.speed()) < 60 || d < 650);
     // every heavy gun that has a solution fires: full volleys, not a trickle
     const go = clear && err < tol && steady && d < e.range && w.heat < 88;
     drone.fire(e.id, go);
@@ -1721,15 +1723,18 @@ function pointDefense() {
   }
 }
 
-// rocket pods: interceptors for missiles (and heavy shells while there are spares), rockets at
+// rocket pods: interceptors for missiles and heavy shells, rockets at
 // the target when nothing is incoming; launchers designate and keep missiles for good shots
 function launchers() {
   for (const e of HW.rocket) {
     const w = W[e.id];
     if (!w.functional) continue;
     const icpt = w.loaded.interceptor ?? 0;
-    const spare = icpt + (w.reserveByType.interceptor ?? 0) > 4;
-    const inc = threats.find((t) => t.distance < 450 && (t.size == "large" || (spare && t.speed > 600 && t.distance < 300)));
+    // heavy shells are the one thing that goes through our plate: interceptors go to them too,
+    // keeping two back for missiles once missiles have been seen
+    const missilesSeen = tracks.some((m) => m.missiles > 0.3);
+    const spare = icpt + (w.reserveByType.interceptor ?? 0) > (missilesSeen ? 2 : 0);
+    const inc = threats.find((t) => t.distance < 450 && (t.size == "large" || (spare && t.speed > 600)));
     if (inc != null && icpt > 0) {
       drone.selectAmmo(e.id, "interceptor");
       const p = drone.lead(e.id, inc) ?? inc;
@@ -1801,6 +1806,22 @@ let searchPoint = null;
 let sweep = -1;
 let movePoint = null;     // a firing position we are driving to (clearing a blocked line)
 
+// distance to the nearest obstacle on one side. A destroyed distance sensor is not taken to mean
+// "blocked" (that would leave the hull reversing for ever): the way is assumed open, and the
+// bumpers and the stuck detector catch what the sensor no longer can.
+let blindSides = {};
+
+function clearance(side) {
+  if (drone.rangeStatus(side) != "ok") {
+    if (!blindSides[side]) {
+      blindSides[side] = true;
+      say("sensor", "lost the " + side + " distance sensor: steering by bumpers and memory there");
+    }
+    return drone.bumper(side) ? 0 : 500;
+  }
+  return openDistance(side);
+}
+
 function drive(t, steer) {
   cmdThrottle = t;
   drone.drive(t, steer);
@@ -1821,9 +1842,9 @@ function detourPoint(sideSign, swing) {
 
 function steerTo(bearing, throttle) {
   const now = drone.time();
-  const front = openDistance("front");
-  const left = openDistance("left");
-  const right = openDistance("right");
+  const front = clearance("front");
+  const left = clearance("left");
+  const right = clearance("right");
   if (drone.bumper("front") || front < 45) return drive(-0.6, left > right ? 1 : -1);
   const toGoal = angleDiff(drone.heading(), bearing);
   if (front < 140 && Math.abs(toGoal) < 100) {
@@ -1864,7 +1885,7 @@ function steerTo(bearing, throttle) {
 function stance(bearing, throttle) {
   const err = angleDiff(drone.heading(), bearing);
   if (throttle < 0 && drone.bumper("rear")) throttle = 0;
-  if (throttle > 0 && openDistance("front") < 80) throttle = 0;
+  if (throttle > 0 && clearance("front") < 80) throttle = 0;
   drive(Math.abs(err) > 35 ? 0 : throttle, clamp(err / 18, -1, 1));
 }
 
@@ -1935,7 +1956,7 @@ function enemySpread() {
 // from there the cover between us no longer hides it
 function peekPoint(m) {
   const b = drone.angleTo(m.x, m.y);
-  const s = openDistance("left") > openDistance("right") ? -1 : 1;
+  const s = clearance("left") > clearance("right") ? -1 : 1;
   const a = (b + 180 + 70 * s) * Math.PI / 180;
   const ar = drone.arena();
   say("move", "#" + m.id + " hidden nearby: going round to look", 3);
@@ -1945,7 +1966,7 @@ function peekPoint(m) {
 // a firing position beside the current one, on the more open side of the blocked line
 function clearingPoint(m) {
   const b = drone.angleTo(m.x, m.y);
-  const s = openDistance("left") > openDistance("right") ? -1 : 1;
+  const s = clearance("left") > clearance("right") ? -1 : 1;
   const a = (b + 90 * s) * Math.PI / 180;
   const ar = drone.arena();
   return { x: clamp(drone.x() + Math.cos(a) * 170, 80, ar.width - 80), y: clamp(drone.y() + Math.sin(a) * 170, 80, ar.height - 80), until: drone.time() + 4 };
@@ -1995,12 +2016,18 @@ function move() {
     if (d < REACH[reach] + 60) return stance(b, 0);
     return steerTo(b, 1);
   }
-  // destroy: hold the chosen distance in the plate stance; a heavy gun about to fire stops the hull
-  const want = REACH[reach];
-  const err = d - want;
+  // destroy: a gunfight is won by volleys, and a moving hull fires fewer. At the default reach we
+  // stand and fire from wherever the guns already reach (up to 850 u); "close" and "long" are the
+  // fallbacks when standing has been failing against this target
   let thr = 0;
-  if (!settle) thr = err > 110 ? 0.7 : err < -120 ? -0.6 : 0;
-  if (err > 350 && !settle) return steerTo(b, 0.9);
+  if (reach == "mid") {
+    if (d > 850) return steerTo(b, 0.9);
+    thr = d < 160 ? -0.6 : 0;
+  } else {
+    const err = d - REACH[reach];
+    if (!settle) thr = err > 110 ? 0.7 : err < -120 ? -0.6 : 0;
+    if (err > 350 && !settle) return steerTo(b, 0.9);
+  }
   stance(b, thr);
 }
 

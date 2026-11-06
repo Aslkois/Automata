@@ -183,7 +183,10 @@ function buildJobs(): Job[] {
         const e: Entrant = { d: o.design.id, brain: `cfg:${doc.id}` };
         for (const a of ARENAS) for (const sd of SEEDS) for (const flip of [false, true]) jobs.push({ id: id++, group: 'suite', arena: a, seed: sd, limit: 150, teams: flip ? [[e], [S]] : [[S], [e]] });
       }
-    const cfg = (name: string, doc: string): Entrant => ({ d: OPPONENTS.find((o) => o.design.name === name)!.design.id, brain: `cfg:${doc}` });
+    const cfg = (name: string, doc?: string): Entrant => {
+      const o = OPPONENTS.find((x) => x.design.name === name)!;
+      return { d: o.design.id, brain: `cfg:${doc ?? o.doctrine}` };
+    };
     const st = (name: string): Entrant => m(BALANCED.find((d) => d.name === name)!.id);
     const packs: [string, Entrant[]][] = [
       ['2 × Juggernaut', [st('Juggernaut'), st('Juggernaut')]],
@@ -202,6 +205,13 @@ function buildJobs(): Job[] {
       const g: Entrant = { d: SOVEREIGN_ID, brain: `cfg:${doc}` };
       for (const y of ids) for (const a of CFG_ARENAS) for (const flip of [false, true]) jobs.push({ id: id++, group: 'bosscfg', arena: a, seed: 1, limit: 150, label: doc, teams: flip ? [[m(y)], [g]] : [[g], [m(y)]] });
       for (const a of ARENAS) for (const sd of SEEDS) for (const flip of [false, true]) jobs.push({ id: id++, group: 'bosscfg', arena: a, seed: sd, limit: 150, label: `${doc}:mirror`, teams: flip ? [[S], [g]] : [[g], [S]] });
+      // the same hard opponents Sovereign's own brain faces, each with its recorded strongest doctrine
+      for (const o of OPPONENTS) {
+        const e: Entrant = { d: o.design.id, brain: `cfg:${o.doctrine}` };
+        for (const a of ARENAS) for (const sd of SEEDS) for (const flip of [false, true]) jobs.push({ id: id++, group: 'bosscfg', arena: a, seed: sd, limit: 150, label: `${doc}:suite`, teams: flip ? [[e], [g]] : [[g], [e]] });
+      }
+      // and the same packs
+      for (const [, team] of packs) for (const a of ARENAS) for (const sd of [1, 2]) jobs.push({ id: id++, group: 'bosscfg', arena: a, seed: sd, limit: 180, label: `${doc}:pack`, teams: [[g], team] });
     }
   }
   return jobs;
@@ -765,18 +775,33 @@ function bossReport(all: Row[], say: (s?: string) => void, score: (r: JobOut, te
     say();
     say(`Configure-generated brains on Sovereign’s exact hardware, against the starter roster (${CFG_ARENAS.map((a) => ARENA_NAME[a]).join(' and ')}, seed 1, both sides) and against Sovereign itself (every arena and starting position, both sides).`);
     say();
-    say('| Brain on Sovereign’s hardware | Against the starters | Against Sovereign (its own brain) |');
-    say('|---|---|---|');
+    say('| Brain on Sovereign’s hardware | Against the starters | Against the custom opponents | Outnumbered (the packs above) | Against Sovereign (its own brain) |');
+    say('|---|---|---|---|---|');
     for (const doc of ['adaptive', 'balanced', 'interception', 'precision']) {
       const vs = (label: string) => {
         const rows = bc.filter((x) => x.job.label === label);
         let v = 0;
-        for (const { job, r } of rows) v += score(r, job.teams[0].some((e) => e.brain === `cfg:${doc}`) ? 0 : 1);
+        // the Configure brain is the one on Sovereign's hull (an opponent may run the same doctrine)
+        for (const { job, r } of rows) v += score(r, job.teams[0].some((e) => e.d === SOVEREIGN_ID && e.brain === `cfg:${doc}`) ? 0 : 1);
         return rows.length ? pct(v / rows.length) + ` (${rows.length})` : '—';
       };
-      say(`| Configure, ${doc} | ${vs(doc)} | ${vs(doc + ':mirror')} |`);
+      say(`| Configure, ${doc} | ${vs(doc)} | ${vs(doc + ':suite')} | ${vs(doc + ':pack')} | ${vs(doc + ':mirror')} |`);
     }
-    say(`| Sovereign’s own brain | ${pct(tot / n)} | — |`);
+    // Sovereign's own brain against the same opponents with the same (recorded) doctrines
+    let ov = 0;
+    let on = 0;
+    for (const { job, r } of all.filter((x) => x.job.group === 'suite')) {
+      const opp = job.teams.flat().find((e) => e.d !== SOVEREIGN_ID)!;
+      const o = OPPONENTS.find((x) => x.design.id === opp.d)!;
+      if (opp.brain !== `cfg:${o.doctrine}`) continue;
+      ov += score(r, sovTeam(job));
+      on++;
+    }
+    const own = all.filter((x) => x.job.group === 'pack');
+    const ownPack = own.reduce((acc, { r }) => acc + score(r, 0), 0);
+    say(`| Sovereign’s own brain | ${pct(tot / n)} | ${on ? pct(ov / on) + ` (${on})` : '—'} | ${own.length ? pct(ownPack / own.length) + ` (${own.length})` : '—'} | — |`);
+    say();
+    say('In mirror matches between two Sovereign hulls the spawn side matters a great deal (development runs: the western side won about 70% of mirror games whichever brain it ran), so the last column is a weak signal; the custom-opponent column is the cleaner comparison of brains on equal hardware.');
     say();
   }
 }

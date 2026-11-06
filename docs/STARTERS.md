@@ -21,7 +21,7 @@ This page is generated from the roster’s own data by `scripts/starters-doc.ts`
 | [Viper](#viper) | advanced | wheeled | Wheeled flanker | 2.86 t | 167 u/s | 74 lines | Code |
 | [Paragon](#paragon) | expert | wheeled | Wheeled adaptive generalist | 4.67 t | 178 u/s | 234 lines | Code |
 | [Juggernaut](#juggernaut) | expert | walking | Walking siege platform | 8.46 t | 90 u/s | 123 lines | Code |
-| [Sovereign](#sovereign) | **boss** | tracked | Boss — the strongest legitimate machine we could engineer | 14.90 t | 113 u/s | 819 lines | Code |
+| [Sovereign](#sovereign) | **boss** | tracked | Boss — the strongest legitimate machine we could engineer | 14.90 t | 113 u/s | 846 lines | Code |
 
 ## Beginner
 
@@ -299,7 +299,7 @@ Sovereign is the final examination. Its hardware was chosen by measuring eight c
 - **Behaviour:** Nine cooperating systems: a self-model (sections, every weapon, power, damage intake); a memory of every contact (position history, velocity, behaviour — rushing, kiting, circling, static — and weapon evidence, from tracing each incoming round back to its shooter); a threat model (danger to us, what our working weapons can do to it); target choice with commitment; a doctrine — destroy, close, screen, recover, pursue, search — scored against the situation, held for a minimum time and abandoned when it costs structure without result (failed ranges are remembered per target); fire control by role (full heavy volleys on good solutions, turret-stripping secondaries, point defense and interceptors on their own); nose-on stance and shield toward the worst fire; wall-following navigation, clearing blocked lines of fire, looking round cover, backing out when enemies spread round it; ammunition and power management. Every decision is logged with its reason.
 - **Strengths:** Beats every starter including Juggernaut, and most purpose-built custom opponents; wins most fights against two or three drones at once.
 - **Weaknesses:** Two heavy-cannon battleships of its own class at once; its tracks (8 mm) can be shot off by machine guns; slow to bring its turrets round on a surprise contact at close range.
-- **Learning focus:** How far engineering and a layered, explainable brain can go — and what you would have to build to beat it.
+- **Learning focus:** How far engineering and a layered, explainable brain can go — and what you would have to build to beat it. Most of its edge is the hull: a Configure brain on the same hardware comes close; the hand-written brain shows in finishing fights and in being outnumbered.
 
 | Section | Class / layout | Armour | Equipment |
 |---|---|---|---|

@@ -12,11 +12,15 @@ export interface Opponent {
   design: DroneDesign;
   /** what it is meant to test */
   idea: string;
+  /** the Configure doctrine that did best against Sovereign in development (used for packs and
+   *  for comparing brains on the same hardware; the main trial plays every doctrine) */
+  doctrine: string;
 }
 
 export const OPPONENTS: Opponent[] = [
   {
     idea: 'heavy-cannon battleship: four heavy cannons, a directional shield, 70 mm all round, two quad guns',
+    doctrine: 'balanced',
     design: design('c-dreadnought', 'Dreadnought', 'tracked',
       sec('heavy', 'max', 70, { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('shield_dir'), I1: m('cooler'), I2: m('autoloader'), I3: m('shell_rack'), I4: m('reactor') }),
       sec('heavy', 'max', 70, { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('radar'), I1: m('cooler'), I2: m('autoloader'), I3: m('shell_rack'), I4: m('reactor') }),
@@ -24,6 +28,7 @@ export const OPPONENTS: Opponent[] = [
   },
   {
     idea: 'the heaviest armour that still moves: 70 mm everywhere, two directional shields, coilguns and a rear heavy cannon',
+    doctrine: 'aggressive',
     design: design('c-monolith', 'Monolith', 'walking',
       sec('heavy', 'max', 70, { H1: m('coilgun'), H2: m('coilgun'), H3: m('shield_dir'), I1: m('capacitor'), I2: m('stabilizer'), I3: m('shell_rack', 0, { payload: 'penetrator' }), I4: m('reactor') }),
       sec('heavy', 'min', 70, { H1: m('shield_dir', 180), H2: m('radar'), H3: m('point_defense'), I1: m('cooler'), I2: m('spall_liner'), I3: m('ammo_small'), I4: m('reactor') }),
@@ -31,6 +36,7 @@ export const OPPONENTS: Opponent[] = [
   },
   {
     idea: 'fast evasive striker: a coilgun and a dual autocannon on wheels',
+    doctrine: 'aggressive',
     design: design('c-lancer', 'Lancer', 'wheeled',
       sec('medium', 'max', 35, { H1: m('coilgun'), H2: m('camera'), I1: m('capacitor'), I2: m('stabilizer'), I3: m('shell_rack', 0, { payload: 'penetrator' }) }),
       sec('medium', 'medium', 30, { H1: m('radar'), H2: m('dual_autocannon'), H3: m('point_defense'), I1: m('ammo_medium'), I2: m('capacitor'), I3: m('ammo_small') }),
@@ -38,6 +44,7 @@ export const OPPONENTS: Opponent[] = [
   },
   {
     idea: 'long-range artillery: two coilguns on a braced walker, radar spotting',
+    doctrine: 'aggressive',
     design: design('c-howitzer', 'Howitzer', 'walking',
       sec('heavy', 'max', 60, { H1: m('coilgun'), H2: m('coilgun'), H3: m('radar'), I1: m('capacitor'), I2: m('stabilizer'), I3: m('shell_rack', 0, { payload: 'penetrator' }), I4: m('reactor') }),
       sec('medium', 'medium', 35, { H1: m('camera'), H2: m('point_defense'), H3: m('quad_mg', 180), I1: m('capacitor'), I2: m('ammo_small'), I3: m('cooler') }),
@@ -45,6 +52,7 @@ export const OPPONENTS: Opponent[] = [
   },
   {
     idea: 'missile saturation: two heavy launchers with two reserves, a rocket pod, two point-defense guns',
+    doctrine: 'balanced',
     design: design('c-hydra', 'Hydra', 'tracked',
       sec('heavy', 'max', 60, { H1: m('missile_launcher'), H2: m('missile_launcher'), H3: m('rocket_pod'), I1: m('rocket_cassette'), I2: m('missile_reserve'), I3: m('missile_reserve'), I4: m('reactor') }),
       sec('heavy', 'min', 50, { H1: m('radar'), H2: m('point_defense'), H3: m('point_defense'), I1: m('ammo_small'), I2: m('battery'), I3: m('cooler') }),
@@ -52,6 +60,7 @@ export const OPPONENTS: Opponent[] = [
   },
   {
     idea: 'close assault: a 70 mm nose, a heavy cannon, two dual autocannons and scatter guns',
+    doctrine: 'aggressive',
     design: design('c-breacher', 'Breacher', 'tracked',
       sec('heavy', 'medium', 70, { H1: m('heavy_cannon'), H2: m('dual_autocannon'), H3: m('dual_autocannon'), I1: m('cooler'), I2: m('autoloader'), I3: m('shell_rack'), I4: m('generator_s') }),
       sec('heavy', 'min', 60, { H1: m('scatter', -60), H2: m('scatter', 60), H3: m('camera'), I1: m('ammo_medium', 0, { payload: 'scatter' }), I2: m('ammo_medium'), I3: m('ammo_medium') }),
@@ -59,6 +68,7 @@ export const OPPONENTS: Opponent[] = [
   },
   {
     idea: 'multi-directional platform: heavy guns and coilguns facing every way',
+    doctrine: 'interception',
     design: design('c-hedgehog', 'Hedgehog', 'walking',
       sec('heavy', 'max', 70, { H1: m('heavy_cannon', -40), H2: m('heavy_cannon', 40), H3: m('radar'), I1: m('cooler'), I2: m('autoloader'), I3: m('shell_rack'), I4: m('reactor') }),
       sec('heavy', 'max', 60, { H1: m('coilgun', -90), H2: m('coilgun', 90), H3: m('point_defense'), I1: m('capacitor'), I2: m('shell_rack', 0, { payload: 'penetrator' }), I3: m('ammo_small'), I4: m('reactor') }),
@@ -66,6 +76,7 @@ export const OPPONENTS: Opponent[] = [
   },
   {
     idea: 'fast flying rocket raider, fielded in packs',
+    doctrine: 'aggressive',
     design: design('c-wraith', 'Wraith', 'flying',
       sec('light', 'max', 15, { H1: m('rocket_pod'), H2: m('camera') }),
       sec('light', 'medium', 12, { I1: m('rocket_cassette'), I2: m('rocket_cassette') }),
