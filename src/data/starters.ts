@@ -1275,6 +1275,7 @@ function discover() {
   }
   for (const s of drone.shields()) HW.shields.push(s.id);
   say("hw", "online: " + HW.heavy.length + " heavy guns, " + HW.medium.length + " medium guns, " + HW.pd.length + " point defense, " + HW.rocket.length + " rocket pods, " + HW.shields.length + " shields");
+  say("plan", "plan: " + plan + " — no contact yet");
 }
 
 function assessSelf() {

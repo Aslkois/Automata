@@ -1,5 +1,5 @@
-// What a brain says it is doing: the newest "mode: …", "state: …" or "tactic: …" it logged
-// (generated brains and the starters log their state changes), plus what it reported in the
+// What a brain says it is doing: the newest "mode: …", "state: …", "tactic: …" or "plan: …" it
+// logged (generated brains and the starters log their state changes; Sovereign logs its plan), plus what it reported in the
 // last second (cooling a weapon, intercepting a round, a new target). Read from the decision
 // history the runtime already records — nothing is inferred from the simulation itself.
 import type { DecisionRecord } from '../../program/runtime';
@@ -14,7 +14,7 @@ export interface BrainState {
   activity: { text: string; loc: TraceLoc }[];
 }
 
-const STATE = /^(?:mode|state|tactic):\s*(.+)$/;
+const STATE = /^(?:mode|state|tactic|plan):\s*(.+)$/;
 const ACTIVITY = /^(cooling|intercepting|dodging|target|stuck)/;
 
 export function brainState(history: DecisionRecord[], now: number): BrainState | null {
