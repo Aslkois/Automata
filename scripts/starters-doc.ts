@@ -8,6 +8,7 @@ import { computeStats, type SectionDesign } from '../src/sim/design';
 const out: string[] = [];
 const say = (s = '') => out.push(s);
 const VIEW: Record<string, string> = { blocks: 'Blocks', nodes: 'Nodes', code: 'Code', configure: 'Configure' };
+const TIER: Record<string, string> = { beginner: 'beginner', intermediate: 'intermediate', advanced: 'advanced', expert: 'expert', boss: '**boss**' };
 const parts = (s: SectionDesign) =>
   Object.entries(s.slots)
     .filter(([, m]) => m)
@@ -16,7 +17,7 @@ const parts = (s: SectionDesign) =>
 
 say('# Starter drones');
 say();
-say(`AUTOMATA ships ${DEFAULT_DESIGNS.length} starter drones. Each one is a coherent machine built around one combat problem, with its own hand-written brain; together they climb from a dozen-line beginner program to expert brains with memory and utility scoring. All of them use only the public drone API and what their own sensors report — no starter sees through walls, reads enemy health or knows where an unseen enemy is.`);
+say(`AUTOMATA ships ${DEFAULT_DESIGNS.length} starter drones. Fifteen are balanced teaching machines, each built around one combat problem with its own hand-written brain; they climb from a dozen-line beginner program to expert brains with memory and utility scoring. The sixteenth, **Sovereign**, is the only member of the **Boss** tier: it is not balanced, and it is built to dominate. All of them use only the public drone API and what their own sensors report — no starter sees through walls, reads enemy health or knows where an unseen enemy is — and all of them obey the same construction rules and physics.`);
 say();
 say('This page is generated from the roster’s own data by `scripts/starters-doc.ts`. Measured results against each other are in [EVALUATION.md](EVALUATION.md).');
 say();
@@ -26,12 +27,16 @@ for (const d of DEFAULT_DESIGNS) {
   const i = STARTER_INFO.find((x) => x.designId === d.id)!;
   const b = DEFAULT_BRAINS.find((x) => x.designId === d.id)!;
   const s = computeStats(d);
-  say(`| [${d.name}](#${d.name.toLowerCase()}) | ${i.complexity} | ${d.chassis} | ${i.role} | ${(s.mass / 1000).toFixed(2)} t | ${Math.round(s.topSpeed)} u/s | ${b.code.split('\n').length} lines | ${VIEW[b.view]} |`);
+  say(`| [${d.name}](#${d.name.toLowerCase()}) | ${TIER[i.complexity]} | ${d.chassis} | ${i.role} | ${(s.mass / 1000).toFixed(2)} t | ${Math.round(s.topSpeed)} u/s | ${b.code.split('\n').length} lines | ${VIEW[b.view]} |`);
 }
 say();
-for (const level of ['beginner', 'intermediate', 'advanced', 'expert'] as const) {
+for (const level of ['beginner', 'intermediate', 'advanced', 'expert', 'boss'] as const) {
   say(`## ${level[0].toUpperCase() + level.slice(1)}`);
   say();
+  if (level === 'boss') {
+    say('Sovereign is the final examination. Its hardware was chosen by measuring eight candidate hulls in simulated combat, and its brain — about 800 lines, the largest in the roster — was rewritten and re-measured until further changes stopped paying off. Measured results, including against custom battleships, missile batteries and packs of two or three drones, are in [EVALUATION.md](EVALUATION.md) §7; how it was engineered is in §8.');
+    say();
+  }
   for (const d of DEFAULT_DESIGNS) {
     const i = STARTER_INFO.find((x) => x.designId === d.id)!;
     if (i.complexity !== level) continue;
@@ -58,7 +63,7 @@ for (const level of ['beginner', 'intermediate', 'advanced', 'expert'] as const)
 say('## How the roster was put together');
 say();
 say('- **No quota.** Each starter answers a different question: what problem it solves, why its chassis, why every part is there, how it fights, what it does when the matchup is bad, what it teaches, and why the roster needs it. Designs that could not answer all seven were not kept.');
-say('- **All four chassis are used on purpose:** wheels for speed and duels (Picket, Rapier, Kestrel, Jackal, Talon, Viper, Paragon), tracks for armour that must arrive (Bulldog, Mauler, Warden), legs for braced firing platforms (Citadel, Longbow, Juggernaut), and thrusters for speed above all (Gnat, Hornet).');
+say('- **All four chassis are used on purpose:** wheels for speed and duels (Picket, Rapier, Kestrel, Jackal, Talon, Viper, Paragon), tracks for armour that must arrive (Bulldog, Mauler, Warden, Sovereign), legs for braced firing platforms (Citadel, Longbow, Juggernaut), and thrusters for speed above all (Gnat, Hornet).');
 say('- **Every part is used by the brain.** A unit test fails if a starter carries a weapon or shield its brain never addresses.');
 say('- **The brains are separate programs,** not one template with different numbers: they share helper functions from the standard library, but the decision logic of each is its own (see the program-similarity line in EVALUATION.md).');
 say('- **Distinct behaviour is measured,** not assumed: EVALUATION.md fingerprints each starter’s movement, range, facing and fire from simulation telemetry.');

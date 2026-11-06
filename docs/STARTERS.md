@@ -1,6 +1,6 @@
 # Starter drones
 
-AUTOMATA ships 15 starter drones. Each one is a coherent machine built around one combat problem, with its own hand-written brain; together they climb from a dozen-line beginner program to expert brains with memory and utility scoring. All of them use only the public drone API and what their own sensors report — no starter sees through walls, reads enemy health or knows where an unseen enemy is.
+AUTOMATA ships 16 starter drones. Fifteen are balanced teaching machines, each built around one combat problem with its own hand-written brain; they climb from a dozen-line beginner program to expert brains with memory and utility scoring. The sixteenth, **Sovereign**, is the only member of the **Boss** tier: it is not balanced, and it is built to dominate. All of them use only the public drone API and what their own sensors report — no starter sees through walls, reads enemy health or knows where an unseen enemy is — and all of them obey the same construction rules and physics.
 
 This page is generated from the roster’s own data by `scripts/starters-doc.ts`. Measured results against each other are in [EVALUATION.md](EVALUATION.md).
 
@@ -21,6 +21,7 @@ This page is generated from the roster’s own data by `scripts/starters-doc.ts`
 | [Viper](#viper) | advanced | wheeled | Wheeled flanker | 2.86 t | 167 u/s | 74 lines | Code |
 | [Paragon](#paragon) | expert | wheeled | Wheeled adaptive generalist | 4.67 t | 178 u/s | 234 lines | Code |
 | [Juggernaut](#juggernaut) | expert | walking | Walking siege platform | 8.46 t | 90 u/s | 123 lines | Code |
+| [Sovereign](#sovereign) | **boss** | tracked | Boss — the strongest legitimate machine we could engineer | 14.90 t | 113 u/s | 847 lines | Code |
 
 ## Beginner
 
@@ -285,10 +286,31 @@ This page is generated from the roster’s own data by `scripts/starters-doc.ts`
 | middle | heavy / min | 30 mm | H1 Search Radar, H2 Compact Shield Emitter, H3 Machine Gun (180°), I1 Fire Suppression System, I2 Shell Rack, I3 Reinforced Coupling, I4 Small-Calibre Magazine |
 | rear | light / medium | 12 mm | I1 Cooling Unit, I2 Thermal Reservoir |
 
+## Boss
+
+Sovereign is the final examination. Its hardware was chosen by measuring eight candidate hulls in simulated combat, and its brain — about 800 lines, the largest in the roster — was rewritten and re-measured until further changes stopped paying off. Measured results, including against custom battleships, missile batteries and packs of two or three drones, are in [EVALUATION.md](EVALUATION.md) §7; how it was engineered is in §8.
+
+### Sovereign
+
+*Boss — the strongest legitimate machine we could engineer* · tracked
+
+- **Problem it solves:** Everything: the starter roster, purpose-built battleships, missile batteries, swarms — and being outnumbered. It is not balanced and is not meant to be.
+- **Engineering:** Chosen by measuring eight candidate hulls in simulated combat against the roster and a suite of custom opponents. Tracked (faster than legs at this weight, turns on the spot); 70 mm on all three heavy sections, so no face is weak; four heavy cannons forward on two autoloaders; a dual autocannon whose 50 mm rounds strip other drones’ turrets; a directional shield; point defense and an interceptor rocket pod with a cassette, against shells and missiles; radar; two reactors. All 60 shells ride in three racks in the rear section — a shell rack cooks off when hit, and in the measured trials a forward rack was the first thing to go — and a spall liner guards the middle section, which holds the CPU and power core. 14.9 t, 113 u/s.
+- **Behaviour:** Nine cooperating systems: a self-model (sections, every weapon, power, damage intake); a memory of every contact (position history, velocity, behaviour — rushing, kiting, circling, static — and weapon evidence, from tracing each incoming round back to its shooter); a threat model (danger to us, what our working weapons can do to it); target choice with commitment; a doctrine — destroy, close, screen, recover, pursue, search — scored against the situation, held for a minimum time and abandoned when it costs structure without result (failed ranges are remembered per target); fire control by role (full heavy volleys on good solutions, turret-stripping secondaries, point defense and interceptors on their own); nose-on stance and shield toward the worst fire; wall-following navigation, clearing blocked lines of fire, looking round cover, backing out when enemies spread round it; ammunition and power management. Every decision is logged with its reason.
+- **Strengths:** Beats every starter including Juggernaut, and most purpose-built custom opponents; wins most fights against two or three drones at once.
+- **Weaknesses:** Two heavy-cannon battleships of its own class at once; its tracks (8 mm) can be shot off by machine guns; slow to bring its turrets round on a surprise contact at close range.
+- **Learning focus:** How far engineering and a layered, explainable brain can go — and what you would have to build to beat it. Most of its edge is the hull: a Configure brain on the same hardware comes close; the hand-written brain shows in finishing fights and in being outnumbered.
+
+| Section | Class / layout | Armour | Equipment |
+|---|---|---|---|
+| front | heavy / max | 70 mm | H1 Heavy Cannon, H2 Heavy Cannon, H3 Dual Autocannon, I1 Cooling Unit, I2 Autoloader, I3 Medium-Calibre Magazine, I4 Reactor |
+| middle | heavy / max | 70 mm | H1 Heavy Cannon, H2 Heavy Cannon, H3 Directional Shield, I1 Small-Calibre Magazine, I2 Autoloader, I3 Spall Liner, I4 Reactor |
+| rear | heavy / min | 70 mm | H1 Rocket Pod [6 interceptors], H2 Search Radar, H3 Point Defense Gun, I1 Rocket Cassette [8 interceptors], I2 Shell Rack, I3 Shell Rack, I4 Shell Rack |
+
 ## How the roster was put together
 
 - **No quota.** Each starter answers a different question: what problem it solves, why its chassis, why every part is there, how it fights, what it does when the matchup is bad, what it teaches, and why the roster needs it. Designs that could not answer all seven were not kept.
-- **All four chassis are used on purpose:** wheels for speed and duels (Picket, Rapier, Kestrel, Jackal, Talon, Viper, Paragon), tracks for armour that must arrive (Bulldog, Mauler, Warden), legs for braced firing platforms (Citadel, Longbow, Juggernaut), and thrusters for speed above all (Gnat, Hornet).
+- **All four chassis are used on purpose:** wheels for speed and duels (Picket, Rapier, Kestrel, Jackal, Talon, Viper, Paragon), tracks for armour that must arrive (Bulldog, Mauler, Warden, Sovereign), legs for braced firing platforms (Citadel, Longbow, Juggernaut), and thrusters for speed above all (Gnat, Hornet).
 - **Every part is used by the brain.** A unit test fails if a starter carries a weapon or shield its brain never addresses.
 - **The brains are separate programs,** not one template with different numbers: they share helper functions from the standard library, but the decision logic of each is its own (see the program-similarity line in EVALUATION.md).
 - **Distinct behaviour is measured,** not assumed: EVALUATION.md fingerprints each starter’s movement, range, facing and fire from simulation telemetry.

@@ -1204,3 +1204,853 @@ function update() {
   }
 }
 `;
+
+// ─────────────────────────────────────────────────────────────── boss
+
+export const SOVEREIGN_CODE = `// SOVEREIGN — boss. A machine engineered around winning, and a brain to match.
+//
+// Nine cooperating systems run every decision (10 Hz):
+//   1. SELF       what still works: sections and plate, every weapon, power, heat, damage intake
+//   2. MEMORY     a track per contact: position history, velocity, heading, behaviour (rushing,
+//                 kiting, circling, static) and evidence of its weapons — every incoming round is
+//                 traced back along its path to whoever fired it
+//   3. THREAT     how dangerous each contact is to us, and what our working weapons can do to it
+//   4. TARGET     one priority target, chosen with commitment (a rival must stay better for a while)
+//   5. DOCTRINE   an objective — destroy, close, screen, recover, pursue, search — scored against
+//                 the situation, held for a minimum time, and abandoned when it is not working:
+//                 failed approaches are remembered per target and not repeated
+//   6. WEAPONS    every weapon has a role: heavy guns fire full volleys on good solutions, medium
+//                 guns strip turrets that the heavy guns cannot reach through plate, point defense
+//                 and interceptors work on incoming rounds by themselves
+//   7. DEFENCE    nose-on to the danger (armour is one thickness per section: nose-on, only the
+//                 front section's narrow face can be hit; angled, the long sides of all three
+//                 sections — the middle one holds the CPU — are exposed), the shield toward the
+//                 worst incoming fire, fires put out at once
+//   8. MOVEMENT   distance and stance for the objective, clearing blocked lines of fire, detours
+//                 round cover, getting unstuck, and a search that looks behind every cover
+//   9. RESOURCES  power by phase, heat rests, ammunition economy
+// Every decision that matters is logged with its reason, for the Debug drawer and the spectator.
+// Only the public drone API and its own sensors: it never knows what it cannot see.
+
+// ═══════════════════════════════════════════════════════════════ 1. self
+let HW = null;            // weapons by role, discovered at the first decision
+let W = {};               // this decision's weapon snapshot, by id
+let SEC = {};             // this decision's sections, by position
+let health = 1;           // average section integrity
+let lastSec = null;
+let intake = 0;           // smoothed structure lost per second
+let hurtAt = -99;
+let heavyUp = 0;          // working heavy guns
+let lastLog = {};
+
+function say(topic, text, every) {
+  const t = drone.time();
+  const prev = lastLog[topic];
+  if (prev != null && (prev.text == text ? t - prev.t < 5 : t - prev.t < (every ?? 0))) return;
+  lastLog[topic] = { t: t, text: text };
+  drone.log(text);
+}
+
+function roleOf(type) {
+  if (type == "heavy_cannon" || type == "coilgun") return "heavy";
+  if (type == "missile_launcher") return "missile";
+  if (type == "rocket_pod") return "rocket";
+  if (type == "point_defense") return "pd";
+  if (type == "scatter") return "scatter";
+  if (type == "mg" || type == "quad_mg") return "light";
+  return "medium";          // autocannon, dual autocannon, rotary cannon
+}
+
+function discover() {
+  HW = { heavy: [], medium: [], pd: [], missile: [], rocket: [], all: [], shields: [] };
+  for (const w of drone.weapons()) {
+    const r = roleOf(w.type);
+    const e = { id: w.id, role: r, type: w.type, range: w.range, pen: w.penetration, coil: w.type == "coilgun", start: w.ammo + w.reserve };
+    HW.all.push(e);
+    if (r == "heavy") HW.heavy.push(e);
+    else if (r == "pd") HW.pd.push(e);
+    else if (r == "missile") HW.missile.push(e);
+    else if (r == "rocket") HW.rocket.push(e);
+    else HW.medium.push(e);
+  }
+  for (const s of drone.shields()) HW.shields.push(s.id);
+  say("hw", "online: " + HW.heavy.length + " heavy guns, " + HW.medium.length + " medium guns, " + HW.pd.length + " point defense, " + HW.rocket.length + " rocket pods, " + HW.shields.length + " shields");
+  say("plan", "plan: " + plan + " — no contact yet");
+}
+
+function assessSelf() {
+  W = {};
+  for (const w of drone.weapons()) W[w.id] = w;
+  heavyUp = 0;
+  for (const e of HW.heavy) if (W[e.id].functional) heavyUp = heavyUp + 1;
+  let sum = 0;
+  let worst = 0;
+  const secs = drone.sections();
+  for (const s of secs) {
+    SEC[s.id] = s;
+    const integ = s.attached && !s.destroyed ? s.integrity : 0;
+    sum = sum + integ;
+    if (lastSec != null) worst = Math.max(worst, lastSec[s.id] - integ);
+  }
+  lastSec = {};
+  for (const s of secs) lastSec[s.id] = s.attached && !s.destroyed ? s.integrity : 0;
+  if (worst > 0.002) hurtAt = drone.time();
+  intake = intake * 0.92 + worst * 10 * 0.08;
+  health = sum / 3;
+  for (const f of drone.failures()) if (f.type == "component-destroyed" || f.type == "section-destroyed") say("fail", "lost: " + f.detail);
+}
+
+// ═══════════════════════════════════════════════════════════════ 2. memory
+let tracks = [];
+let threats = [];
+let sources = [];         // where unattributed fire came from {x, y, t}
+
+function observe() {
+  const now = drone.time();
+  for (const c of drone.enemies()) {
+    let m = tracks.find((x) => x.id == c.id);
+    if (m == null) {
+      m = { id: c.id, first: now, size: null, hist: [], shots: 0, heavy: 0, missiles: 0, behaviour: "unknown", failed: {}, gone: false, blocked: 0, vx: 0, vy: 0 };
+      tracks.push(m);
+      say("new", "contact #" + c.id + " at " + Math.round(c.distance) + " u");
+    }
+    m.x = c.x;
+    m.y = c.y;
+    if (c.vx != null) {
+      m.vx = c.vx;
+      m.vy = c.vy;
+    }
+    if (c.heading != null) m.heading = c.heading;
+    if (c.size != null) m.size = c.size;
+    m.seen = now;
+    m.gone = c.disabled == true;
+    m.contact = c;
+    if (m.hist.length == 0 || now - m.hist[m.hist.length - 1].t >= 0.5) {
+      m.hist.push({ t: now, x: c.x, y: c.y, d: c.distance });
+      if (m.hist.length > 8) m.hist.shift();
+    }
+  }
+  tracks = tracks.filter((m) => !m.gone && now - m.seen < 30);
+  // incoming rounds: trace each back along its path to the contact on that line
+  threats = drone.threats();
+  for (const t of threats) {
+    const sp = Math.max(1, t.speed);
+    const ux = -t.vx / sp;
+    const uy = -t.vy / sp;
+    let best = null;
+    let bestOff = 70;
+    for (const m of tracks) {
+      const rx = m.x - t.x;
+      const ry = m.y - t.y;
+      if (rx * ux + ry * uy < 0) continue;
+      const off = Math.abs(rx * uy - ry * ux);
+      if (off < bestOff) {
+        bestOff = off;
+        best = m;
+      }
+    }
+    const shell = t.speed > 600 && t.size != "large";
+    if (best != null) {
+      best.shots = best.shots + 0.1;
+      if (shell) best.heavy = Math.min(3, best.heavy + 0.1);
+      if (t.size == "large") best.missiles = Math.min(3, best.missiles + 0.1);
+    } else if (sources.length < 6 && t.distance > 150) sources.push({ x: t.x + ux * 500, y: t.y + uy * 500, t: now });
+  }
+  sources = sources.filter((s) => now - s.t < 10);
+  for (const m of tracks) {
+    m.shots = m.shots * 0.97;
+    m.heavy = m.heavy * 0.997;
+    m.missiles = m.missiles * 0.997;
+    m.behaviour = classify(m);
+  }
+}
+
+// how it moves, from its position history relative to us
+function classify(m) {
+  if (m.hist.length < 4) return "unknown";
+  const a = m.hist[m.hist.length - 4];
+  const b = m.hist[m.hist.length - 1];
+  const dt = Math.max(0.1, b.t - a.t);
+  const travel = Math.hypot(b.x - a.x, b.y - a.y) / dt;
+  const closing = (a.d - b.d) / dt;
+  if (travel < 15) return "static";
+  if (closing > 40) return "rushing";
+  if (closing < -40) return "kiting";
+  if (travel > 60 && Math.abs(closing) < 30) return "circling";
+  return "manoeuvring";
+}
+
+function visible(m) {
+  return m != null && m.seen == drone.time();
+}
+
+// where it should be t seconds from now, from what we last observed
+function ahead(m, t) {
+  const k = Math.min(drone.time() - m.seen + t, 3);
+  return { x: m.x + m.vx * k, y: m.y + m.vy * k };
+}
+
+// ═══════════════════════════════════════════════════════════════ 3. threat
+// the plate we expect on the face we would hit: size class gives the plate, aspect the face
+function plateFacing(m) {
+  const base = m.size == "large" ? 60 : m.size == "medium" ? 30 : m.size == "small" ? 14 : 35;
+  if (m.heading == null) return base;
+  const a = Math.abs(angleDiff(m.heading, drone.angleTo(m.x, m.y) + 180));
+  return a > 120 ? base * 0.4 : a > 60 ? base * 0.75 : base;
+}
+
+function aimedAtUs(m) {
+  return m.heading != null && Math.abs(angleDiff(m.heading, drone.angleTo(m.x, m.y) + 180)) < 35;
+}
+
+// heavy guns seen firing, or a hull big enough to carry them
+function heavyArmed(m) {
+  return m.heavy > 0.25 || m.size == "large";
+}
+
+function danger(m, d) {
+  let v = (m.size == "large" ? 3 : m.size == "medium" ? 2 : m.size == "small" ? 1.2 : 2) + m.heavy * 4 + m.missiles * 2 + Math.min(m.shots, 3);
+  if (aimedAtUs(m)) v = v + 1;
+  if (m.behaviour == "rushing") v = v + 1.5;
+  return v * (d < 350 ? 1.6 : d < 700 ? 1.2 : 0.9);
+}
+
+// what we can do to it: the best working weapon that reaches, through plate or at its turrets
+function harm(m, d) {
+  const plate = plateFacing(m);
+  let best = 0;
+  for (const e of HW.all) {
+    if (!W[e.id].functional || e.role == "pd" || d > e.range) continue;
+    const v = e.pen >= plate * 1.15 ? (e.role == "heavy" ? 3 : 1.6) : e.pen >= 30 ? 0.8 : 0.1;
+    if (v > best) best = v;
+  }
+  return best;
+}
+
+// ═══════════════════════════════════════════════════════════════ 4. target
+let target = null;
+let targetSince = 0;
+let rival = null;
+let rivalSince = 0;
+
+function score(m) {
+  const d = drone.distanceTo(m.x, m.y);
+  let s = danger(m, d) * 0.6 + harm(m, d) * 1.2 - (drone.time() - m.seen) * 0.4 - d / 900;
+  // its thin rear toward us: take the opening
+  if (plateFacing(m) < 20 && m.size != "small") s = s + 1;
+  return s;
+}
+
+function acquire(m, why) {
+  target = m;
+  targetSince = drone.time();
+  rival = null;
+  say("target", why);
+}
+
+function chooseTarget() {
+  if (target != null && tracks.indexOf(target) < 0) {
+    say("target", "#" + target.id + " is out of the fight");
+    target = null;
+  }
+  let best = null;
+  for (const m of tracks) {
+    m.score = score(m);
+    if (best == null || m.score > best.score) best = m;
+  }
+  if (best == null) return;
+  if (target == null) return acquire(best, "target #" + best.id + " (" + (best.size ?? "unclassified") + ", " + best.behaviour + (best.heavy > 0.25 ? ", fires heavy rounds" : "") + ")");
+  if (best == target) {
+    rival = null;
+    return;
+  }
+  // commitment: a rival must stay clearly better for a moment before we switch
+  if (best.score > target.score + 0.8 || !visible(target)) {
+    if (rival != best) {
+      rival = best;
+      rivalSince = drone.time();
+    }
+    if (drone.time() - rivalSince > (visible(target) ? 1.2 : 0.5)) acquire(best, "switch to #" + best.id + ": " + (best.heavy > 0.5 ? "it fires heavy rounds" : best.missiles > 0.5 ? "it launches missiles" : best.behaviour == "rushing" ? "it is rushing us" : !visible(target) ? "#" + target.id + " out of sight" : "greater threat"));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════ 5. doctrine
+let plan = "search";
+let planSince = -99;
+let planHealth = 1;
+let reach = "mid";        // fighting distance for the current target: close · mid · long
+
+// fighting distance: "mid" = fire from where we are (up to 850 u); the others are fallbacks
+const REACH = { close: 260, mid: 600, long: 760 };
+
+function nearCount(r) {
+  let n = 0;
+  for (const m of tracks) if (visible(m) && drone.distanceTo(m.x, m.y) < r) n = n + 1;
+  return n;
+}
+
+function planScores(d) {
+  const t = target;
+  const outranged = (t.missiles > 0.3 || (t.heavy > 0.3 && d > 650)) && d > 500;
+  const fast = t.behaviour == "circling" || Math.hypot(t.vx, t.vy) > 110;
+  const broken = health < 0.35 || heavyUp == 0;
+  return {
+    destroy: 1.2 + (heavyUp > 0 ? 0.4 : 0),
+    close: (outranged ? 1.6 : 0) + (t.behaviour == "kiting" && d > 600 ? 1 : 0) + (t.blocked > 1.5 ? 1.4 : 0),
+    screen: (fast && d < 600 ? 1.5 : 0) + (nearCount(550) > 1 ? 0.9 : 0),
+    recover: (broken ? 2.2 : 0) + (intake > 0.05 && health < 0.6 ? 0.8 : 0),
+  };
+}
+
+let shellsLow = false;
+
+function choosePlan() {
+  const now = drone.time();
+  const low = HW.heavy.length > 0 && HW.heavy.every((e) => !W[e.id].functional || ammoShare(e) < 0.2);
+  if (low && !shellsLow) {
+    shellsLow = true;
+    reach = "close";
+    say("plan", "heavy ammunition under 20%: closing in, best shots only, medium guns carry the fight");
+  }
+  if (target == null) {
+    const p = tracks.length > 0 || sources.length > 0 ? "pursue" : "search";
+    if (plan != p) setPlan(p, p == "pursue" ? (tracks.length > 0 ? "contact lost: going where it should be" : "fire came from out of sight: going to its source") : "nothing in sight: sweeping");
+    return;
+  }
+  // a target that flickers behind a corner is not "lost": keep the plan for a moment
+  if (now - target.seen > 1.2) {
+    if (plan != "pursue") setPlan("pursue", "#" + target.id + " out of sight: " + (drone.distanceTo(target.x, target.y) < 450 ? "looking round its cover" : "predicting its route"));
+    return;
+  }
+  if (!visible(target)) return;
+  const d = drone.distanceTo(target.x, target.y);
+  // a plan that costs structure without result is failing: remember it, and change the approach
+  if (plan == "destroy" && now - planSince > 10 && planHealth - health > 0.22) {
+    target.failed[reach] = now;
+    const next = reach == "mid" ? "close" : reach == "close" ? "long" : "mid";
+    say("plan", "fighting #" + target.id + " at " + reach + " range is failing (lost " + Math.round((planHealth - health) * 100) + "%): trying " + next + " range");
+    reach = next;
+    planSince = now;
+    planHealth = health;
+  }
+  const s = planScores(d);
+  let best = plan;
+  let bestS = s[plan] != null ? s[plan] + (now - planSince < 3 ? 1 : 0.3) : -1e9;
+  for (const k of ["destroy", "close", "screen", "recover"]) {
+    if (s[k] > bestS) {
+      best = k;
+      bestS = s[k];
+    }
+  }
+  if (best != plan) {
+    const why = best == "recover" ? "structure " + Math.round(health * 100) + "%, heavy guns " + heavyUp : best == "close" ? (target.blocked > 1.5 ? "no line of fire to #" + target.id : "#" + target.id + " outranges us: closing") : best == "screen" ? (nearCount(550) > 1 ? "several enemies close: holding a front toward them" : "#" + target.id + " circles: turning with it, not chasing") : "heavy guns on #" + target.id + " at " + reach + " range";
+    setPlan(best, why);
+  }
+}
+
+function setPlan(p, why) {
+  plan = p;
+  planSince = drone.time();
+  planHealth = health;
+  say("plan", "plan: " + p + " — " + why);
+}
+
+// ═══════════════════════════════════════════════════════════════ 6. weapons
+let settle = false;       // a heavy gun is about to fire: keep the hull steady
+
+function solution(id, m) {
+  if (!visible(m)) return null;
+  const p = drone.lead(id, m.contact) ?? m.contact;
+  return drone.inArc(id, p.x, p.y) ? p : null;
+}
+
+// how far off the aim may be: the target's angular size at this range
+function tolerance(e, d, m) {
+  const r = m.size == "large" ? 20 : m.size == "small" ? 12 : 16;
+  const geo = Math.atan2(r * 0.6, Math.max(60, d)) * 180 / Math.PI;
+  if (e.role == "heavy") return Math.min(geo, e.coil ? 1.2 : 1.8);
+  return Math.max(geo, e.role == "light" ? 4 : 2.5);
+}
+
+function ammoShare(e) {
+  const w = W[e.id];
+  return e.start > 0 ? (w.ammo + w.reserve) / e.start : 1;
+}
+
+// where the next enemy should come from: the target's predicted position, the origin of the last
+// unexplained fire, or the middle of the arena, where every route meets
+function watchPoint() {
+  if (target != null) return ahead(target, 0.8);
+  if (tracks.length > 0) return ahead(tracks[0], 0.8);
+  if (sources.length > 0) return sources[sources.length - 1];
+  const a = drone.arena();
+  return { x: a.width / 2, y: a.height / 2 };
+}
+
+function heavyGuns() {
+  settle = false;
+  let blocked = 0;
+  let bearing = 0;
+  for (const e of HW.heavy) {
+    const w = W[e.id];
+    if (!w.functional) continue;
+    // the priority target if this gun bears on it, else the most dangerous one it does bear on
+    let m = target;
+    let p = m != null ? solution(e.id, m) : null;
+    if (p == null) {
+      for (const o of tracks) {
+        if (o == target) continue;
+        const q = solution(e.id, o);
+        if (q != null && (m == target || danger(o, 0) > danger(m, 0))) {
+          m = o;
+          p = q;
+        }
+      }
+    }
+    if (p == null) {
+      // nothing to shoot: keep the gun on where the enemy should appear, so the first volley
+      // is ready the moment it does (turrets of this size take a second or two to come round)
+      const wp = watchPoint();
+      drone.aimAt(e.id, wp.x, wp.y);
+      drone.fire(e.id, false);
+      continue;
+    }
+    bearing = bearing + 1;
+    drone.aimAt(e.id, p.x, p.y);
+    if (e.coil && w.charging) drone.setPower(0.8, 2.5, 1);
+    if (!w.ready) {
+      drone.fire(e.id, false);
+      continue;
+    }
+    const d = drone.distanceTo(m.x, m.y);
+    const err = drone.aimError(e.id, p.x, p.y);
+    // short of ammunition: only the best shots
+    const tol = tolerance(e, d, m) * (ammoShare(e) < 0.25 ? 0.7 : 1);
+    const clear = drone.canFire(e.id, p.x, p.y);
+    if (!clear) blocked = blocked + 1;
+    if (err < tol * 2.5) settle = true;
+    const st = drone.stability();
+    // the lead already allows for our own motion: at gunfight ranges a moving hull may fire
+    const steady = e.coil ? st.shake < 0.4 && Math.abs(drone.speed()) < 25 : st.shake < 0.9 && (Math.abs(drone.speed()) < 60 || d < 650);
+    // every heavy gun that has a solution fires: full volleys, not a trickle
+    const go = clear && err < tol && steady && d < e.range && w.heat < 88;
+    drone.fire(e.id, go);
+    if (go && m != target) say("fire", e.id + " fires on #" + m.id + ": the priority target is outside its arc", 4);
+    if (!go && clear && err >= tol) say("hold", "holding " + e.id + ": aim " + err.toFixed(1) + "° of " + tol.toFixed(1) + "°", 4);
+  }
+  // every gun that bears is blocked by cover: the line of fire has to be cleared by moving
+  if (target != null && visible(target)) {
+    if (bearing > 0 && blocked == bearing) target.blocked = target.blocked + 0.1;
+    else target.blocked = Math.max(0, target.blocked - 0.2);
+    if (target.blocked > 0.5) say("hold", "line of fire to #" + target.id + " blocked by cover", 4);
+  }
+}
+
+// medium and light guns pick their own targets: through plate where they can, otherwise at the
+// turrets and running gear of whatever the heavy guns are fighting; fast things first
+function mediumGuns() {
+  for (const e of HW.medium) {
+    const w = W[e.id];
+    if (!w.functional) continue;
+    let best = null;
+    let bestV = 0;
+    let bp = null;
+    for (const m of tracks) {
+      const p = solution(e.id, m);
+      if (p == null) continue;
+      const d = drone.distanceTo(m.x, m.y);
+      if (d > e.range * 0.92) continue;
+      const v = (e.pen >= plateFacing(m) ? 2 : 1) + (m.size == "small" ? 1 : 0) + (d < 350 ? 1.5 : 0) + (m == target ? 1 : 0) + (m.behaviour == "circling" ? 1 : 0) + (heavyArmed(m) ? 0.5 : 0);
+      if (v > bestV) {
+        bestV = v;
+        best = m;
+        bp = p;
+      }
+    }
+    if (best == null) {
+      drone.fire(e.id, false);
+      if (target != null) drone.aimAt(e.id, target.x, target.y);
+      continue;
+    }
+    drone.aimAt(e.id, bp.x, bp.y);
+    if (w.fireModes.length > 1) drone.setFireMode(e.id, best.size == "large" ? "sync" : "sequence");
+    const d = drone.distanceTo(best.x, best.y);
+    drone.fire(e.id, drone.aimError(e.id, bp.x, bp.y) < tolerance(e, d, best) && drone.canFire(e.id, bp.x, bp.y) && w.heat < 82 && (e.role != "scatter" || d < 260));
+  }
+}
+
+// point defense: missiles first, then heavy shells, then whatever lands soonest; each gun takes
+// a different round when there are several
+let lastIntercept = -1;
+
+function pointDefense() {
+  const order = threats.slice().sort((a, b) => (b.size == "large" ? 2 : b.speed > 600 ? 1 : 0) - (a.size == "large" ? 2 : a.speed > 600 ? 1 : 0) || a.closingTime - b.closingTime);
+  let k = 0;
+  for (const e of HW.pd) {
+    if (!W[e.id].functional) continue;
+    let t = null;
+    for (let i = k; i < order.length && t == null; i++) {
+      if (order[i].distance < 380) {
+        t = order[i];
+        k = i + 1;
+      }
+    }
+    if (t == null && order.length > 0 && order[0].distance < 380) t = order[0];
+    if (t != null) {
+      const p = drone.lead(e.id, t) ?? t;
+      drone.aimAt(e.id, p.x, p.y);
+      drone.fire(e.id, drone.aimError(e.id, p.x, p.y) < 7);
+      if (t.id != lastIntercept) {
+        lastIntercept = t.id;
+        say("pd", "point defense on " + (t.size == "large" ? "missile" : t.speed > 600 ? "shell" : "round") + " #" + t.id, 2);
+      }
+      continue;
+    }
+    // nothing incoming: strip whatever is close
+    let near = null;
+    let np = null;
+    for (const m of tracks) {
+      if (drone.distanceTo(m.x, m.y) > 330) continue;
+      const p = solution(e.id, m);
+      if (p != null) {
+        near = m;
+        np = p;
+      }
+    }
+    if (near != null) {
+      drone.aimAt(e.id, np.x, np.y);
+      drone.fire(e.id, drone.aimError(e.id, np.x, np.y) < 6);
+    } else drone.fire(e.id, false);
+  }
+}
+
+// rocket pods: interceptors for missiles and heavy shells, rockets at
+// the target when nothing is incoming; launchers designate and keep missiles for good shots
+function launchers() {
+  for (const e of HW.rocket) {
+    const w = W[e.id];
+    if (!w.functional) continue;
+    const icpt = w.loaded.interceptor ?? 0;
+    // heavy shells are the one thing that goes through our plate: interceptors go to them too,
+    // keeping two back for missiles once missiles have been seen
+    const missilesSeen = tracks.some((m) => m.missiles > 0.3);
+    const spare = icpt + (w.reserveByType.interceptor ?? 0) > (missilesSeen ? 2 : 0);
+    const inc = threats.find((t) => t.distance < 450 && (t.size == "large" || (spare && t.speed > 600)));
+    if (inc != null && icpt > 0) {
+      drone.selectAmmo(e.id, "interceptor");
+      const p = drone.lead(e.id, inc) ?? inc;
+      drone.aimAt(e.id, p.x, p.y);
+      drone.fire(e.id, drone.aimError(e.id, p.x, p.y) < 6);
+      say("icpt", "interceptors on " + (inc.size == "large" ? "missile" : "shell") + " #" + inc.id, 2);
+      continue;
+    }
+    if ((w.loaded.rocket ?? 0) > 0) drone.selectAmmo(e.id, "rocket");
+    const p = target != null ? solution(e.id, target) : null;
+    if (p == null || (w.loaded.rocket ?? 0) == 0) {
+      drone.fire(e.id, false);
+      continue;
+    }
+    drone.aimAt(e.id, p.x, p.y);
+    const d = drone.distanceTo(target.x, target.y);
+    drone.fire(e.id, d < 700 && drone.aimError(e.id, p.x, p.y) < 3 && drone.canFire(e.id, p.x, p.y));
+  }
+  for (const e of HW.missile) {
+    if (!W[e.id].functional || target == null || !visible(target)) {
+      drone.fire(e.id, false);
+      continue;
+    }
+    drone.designate(e.id, target.contact);
+    const p = solution(e.id, target);
+    const d = drone.distanceTo(target.x, target.y);
+    drone.fire(e.id, p != null && d > 260 && d < e.range * 0.85 && drone.time() - target.first > 0.8);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════ 7. defence
+function defence() {
+  // the shield goes where the worst fire comes from: heavy shells, then missiles, then the most
+  // dangerous contact pointed at us
+  let fx = null;
+  let fy = null;
+  const shell = threats.find((t) => t.speed > 600) ?? threats[0];
+  if (shell != null) {
+    fx = shell.x;
+    fy = shell.y;
+  } else {
+    let worst = null;
+    for (const m of tracks) {
+      if (!visible(m)) continue;
+      m.dz = danger(m, drone.distanceTo(m.x, m.y)) + (aimedAtUs(m) ? 2 : 0);
+      if (worst == null || m.dz > worst.dz) worst = m;
+    }
+    if (worst != null) {
+      fx = worst.x;
+      fy = worst.y;
+    }
+  }
+  const pw = drone.power();
+  const low = pw.capacity > 0 && pw.stored < pw.capacity * 0.12;
+  for (const id of HW.shields) {
+    if (fx != null) drone.shieldFaceToward(id, fx, fy);
+    drone.raiseShield(id, fx != null && !low);
+  }
+  for (const f of drone.fires()) drone.suppressFire(f.section);
+}
+
+// ═══════════════════════════════════════════════════════════════ 8. movement
+let cmdThrottle = 0;
+let lastThrottle = 0;
+let stuckFor = 0;
+let escapeUntil = -1;
+let escapeTurn = 1;
+let searchPoint = null;
+let sweep = -1;
+let movePoint = null;     // a firing position we are driving to (clearing a blocked line)
+
+// distance to the nearest obstacle on one side. A destroyed distance sensor is not taken to mean
+// "blocked" (that would leave the hull reversing for ever): the way is assumed open, and the
+// bumpers and the stuck detector catch what the sensor no longer can.
+let blindSides = {};
+
+function clearance(side) {
+  if (drone.rangeStatus(side) != "ok") {
+    if (!blindSides[side]) {
+      blindSides[side] = true;
+      say("sensor", "lost the " + side + " distance sensor: steering by bumpers and memory there");
+    }
+    return drone.bumper(side) ? 0 : 500;
+  }
+  return openDistance(side);
+}
+
+function drive(t, steer) {
+  cmdThrottle = t;
+  drone.drive(t, steer);
+}
+
+// toward a bearing, round cover: an obstacle ahead sets a detour point about 260 u away, 70°
+// off our heading on the side away from where the obstacle extends; we drive to it and then
+// resume. Blocked again on the way, the next detour swings wider; a failed side is flipped.
+let detour = null;        // {x, y, until, side, swing}
+let detourFails = 0;
+let lastDetourAt = -99;
+
+function detourPoint(sideSign, swing) {
+  const a = (drone.heading() + sideSign * swing) * Math.PI / 180;
+  const ar = drone.arena();
+  return { x: clamp(drone.x() + Math.cos(a) * 260, 70, ar.width - 70), y: clamp(drone.y() + Math.sin(a) * 260, 70, ar.height - 70) };
+}
+
+function steerTo(bearing, throttle) {
+  const now = drone.time();
+  const front = clearance("front");
+  const left = clearance("left");
+  const right = clearance("right");
+  if (drone.bumper("front") || front < 45) return drive(-0.6, left > right ? 1 : -1);
+  const toGoal = angleDiff(drone.heading(), bearing);
+  if (front < 140 && Math.abs(toGoal) < 100) {
+    if (detour == null) {
+      let side = left < 220 && right >= 220 ? 1 : right < 220 && left >= 220 ? -1 : toGoal >= 0 ? 1 : -1;
+      if (now - lastDetourAt < 6) detourFails = detourFails + 1;
+      else detourFails = 0;
+      if (detourFails >= 2) {
+        side = -side;
+        detourFails = 0;
+      }
+      const p = detourPoint(side, 70);
+      detour = { x: p.x, y: p.y, until: now + 5, side: side, swing: 70 };
+      lastDetourAt = now;
+      say("move", "cover ahead: detour to the " + (side > 0 ? "right" : "left"), 3);
+    } else if (now - lastDetourAt > 1) {
+      // still blocked on the way round: swing wider
+      detour.swing = Math.min(130, detour.swing + 30);
+      const p = detourPoint(detour.side, detour.swing);
+      detour.x = p.x;
+      detour.y = p.y;
+      detour.until = now + 5;
+      lastDetourAt = now;
+    }
+  }
+  if (detour != null) {
+    if (now > detour.until || drone.distanceTo(detour.x, detour.y) < 60) detour = null;
+    else {
+      const e = angleDiff(drone.heading(), drone.angleTo(detour.x, detour.y));
+      return drive(Math.abs(e) > 50 ? throttle * 0.25 : throttle, clamp(e / 25, -1, 1));
+    }
+  }
+  drive(Math.abs(toGoal) > 50 ? throttle * 0.2 : throttle, clamp(toGoal / 25, -1, 1));
+}
+
+// the stance: nose-on to the line of fire, moving only along the hull's own axis (forward to
+// close, back to open the range) so the front plate never turns away
+function stance(bearing, throttle) {
+  const err = angleDiff(drone.heading(), bearing);
+  if (throttle < 0 && drone.bumper("rear")) throttle = 0;
+  if (throttle > 0 && clearance("front") < 80) throttle = 0;
+  drive(Math.abs(err) > 35 ? 0 : throttle, clamp(err / 18, -1, 1));
+}
+
+function unstuck() {
+  const now = drone.time();
+  if (now < escapeUntil) {
+    drive(-0.8, escapeTurn);
+    return true;
+  }
+  if (Math.abs(drone.speed()) < 4 && Math.abs(lastThrottle) > 0.25) stuckFor = stuckFor + 0.1;
+  else stuckFor = 0;
+  if (stuckFor > 1.2) {
+    stuckFor = 0;
+    escapeTurn = -escapeTurn;
+    escapeUntil = now + 1.2;
+    if (detour != null) {
+      detour.side = -detour.side;
+      const p = detourPoint(detour.side, 90);
+      detour.x = p.x;
+      detour.y = p.y;
+      detour.until = now + 6;
+    }
+    say("move", "stuck: backing out", 2);
+    return true;
+  }
+  return false;
+}
+
+// search: a loop round the middle that looks behind every piece of central cover, then the far
+// side of the arena
+function searchGoal() {
+  const a = drone.arena();
+  const ring = [[0.35, 0.25], [0.65, 0.25], [0.8, 0.5], [0.65, 0.75], [0.35, 0.75], [0.2, 0.5], [0.85, 0.2], [0.85, 0.8], [0.15, 0.8], [0.15, 0.2]];
+  if (searchPoint == null || drone.distanceTo(searchPoint.x, searchPoint.y) < 160) {
+    if (sweep < 0) {
+      let bestD = 1e9;
+      for (let i = 0; i < 6; i++) {
+        const dd = drone.distanceTo(ring[i][0] * a.width, ring[i][1] * a.height);
+        if (dd < bestD) {
+          bestD = dd;
+          sweep = i;
+        }
+      }
+    } else sweep = (sweep + 1) % ring.length;
+    searchPoint = { x: ring[sweep][0] * a.width, y: ring[sweep][1] * a.height };
+    say("move", "searching: waypoint " + sweep, 2);
+  }
+  return searchPoint;
+}
+
+// how far apart the visible enemies are, seen from here
+function enemySpread() {
+  let lo = 0;
+  let hi = 0;
+  let first = null;
+  for (const m of tracks) {
+    if (!visible(m)) continue;
+    const b = drone.angleTo(m.x, m.y);
+    if (first == null) first = b;
+    const rel = angleDiff(first, b);
+    lo = Math.min(lo, rel);
+    hi = Math.max(hi, rel);
+  }
+  return { deg: hi - lo, wide: hi - lo > 80 };
+}
+
+// a point beside the target's last position, off the line between us, on our more open side:
+// from there the cover between us no longer hides it
+function peekPoint(m) {
+  const b = drone.angleTo(m.x, m.y);
+  const s = clearance("left") > clearance("right") ? -1 : 1;
+  const a = (b + 180 + 70 * s) * Math.PI / 180;
+  const ar = drone.arena();
+  say("move", "#" + m.id + " hidden nearby: going round to look", 3);
+  return { x: clamp(m.x + Math.cos(a) * 260, 80, ar.width - 80), y: clamp(m.y + Math.sin(a) * 260, 80, ar.height - 80), until: drone.time() + 5 };
+}
+
+// a firing position beside the current one, on the more open side of the blocked line
+function clearingPoint(m) {
+  const b = drone.angleTo(m.x, m.y);
+  const s = clearance("left") > clearance("right") ? -1 : 1;
+  const a = (b + 90 * s) * Math.PI / 180;
+  const ar = drone.arena();
+  return { x: clamp(drone.x() + Math.cos(a) * 170, 80, ar.width - 80), y: clamp(drone.y() + Math.sin(a) * 170, 80, ar.height - 80), until: drone.time() + 4 };
+}
+
+function move() {
+  lastThrottle = cmdThrottle;
+  cmdThrottle = 0;
+  if (unstuck()) return;
+  if (plan == "search" || target == null) {
+    let goal = null;
+    if (tracks.length > 0) goal = ahead(tracks[0], 1.5);
+    else if (sources.length > 0) goal = sources[sources.length - 1];
+    else goal = searchGoal();
+    return steerTo(drone.angleTo(goal.x, goal.y), 0.9);
+  }
+  const d = drone.distanceTo(target.x, target.y);
+  const b = drone.angleTo(target.x, target.y);
+  if (plan == "pursue") {
+    // close by and hidden: it is behind cover — go round beside it, not into the cover
+    if (d < 450) {
+      if (movePoint == null || drone.time() > movePoint.until || drone.distanceTo(movePoint.x, movePoint.y) < 60) movePoint = peekPoint(target);
+      return steerTo(drone.angleTo(movePoint.x, movePoint.y), 0.9);
+    }
+    const p = ahead(target, 1);
+    return steerTo(drone.angleTo(p.x, p.y), 1);
+  }
+  if (plan == "recover") return stance(b, d < 900 ? -0.8 : 0);
+  if (plan == "screen") {
+    // outnumbered: if the enemies spread round us, back away from their middle so they all
+    // come into the forward arc of the heavy guns instead of reaching our flanks
+    const spread = enemySpread();
+    if (spread.wide) {
+      say("move", "enemies " + Math.round(spread.deg) + "° apart: backing out to bring them into one arc", 4);
+      return stance(b, -0.7);
+    }
+    return stance(b, d < 300 ? -0.6 : 0);
+  }
+  if (plan == "close") {
+    if (target.blocked > 1.5) {
+      if (movePoint == null || drone.time() > movePoint.until || drone.distanceTo(movePoint.x, movePoint.y) < 50) {
+        movePoint = clearingPoint(target);
+        say("move", "moving to clear the line of fire to #" + target.id, 3);
+      }
+      return steerTo(drone.angleTo(movePoint.x, movePoint.y), 0.8);
+    }
+    if (d < REACH[reach] + 60) return stance(b, 0);
+    return steerTo(b, 1);
+  }
+  // destroy: a gunfight is won by volleys, and a moving hull fires fewer. At the default reach we
+  // stand and fire from wherever the guns already reach (up to 850 u); "close" and "long" are the
+  // fallbacks when standing has been failing against this target
+  let thr = 0;
+  if (reach == "mid") {
+    if (d > 850) return steerTo(b, 0.9);
+    thr = d < 160 ? -0.6 : 0;
+  } else {
+    const err = d - REACH[reach];
+    if (!settle) thr = err > 110 ? 0.7 : err < -120 ? -0.6 : 0;
+    if (err > 350 && !settle) return steerTo(b, 0.9);
+  }
+  stance(b, thr);
+}
+
+// ═══════════════════════════════════════════════════════════════ 9. resources
+function resources() {
+  const charging = HW.heavy.some((e) => W[e.id].charging);
+  drone.setPower(plan == "close" || plan == "pursue" || plan == "search" ? 1.4 : 1, charging ? 2 : 1.2, threats.length > 0 ? 1.5 : 0.9);
+}
+
+// ═══════════════════════════════════════════════════════════════ main loop
+function update() {
+  if (HW == null) discover();
+  assessSelf();
+  observe();
+  chooseTarget();
+  choosePlan();
+  resources();
+  heavyGuns();
+  mediumGuns();
+  pointDefense();
+  launchers();
+  defence();
+  move();
+}
+`;

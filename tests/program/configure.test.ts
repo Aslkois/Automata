@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DESIGNS } from '../../src/data/defaults';
-import { HORNET, JUGGERNAUT, LONGBOW, PARAGON, PICKET, TALON, WARDEN } from '../../src/data/roster';
+import { HORNET, JUGGERNAUT, LONGBOW, PARAGON, PICKET, SOVEREIGN, TALON, WARDEN } from '../../src/data/roster';
 import { compileBrain } from '../../src/program/brain/compile';
 import { freshIds } from '../../src/program/brain/ir';
 import { applyEdit, codeDocFor, irFromCode, newBrain, validateBrain, STARTER_CODE } from '../../src/program/brain/model';
@@ -273,6 +273,7 @@ describe('debugger: brain state', () => {
     for (const [d, code] of [
       [LONGBOW, generateCode(LONGBOW, defaultConfig('precision'))],
       [PARAGON, DEFAULT_BRAINS.find((b) => b.designId === PARAGON.id)!.code],
+      [SOVEREIGN, DEFAULT_BRAINS.find((b) => b.designId === SOVEREIGN.id)!.code],
     ] as const) {
       const sim = new Simulation({ seed: 2, arena: defaultArena(), mode: 'duel', timeLimit: 0, decisionHz: 10, drones: [{ design: d, program: compiles(code), team: 0 }, { design: PICKET, program: compiles(generateCode(PICKET, defaultConfig())), team: 1 }] });
       sim.run(12);
@@ -282,5 +283,9 @@ describe('debugger: brain state', () => {
       expect(s!.state.length, d.name).toBeGreaterThan(2);
       expect(s!.loc.kind).toBe('line');
     }
+    // Sovereign reports its plan from its first decision, before it has seen anything
+    const sim = new Simulation({ seed: 1, arena: defaultArena(), mode: 'duel', timeLimit: 0, decisionHz: 10, drones: [{ design: SOVEREIGN, program: compiles(DEFAULT_BRAINS.find((b) => b.designId === SOVEREIGN.id)!.code), team: 0 }, { design: PICKET, program: compiles(generateCode(PICKET, defaultConfig())), team: 1 }] });
+    sim.run(0.3);
+    expect(brainState(sim.controllers.get(sim.drones[0].id)!.history, sim.time)?.state).toBe('search');
   }, 30_000);
 });
