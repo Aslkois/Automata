@@ -801,7 +801,10 @@ function bossReport(all: Row[], say: (s?: string) => void, score: (r: JobOut, te
     const ownPack = own.reduce((acc, { r }) => acc + score(r, 0), 0);
     say(`| Sovereign’s own brain | ${pct(tot / n)} | ${on ? pct(ov / on) + ` (${on})` : '—'} | ${own.length ? pct(ownPack / own.length) + ` (${own.length})` : '—'} | — |`);
     say();
-    say('In mirror matches between two Sovereign hulls the spawn side matters a great deal (development runs: the western side won about 70% of mirror games whichever brain it ran), so the last column is a weak signal; the custom-opponent column is the cleaner comparison of brains on equal hardware.');
+    const mir = bc.filter((x) => x.job.label?.endsWith(':mirror'));
+    const mirSov = mir.reduce((acc, { job, r }) => acc + score(r, job.teams[0].some((e) => e.d === SOVEREIGN_ID && e.brain === 'manual') ? 0 : 1), 0);
+    if (mir.length)
+      say(`**Mirror matches are a draw between brains.** Over all four doctrines Sovereign’s own brain scored ${pct(mirSov / mir.length)} against Configure on identical hardware (${mir.length} battles): in a straight duel between equal hulls it is not better than a generated brain. These duels are decided in the first exchange — whichever side loses its dual autocannon or a front cannon in the first two seconds loses the fight — and doctrines that differ only in a few settings land far apart, which shows how noisy 18 battles are. The custom-opponent and outnumbered columns are where the brains differ.`);
     say();
   }
 }
