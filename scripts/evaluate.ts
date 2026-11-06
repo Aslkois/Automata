@@ -17,10 +17,11 @@
 import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { DEFAULT_BRAINS, DEFAULT_DESIGNS, STARTER_INFO } from '../src/data/defaults';
+import { DEFAULT_BRAINS, DEFAULT_DESIGNS, isBoss, STARTER_INFO } from '../src/data/defaults';
+import { OPPONENTS } from './opponents';
 import { compileBrain } from '../src/program/brain/compile';
 import { irFromCode } from '../src/program/brain/model';
-import { analyzeHardware, defaultConfig, generateCode, initialConfig, type BrainConfig } from '../src/program/configure';
+import { analyzeHardware, defaultConfig, DOCTRINES, generateCode, initialConfig, type BrainConfig, type Doctrine } from '../src/program/configure';
 import type { ProgramSource } from '../src/program/types';
 import { computeStats, validateDesign, type DroneDesign } from '../src/sim/design';
 import type { Arena } from '../src/sim/types';
@@ -50,7 +51,9 @@ const ARENA_NAME: Record<string, string> = { yard: 'Foundry Yard', open: 'Open g
 
 // ------------------------------------------------------------------------------- entrants
 
-type BrainRef = 'manual' | 'default' | 'special';
+/** manual = the starter's own brain; default/special = Configure on the starter's hardware;
+ * cfg:<doctrine> = Configure with that doctrine (custom opponents, and Configure on Sovereign) */
+type BrainRef = 'manual' | 'default' | 'special' | `cfg:${string}`;
 interface Entrant {
   d: string;
   brain: BrainRef;
@@ -73,9 +76,13 @@ const SPECIAL: Record<string, Partial<BrainConfig>> = {
   'starter-paragon': { doctrine: 'adaptive' },
   'starter-juggernaut': { doctrine: 'area' },
 };
-const design = (id: string) => DEFAULT_DESIGNS.find((d) => d.id === id)!;
+const design = (id: string) => DEFAULT_DESIGNS.find((d) => d.id === id) ?? OPPONENTS.find((o) => o.design.id === id)!.design;
+const SOVEREIGN_ID = 'starter-sovereign';
+/** the balanced starters: the round robin, categories and Configure sections leave the boss out */
+const BALANCED = DEFAULT_DESIGNS.filter((d) => !isBoss(d.id));
 function configFor(e: Entrant): BrainConfig | null {
   const d = design(e.d);
+  if (e.brain.startsWith('cfg:')) return defaultConfig(e.brain.slice(4) as Doctrine);
   if (e.brain === 'default') return initialConfig(d);
   if (e.brain === 'special') {
     const s = SPECIAL[e.d];
@@ -100,7 +107,11 @@ function programFor(e: Entrant): ProgramSource {
 
 interface Job {
   id: number;
-  group: 'rr' | 'cfg' | 'mirror' | 'pairs' | 'solo';
+  group: 'rr' | 'cfg' | 'mirror' | 'pairs' | 'solo' | 'boss' | 'suite' | 'pack' | 'bosscfg';
+  /** battle time limit (s); 120 unless set */
+  limit?: number;
+  /** a label for grouped reporting (packs) */
+  label?: string;
   arena: string;
   seed: number;
   teams: [Entrant[], Entrant[]];
@@ -136,7 +147,7 @@ interface JobOut {
 function buildJobs(): Job[] {
   const jobs: Job[] = [];
   let id = 0;
-  const ids = DEFAULT_DESIGNS.map((d) => d.id);
+  const ids = BALANCED.map((d) => d.id);
   const m = (d: string): Entrant => ({ d, brain: 'manual' });
   for (let i = 0; i < ids.length; i++)
     for (let j = i + 1; j < ids.length; j++)
@@ -162,6 +173,37 @@ function buildJobs(): Job[] {
         for (const s of [1, 2]) jobs.push({ id: id++, group: 'solo', arena: 'yard', seed: s, teams: [[m(ids[i])], [m(y), m(z)]] });
       }
   }
+  // ── the boss: Sovereign against every starter, the custom suite (every doctrine), packs, and
+  //    Configure on its own hardware (is it the hardware or the brain?)
+  const S: Entrant = { d: SOVEREIGN_ID, brain: 'manual' };
+  for (const y of ids) for (const a of ARENAS) for (const sd of SEEDS) for (const flip of [false, true]) jobs.push({ id: id++, group: 'boss', arena: a, seed: sd, limit: 150, teams: flip ? [[m(y)], [S]] : [[S], [m(y)]] });
+  if (!QUICK) {
+    for (const o of OPPONENTS)
+      for (const doc of DOCTRINES) {
+        const e: Entrant = { d: o.design.id, brain: `cfg:${doc.id}` };
+        for (const a of ARENAS) for (const sd of SEEDS) for (const flip of [false, true]) jobs.push({ id: id++, group: 'suite', arena: a, seed: sd, limit: 150, teams: flip ? [[e], [S]] : [[S], [e]] });
+      }
+    const cfg = (name: string, doc: string): Entrant => ({ d: OPPONENTS.find((o) => o.design.name === name)!.design.id, brain: `cfg:${doc}` });
+    const st = (name: string): Entrant => m(BALANCED.find((d) => d.name === name)!.id);
+    const packs: [string, Entrant[]][] = [
+      ['2 × Juggernaut', [st('Juggernaut'), st('Juggernaut')]],
+      ['Juggernaut + Mauler', [st('Juggernaut'), st('Mauler')]],
+      ['3 × Mauler', [st('Mauler'), st('Mauler'), st('Mauler')]],
+      ['Warden + Talon + Longbow', [st('Warden'), st('Talon'), st('Longbow')]],
+      ['Paragon + Citadel + Viper', [st('Paragon'), st('Citadel'), st('Viper')]],
+      ['3 × Wraith', [cfg('Wraith', 'aggressive'), cfg('Wraith', 'aggressive'), cfg('Wraith', 'aggressive')]],
+      ['Hydra + Howitzer', [cfg('Hydra', 'balanced'), cfg('Howitzer', 'aggressive')]],
+      ['Breacher + Lancer + Viper', [cfg('Breacher', 'aggressive'), cfg('Lancer', 'aggressive'), st('Viper')]],
+      ['2 × Dreadnought', [cfg('Dreadnought', 'balanced'), cfg('Dreadnought', 'balanced')]],
+    ];
+    for (const [label, team] of packs) for (const a of ARENAS) for (const sd of [1, 2]) jobs.push({ id: id++, group: 'pack', arena: a, seed: sd, limit: 180, label, teams: [[S], team] });
+    // Configure-generated brains on Sovereign's hardware: against the roster, and against Sovereign
+    for (const doc of ['adaptive', 'balanced', 'interception', 'precision'] as Doctrine[]) {
+      const g: Entrant = { d: SOVEREIGN_ID, brain: `cfg:${doc}` };
+      for (const y of ids) for (const a of CFG_ARENAS) for (const flip of [false, true]) jobs.push({ id: id++, group: 'bosscfg', arena: a, seed: 1, limit: 150, label: doc, teams: flip ? [[m(y)], [g]] : [[g], [m(y)]] });
+      for (const a of ARENAS) for (const sd of SEEDS) for (const flip of [false, true]) jobs.push({ id: id++, group: 'bosscfg', arena: a, seed: sd, limit: 150, label: `${doc}:mirror`, teams: flip ? [[S], [g]] : [[g], [S]] });
+    }
+  }
   return jobs;
 }
 
@@ -179,14 +221,15 @@ function run(job: Job): JobOut {
       return { design: design(e.d), program: programFor(e), team: t, x: sp.x, y: sp.y, angle: sp.angle };
     }),
   );
-  const sim = new Simulation({ seed: job.seed, arena: a, mode: 'duel', timeLimit: TIME_LIMIT, decisionHz: 10, drones });
+  const limit = job.limit ?? TIME_LIMIT;
+  const sim = new Simulation({ seed: job.seed, arena: a, mode: 'duel', timeLimit: limit, decisionHz: 10, drones });
   const meta = job.teams.flatMap((team, t) => team.map((e) => ({ team: t, ...e })));
-  const out: DroneOut[] = sim.drones.map((d, i) => ({ team: meta[i].team, d: meta[i].d, brain: meta[i].brain, alive: true, survived: TIME_LIMIT, shots: 0, hits: 0, samples: 0, dist: 0, speed: 0, moving: 0, noseOn: 0, turn: 0, sees: 0, states: 0 }));
+  const out: DroneOut[] = sim.drones.map((d, i) => ({ team: meta[i].team, d: meta[i].d, brain: meta[i].brain, alive: true, survived: limit, shots: 0, hits: 0, samples: 0, dist: 0, speed: 0, moving: 0, noseOn: 0, turn: 0, sees: 0, states: 0 }));
   const idx = new Map(sim.drones.map((d, i) => [d.id, i]));
   const states = sim.drones.map(() => new Set<string>());
   const lastTick = sim.drones.map(() => -1);
   let nextSample = 0;
-  while (!sim.result && sim.time < TIME_LIMIT + 1) {
+  while (!sim.result && sim.time < limit + 1) {
     sim.step();
     for (const e of sim.takeEvents() as { type: string; drone?: number; shooter?: number; result?: string }[]) {
       if (e.type === 'shot' && e.drone != null) out[idx.get(e.drone)!].shots++;
@@ -302,7 +345,7 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 const short = (id: string) => NAME(id).slice(0, 4);
 
 function report(jobs: Job[], results: Map<number, JobOut>, seconds: number) {
-  const ids = DEFAULT_DESIGNS.map((d) => d.id);
+  const ids = BALANCED.map((d) => d.id);
   const out: string[] = [];
   const say = (s = '') => out.push(s);
   const all = jobs.map((j) => ({ job: j, r: results.get(j.id)! }));
@@ -595,9 +638,10 @@ function report(jobs: Job[], results: Map<number, JobOut>, seconds: number) {
   say('|---|---|---|');
   for (const level of ['beginner', 'intermediate', 'advanced', 'expert']) say(`| ${level} | ${byLevel(level, 'default')} | ${byLevel(level, 'special')} |`);
   say();
+  bossReport(all, say, score);
   // the investigations are written by hand (they explain the numbers above); kept in their own file
   if (existsSync('scripts/evaluate-notes.md')) {
-    say('## 7. Investigations');
+    say('## 8. Investigations');
     say();
     say('*Written by hand from diagnostic runs (timelines, hit tallies), not generated. The figures quoted were measured during development and may differ slightly from the tables above, which are the current run.*');
     say();
@@ -606,6 +650,135 @@ function report(jobs: Job[], results: Map<number, JobOut>, seconds: number) {
   }
   writeFileSync('docs/EVALUATION.md', out.join('\n') + '\n');
   console.log(out.join('\n'));
+}
+
+// ------------------------------------------------------------------------------- the boss
+
+type Row = { job: Job; r: JobOut };
+
+function bossReport(all: Row[], say: (s?: string) => void, score: (r: JobOut, team: number) => number) {
+  const sovTeam = (job: Job) => (job.teams[0].some((e) => e.d === SOVEREIGN_ID && e.brain === 'manual') ? 0 : 1);
+  const boss = all.filter((x) => x.job.group === 'boss');
+  if (!boss.length) return;
+  say('## 7. Boss: Sovereign');
+  say();
+  say('Sovereign is the one starter that is not balanced: it is built to dominate. It plays by the same rules as every drone — the same construction system, physics, sensors, programming API and CPU budget; nothing about it is special-cased in the simulation. These are its measured results. Battles here run to 150 s (180 s for packs).');
+  say();
+  // vs each starter
+  const per = new Map<string, { s: number; n: number; w: number; d: number; l: number; t: number[]; hp: number }>();
+  for (const { job, r } of boss) {
+    const t = sovTeam(job);
+    const opp = job.teams[1 - t][0].d;
+    const c = per.get(opp) ?? { s: 0, n: 0, w: 0, d: 0, l: 0, t: [], hp: 0 };
+    const sc = score(r, t);
+    c.s += sc;
+    c.n++;
+    if (sc === 1) {
+      c.w++;
+      c.t.push(r.time);
+    } else if (sc === 0) c.l++;
+    else c.d++;
+    per.set(opp, c);
+  }
+  let tot = 0;
+  let n = 0;
+  say(`### Against every starter (${boss.length} battles: ${ARENAS.length} arenas × ${SEEDS.length} starting positions × both sides)`);
+  say();
+  say('| Opponent | Score | W-D-L | Median time to win |');
+  say('|---|---|---|---|');
+  for (const [opp, c] of per) {
+    tot += c.s;
+    n += c.n;
+    const med = c.t.sort((a, b) => a - b)[Math.floor(c.t.length / 2)];
+    say(`| ${NAME(opp)} | ${pct(c.s / c.n)} | ${c.w}-${c.d}-${c.l} | ${med != null ? Math.round(med) + ' s' : '—'} |`);
+  }
+  say(`| **All starters** | **${pct(tot / n)}** | | |`);
+  say();
+  // custom suite: every doctrine, reported at the opponent's strongest
+  const suite = all.filter((x) => x.job.group === 'suite');
+  if (suite.length) {
+    say(`### Against custom opponents (${suite.length} battles)`);
+    say();
+    say('Eight opponents built for these trials with the real construction system (scripts/opponents.ts), none with a construction warning. Each was given every one of Configure’s eight doctrines and played Sovereign on every arena and starting position from both sides; the table reports each opponent **at its strongest** — the doctrine that did best against Sovereign — which is a pessimistic measure for Sovereign. The last column is Sovereign’s score against each doctrine.');
+    say();
+    say('| Opponent | Idea | Strongest brain | Sovereign’s score against it | W-D-L | Sovereign against each doctrine |');
+    say('|---|---|---|---|---|---|');
+    let st = 0;
+    let sn = 0;
+    for (const o of OPPONENTS) {
+      const byDoc = DOCTRINES.map((doc) => {
+        const rows = suite.filter((x) => x.job.teams.some((t) => t.some((e) => e.d === o.design.id && e.brain === `cfg:${doc.id}`)));
+        let v = 0;
+        let w = 0;
+        let dr = 0;
+        let l = 0;
+        for (const { job, r } of rows) {
+          const sc = score(r, sovTeam(job));
+          v += sc;
+          if (sc === 1) w++;
+          else if (sc === 0) l++;
+          else dr++;
+        }
+        return { doc: doc.id, v: v / Math.max(1, rows.length), w, dr, l, n: rows.length };
+      });
+      const worst = byDoc.reduce((a, b) => (b.v < a.v ? b : a));
+      st += worst.v * worst.n;
+      sn += worst.n;
+      say(`| ${o.design.name} | ${o.idea} | ${worst.doc} | ${pct(worst.v)} | ${worst.w}-${worst.dr}-${worst.l} | ${byDoc.map((b) => `${b.doc} ${pct(b.v)}`).join(', ')} |`);
+    }
+    say(`| **All, each at its strongest** | | | **${pct(st / sn)}** | | |`);
+    say();
+  }
+  // packs
+  const packs = all.filter((x) => x.job.group === 'pack');
+  if (packs.length) {
+    say(`### Outnumbered (${packs.length} battles)`);
+    say();
+    say('Sovereign alone against two or three drones at once (custom opponents use the doctrine that was strongest against Sovereign in development); each pack on every arena with two starting positions.');
+    say();
+    say('| Opponents | Sovereign’s score | W-D-L | Opponents put out of the fight per battle |');
+    say('|---|---|---|---|');
+    const labels = [...new Set(packs.map((x) => x.job.label!))];
+    for (const label of labels) {
+      const rows = packs.filter((x) => x.job.label === label);
+      let v = 0;
+      let w = 0;
+      let dr = 0;
+      let l = 0;
+      let down = 0;
+      for (const { job, r } of rows) {
+        const sc = score(r, 0);
+        v += sc;
+        if (sc === 1) w++;
+        else if (sc === 0) l++;
+        else dr++;
+        down += r.drones.filter((o) => o.team === 1 && !o.alive).length;
+      }
+      say(`| ${label} | ${pct(v / rows.length)} | ${w}-${dr}-${l} | ${(down / rows.length).toFixed(1)} of ${rows[0].job.teams[1].length} |`);
+    }
+    say();
+  }
+  // hardware or brain?
+  const bc = all.filter((x) => x.job.group === 'bosscfg');
+  if (bc.length) {
+    say('### Is it the hardware or the brain?');
+    say();
+    say(`Configure-generated brains on Sovereign’s exact hardware, against the starter roster (${CFG_ARENAS.map((a) => ARENA_NAME[a]).join(' and ')}, seed 1, both sides) and against Sovereign itself (every arena and starting position, both sides).`);
+    say();
+    say('| Brain on Sovereign’s hardware | Against the starters | Against Sovereign (its own brain) |');
+    say('|---|---|---|');
+    for (const doc of ['adaptive', 'balanced', 'interception', 'precision']) {
+      const vs = (label: string) => {
+        const rows = bc.filter((x) => x.job.label === label);
+        let v = 0;
+        for (const { job, r } of rows) v += score(r, job.teams[0].some((e) => e.brain === `cfg:${doc}`) ? 0 : 1);
+        return rows.length ? pct(v / rows.length) + ` (${rows.length})` : '—';
+      };
+      say(`| Configure, ${doc} | ${vs(doc)} | ${vs(doc + ':mirror')} |`);
+    }
+    say(`| Sovereign’s own brain | ${pct(tot / n)} | — |`);
+    say();
+  }
 }
 
 if (!shardArg) main().catch((e) => {

@@ -77,7 +77,7 @@ npm run dev          # http://localhost:5173
    - Detached sections and wrecks stay physical for 2 s, then fade and are removed, leaving a scorch mark.
    - Pan with drag or WASD, zoom with the wheel or a pinch. The app pauses when it goes to the background.
 
-**Starters** (fifteen drones, each with its own hand-written brain; full write-ups in [docs/STARTERS.md](docs/STARTERS.md), measured results in [docs/EVALUATION.md](docs/EVALUATION.md)):
+**Starters** (sixteen drones, each with its own hand-written brain, in five tiers — Beginner, Intermediate, Advanced, Expert and **Boss**; full write-ups in [docs/STARTERS.md](docs/STARTERS.md), measured results in [docs/EVALUATION.md](docs/EVALUATION.md)):
 
 | Drone | Level | Chassis | Role | Brain opens in |
 | --- | --- | --- | --- | --- |
@@ -96,6 +96,7 @@ npm run dev          # http://localhost:5173
 | Viper | advanced | wheeled | rotary cannon flanker; reads the target’s heading and arcs round to its rear | Code |
 | Paragon | expert | wheeled | generalist with memory, utility-scored tactics and explained decisions | Code |
 | Juggernaut | expert | walking | twin heavy cannons, shield, reactor; manages joints, heat, fire and power | Code |
+| **Sovereign** | **boss** | tracked | the final examination: four heavy cannons, 70 mm all round, shield, point defense, interceptors; a nine-system brain with threat analysis, memory, adaptive doctrine and explained decisions. Not balanced — built to dominate, within the same rules as every drone | Code |
 
 **Training** (Simulate → Scenario → Course): basic maze, obstacle course, weapon range, armor test, interception test, missile test, and cooling and power stress. Each course has built-in targets and an objective: reach the goal, knock out every target, or survive.
 
@@ -110,7 +111,7 @@ When you load a design, it is migrated to schema 7:
 - every section starts unmirrored (mirrors saved by the previous two versions are converted or undone);
 - configuration fields are validated.
 
-**The starter roster was replaced.** A library that still holds the old eleven examples exactly as shipped has them retired on load; their programs stay available under **Program → Recovered**, and the whole library is backed up first as `automata.library.before-roster-3`. An old example you changed in any way stays in your library as your own drone. Your own drones, duplicates and imports are never touched. The new starters are added once, and a deleted starter is not brought back. **Restore examples** brings back the current starters.
+**The starter roster was replaced.** A library that still holds the old eleven examples exactly as shipped has them retired on load; their programs stay available under **Program → Recovered**, and the whole library is backed up first as `automata.library.before-roster-3`. An old example you changed in any way stays in your library as your own drone. Your own drones, duplicates and imports are never touched. The new starters are added once, and a deleted starter is not brought back. Sovereign joins an existing fifteen-starter library the same way: added once, nothing else touched. **Restore examples** brings back the current starters.
 
 ## Documentation
 

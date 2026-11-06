@@ -19,6 +19,7 @@ import { BlockEditor, type EditorHandle } from './BlockEditor';
 import { designIds } from './blockTypes';
 import { CodeEditor, type CodeHandle } from './CodeEditor';
 import { ConfigureEditor } from './ConfigureEditor';
+import { TierBadge } from '../TierBadge';
 import { brainState, titleCase } from './brainState';
 import type { TraceLoc } from '../../program/interpreter';
 import { NodeEditor } from './NodeEditor';
@@ -140,7 +141,9 @@ export function Program({ active }: { active: boolean }) {
         <div className="who">
           <Segments size="sm" classes={classesOf(design)} />
           <div>
-            <h1>{design.name}</h1>
+            <h1>
+              {design.name} <TierBadge designId={design.id} />
+            </h1>
             <p className="muted">Brain{cfgStatus === 'synced' ? ' · configured' : cfgStatus === 'customized' ? ' · configured, customised' : ''}</p>
           </div>
           <button className="chip-btn hw" onClick={() => go('construct')} title="Open this drone’s hardware" aria-label="Hardware">

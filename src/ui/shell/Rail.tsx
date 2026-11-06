@@ -4,6 +4,7 @@ import { computeStats, hasErrors, validateDesign, type DroneDesign } from '../..
 import { useShell, type Workspace } from '../App';
 import { Icon, Kbd, Segments, useDismiss } from '../common';
 import { downloadJson, library, pickJsonFile, useLibrary } from '../store';
+import { TierBadge } from '../TierBadge';
 
 const ACTIVITIES: { id: Workspace; label: string; icon: string; hint: string }[] = [
   { id: 'construct', label: 'Construct', icon: 'construct', hint: 'Assemble the drone’s hardware' },
@@ -71,6 +72,7 @@ function Switcher({ onClose }: { onClose: () => void }) {
               <button role="option" aria-selected={d.id === designId} className={d.id === designId ? 'on' : ''} onClick={() => pick(d.id)}>
                 <Segments size="sm" classes={classesOf(d)} />
                 <span className="name">{d.name}</span>
+                <TierBadge designId={d.id} />
                 <span className={`state ${bad ? 'fault' : issues.length ? 'warn' : 'ok'}`}>{bad ? 'Fault' : issues.length ? 'Caution' : 'Ready'}</span>
               </button>
             </li>

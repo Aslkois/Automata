@@ -5,7 +5,7 @@
 // brain. Migration never discards a program: the program clearly associated with a design
 // becomes its brain; every other program is kept in `recovered`, from where the player can
 // load it into any drone (the replaced brain is itself kept as a recovered entry).
-import { DEFAULT_BRAINS, DEFAULT_DESIGNS, STARTER_SET, STARTER_SETS } from '../data/defaults';
+import { DEFAULT_BRAINS, DEFAULT_DESIGNS, ROSTER_REPLACED_SET, STARTER_SET, STARTER_SETS } from '../data/defaults';
 import { LEGACY_BRAINS, LEGACY_DEFAULT_PAIRS, LEGACY_DESIGNS } from '../data/legacy';
 import { irHash, semanticHash } from '../program/brain/ir';
 import { BRAIN_SCHEMA, codeDocFor, irFromCode, newBrain, STARTER_CODE, validateBrain, type Brain } from '../program/brain/model';
@@ -108,7 +108,7 @@ export function retireLegacyExamples(lib: Library, notes: string[]): Library {
 export function addNewStarters(lib: Library, notes: string[]): { library: Library; changed: boolean } {
   const have = lib.starters ?? 1;
   if (have >= STARTER_SET) return { library: lib, changed: false };
-  const base = have < 3 ? retireLegacyExamples(lib, notes) : lib;
+  const base = have < ROSTER_REPLACED_SET ? retireLegacyExamples(lib, notes) : lib;
   const ids = new Set(base.designs.map((d) => d.id));
   const designs = [...base.designs];
   const brains = [...base.brains];

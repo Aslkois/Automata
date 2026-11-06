@@ -369,6 +369,27 @@ test('configure: generate a brain from tactics; edits elsewhere make it customis
   await expect(page.getByRole('radio', { name: /^Precision/ })).toHaveAttribute('aria-checked', 'true');
 });
 
+test('Sovereign: the sole Boss-tier starter, opening in Code, explaining itself in Debug', async ({ page }) => {
+  await page.getByTestId('drone-switcher').click();
+  const option = page.getByRole('option', { name: /Sovereign/ });
+  await expect(option.getByTestId('tier-badge')).toHaveText('Boss');
+  await expect(page.locator('.switcher .tier-boss')).toHaveCount(1);
+  await option.click();
+  await go(page, 'Program');
+  await expect(page.locator('.brain-bar .tier-badge')).toHaveText('Boss');
+  await expect(page.getByRole('radiogroup', { name: 'Editor' }).getByRole('radio', { name: 'Code' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('compile-status')).toContainText('Brain compiles');
+  // deploy it and watch it explain its decisions
+  await page.getByRole('button', { name: 'Test', exact: true }).first().click();
+  const controls = page.getByTestId('sim-controls');
+  await controls.getByRole('radio', { name: '8×' }).click();
+  await controls.getByRole('button', { name: 'Play' }).click();
+  await page.waitForTimeout(1500);
+  await controls.getByRole('button', { name: 'Pause' }).click();
+  await page.getByTestId('drone-list').getByRole('button', { name: /Sovereign/ }).click();
+  await expect(page.getByTestId('inspected-brain-state')).toBeVisible();
+});
+
 test.describe('touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   test('every workspace is usable by touch', async ({ page }) => {

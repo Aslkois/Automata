@@ -156,4 +156,21 @@ export const JUGGERNAUT = design(
   sec('light', 'medium', 12, { I1: m('cooler'), I2: m('thermal_reservoir') }),
 );
 
-export const ROSTER: DroneDesign[] = [PICKET, GNAT, BULLDOG, HORNET, RAPIER, KESTREL, CITADEL, LONGBOW, MAULER, JACKAL, TALON, WARDEN, VIPER, PARAGON, JUGGERNAUT];
+/**
+ * Boss · tracked dreadnought, chosen by measuring eight candidate hulls in simulated combat (see
+ * docs/STARTERS.md and docs/EVALUATION.md). 70 mm on every section, so no face is weak; four heavy
+ * cannons forward with autoloaders; a dual autocannon to strip turrets; a directional shield;
+ * point defense and interceptor rockets against shells and missiles; two reactors. Every shell is
+ * stowed in the rear section — a shell rack cooks off when hit, and the rear is the section that
+ * faces away from the fight — and a spall liner guards the middle section, which holds the CPU.
+ */
+export const SOVEREIGN = design(
+  'starter-sovereign',
+  'Sovereign',
+  'tracked',
+  sec('heavy', 'max', 70, { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('dual_autocannon'), I1: m('cooler'), I2: m('autoloader'), I3: m('ammo_medium'), I4: m('reactor') }),
+  sec('heavy', 'max', 70, { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('shield_dir'), I1: m('ammo_small'), I2: m('autoloader'), I3: m('spall_liner'), I4: m('reactor') }),
+  sec('heavy', 'min', 70, { H1: m('rocket_pod', 0, { interceptors: 6 }), H2: m('radar'), H3: m('point_defense'), I1: m('rocket_cassette', 0, { interceptors: 8 }), I2: m('shell_rack'), I3: m('shell_rack'), I4: m('shell_rack') }),
+);
+
+export const ROSTER: DroneDesign[] = [PICKET, GNAT, BULLDOG, HORNET, RAPIER, KESTREL, CITADEL, LONGBOW, MAULER, JACKAL, TALON, WARDEN, VIPER, PARAGON, JUGGERNAUT, SOVEREIGN];

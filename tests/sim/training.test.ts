@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_BRAINS, DEFAULT_DESIGNS, STARTER_INFO, STARTER_SET } from '../../src/data/defaults';
+import { DEFAULT_BRAINS, DEFAULT_DESIGNS, STARTER_INFO, STARTER_SET, STARTER_SETS } from '../../src/data/defaults';
+import { JUGGERNAUT, SOVEREIGN } from '../../src/data/roster';
 import { LEGACY_BRAINS, LEGACY_DESIGNS, PATHFINDER, PATHFINDER_CODE } from '../../src/data/legacy';
 import { TRAININGS, TRAINING_MAP, trainingScenario } from '../../src/data/training';
 import { compileBrain } from '../../src/program/brain/compile';
@@ -17,8 +18,8 @@ const program = (designId: string) => {
 };
 
 describe('starter drones', () => {
-  it('fifteen starters, each with exactly one brain that compiles, valid hardware and documentation', () => {
-    expect(DEFAULT_DESIGNS).toHaveLength(15);
+  it('sixteen starters, each with exactly one brain that compiles, valid hardware and documentation', () => {
+    expect(DEFAULT_DESIGNS).toHaveLength(16);
     const chassis = new Set(DEFAULT_DESIGNS.map((d) => d.chassis));
     expect([...chassis].sort()).toEqual(['flying', 'tracked', 'walking', 'wheeled']);
     for (const d of DEFAULT_DESIGNS) {
@@ -34,9 +35,46 @@ describe('starter drones', () => {
       expect(info, d.name).toBeDefined();
       for (const k of ['role', 'problem', 'engineering', 'behaviour', 'strengths', 'weaknesses', 'learning'] as const) expect(info![k].length, `${d.name} ${k}`).toBeGreaterThan(10);
     }
-    // every complexity level is represented
-    expect(new Set(STARTER_INFO.map((i) => i.complexity))).toEqual(new Set(['beginner', 'intermediate', 'advanced', 'expert']));
+    // every complexity level is represented; the boss tier is Sovereign alone, and it opens in Code
+    expect(new Set(STARTER_INFO.map((i) => i.complexity))).toEqual(new Set(['beginner', 'intermediate', 'advanced', 'expert', 'boss']));
+    expect(STARTER_INFO.filter((i) => i.complexity === 'boss').map((i) => i.designId)).toEqual(['starter-sovereign']);
+    expect(DEFAULT_DESIGNS[15].id).toBe('starter-sovereign');
+    expect(DEFAULT_BRAINS.find((b) => b.designId === 'starter-sovereign')!.view).toBe('code');
   });
+
+  it('Sovereign is an ordinary design: the same construction rules, no special fields', () => {
+    const keys = (o: object) => Object.keys(o).sort();
+    expect(keys(SOVEREIGN)).toEqual(keys(JUGGERNAUT));
+    for (const pos of ['front', 'middle', 'rear'] as const) {
+      const s = SOVEREIGN.sections[pos];
+      expect(s.armor).toBeLessThanOrEqual(70);
+      for (const mnt of Object.values(s.slots)) if (mnt) for (const k of Object.keys(mnt)) expect(['component', 'rotation', 'payload', 'interceptors', 'fireMode', 'joint']).toContain(k);
+    }
+    expect(validateDesign(SOVEREIGN).filter((i) => i.severity !== 'info')).toEqual([]);
+  });
+
+  it('Sovereign runs inside the same CPU budget, and fights Juggernaut without a runtime error', () => {
+    const sim = new Simulation({
+      seed: 3,
+      arena: TRAINING_MAP.range.arena(),
+      mode: 'duel',
+      timeLimit: 0,
+      decisionHz: 10,
+      drones: [
+        { design: SOVEREIGN, program: program('starter-sovereign'), team: 0, x: 400, y: 550, angle: 0 },
+        { design: JUGGERNAUT, program: program('starter-juggernaut'), team: 1, x: 1300, y: 550, angle: Math.PI },
+      ],
+    });
+    sim.run(20);
+    const ctrl = sim.controllers.get(sim.drones[0].id)!;
+    expect(ctrl.lastError).toBeNull();
+    const maxOps = Math.max(...ctrl.history.map((h) => h.ops));
+    expect(maxOps).toBeLessThan(ctrl.history[0].budget);
+    // it explains itself: decisions are logged with reasons
+    const logs = ctrl.history.flatMap((h) => h.entries.filter((e) => e.kind === 'log').map((e) => e.text));
+    expect(logs.some((t) => /^online: /.test(t))).toBe(true);
+    expect(logs.some((t) => /^(target|plan): /.test(t) || /^target #/.test(t))).toBe(true);
+  }, 60_000);
 
   it('no two starters share a brain, and no starter reuses a retired brain', () => {
     const codes = DEFAULT_BRAINS.map((b) => b.code);
@@ -208,6 +246,30 @@ describe('library: starter roster replacement', () => {
     const m1 = migrateLibrary(JSON.parse(JSON.stringify(lib)))!;
     expect(m1.library.designs.find((d) => d.id === 'design-copy-1')).toEqual(dup);
     expect(m1.library.brains.find((b) => b.designId === 'design-copy-1')).toBeDefined();
+  });
+
+  it('a library from the fifteen-starter roster gains Sovereign once, and nothing else changes', () => {
+    const lib = defaultLibrary();
+    const before = { ...lib, designs: lib.designs.filter((d) => d.id !== 'starter-sovereign'), brains: lib.brains.filter((b) => b.designId !== 'starter-sovereign'), starters: 3 };
+    // the player changed a starter and made a drone of their own
+    before.designs = before.designs.map((d) => (d.id === 'starter-picket' ? { ...d, name: 'My Picket' } : d));
+    before.designs.push({ ...cloneDesign(DEFAULT_DESIGNS[0]), id: 'design-mine', name: 'Mine' });
+    before.brains.push({ ...before.brains[0], id: 'brain-mine', designId: 'design-mine' });
+    const m1 = migrateLibrary(JSON.parse(JSON.stringify(before)))!;
+    expect(m1.migrated).toBe(true);
+    expect(m1.notes.join(' ')).toMatch(/Sovereign/);
+    expect(m1.notes.join(' ')).not.toMatch(/retired/);
+    const ids = m1.library.designs.map((d) => d.id);
+    expect(ids.filter((id) => id === 'starter-sovereign')).toHaveLength(1);
+    expect(ids).toContain('design-mine');
+    expect(m1.library.designs.find((d) => d.id === 'starter-picket')!.name).toBe('My Picket');
+    expect(m1.library.starters).toBe(STARTER_SET);
+    // deleting Sovereign afterwards does not bring it back
+    const gone = { ...m1.library, designs: m1.library.designs.filter((d) => d.id !== 'starter-sovereign'), brains: m1.library.brains.filter((b) => b.designId !== 'starter-sovereign') };
+    const m2 = migrateLibrary(JSON.parse(JSON.stringify(gone)))!;
+    expect(m2.migrated).toBe(false);
+    expect(m2.library.designs.some((d) => d.id === 'starter-sovereign')).toBe(false);
+    expect(STARTER_SETS.map((s) => s.set)).toEqual([3, 4]);
   });
 
   it('the new starters are added once; a deleted starter is not brought back', () => {

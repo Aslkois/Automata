@@ -6,7 +6,7 @@ import { freshIds } from '../program/brain/ir';
 import { applyEdit, codeDocFor, irFromCode, newBrain, validateBrain, type Brain, type ViewDocs, type ViewKind } from '../program/brain/model';
 import type { ProgramSource } from '../program/types';
 import { cloneDesign, newDesign, parseDesign, type DroneDesign } from '../sim/design';
-import { STARTER_SET } from '../data/defaults';
+import { ROSTER_REPLACED_SET } from '../data/defaults';
 import { applyConfig, configStatus, refreshForHardware, storeSettings, type BrainConfig } from '../program/configure';
 import { defaultLibrary, ensureBrains, LIBRARY_VERSION, migrateLibrary, recoveredFromBrain, type Library, type RecoveredProgram } from './migrate';
 
@@ -44,7 +44,7 @@ function load(): Library {
   try {
     if (version !== LIBRARY_VERSION && !globalThis.localStorage?.getItem(BACKUP_KEY)) globalThis.localStorage?.setItem(BACKUP_KEY, s);
     // the roster replacement retires untouched old examples: keep the library exactly as it was
-    if (starters < STARTER_SET && !globalThis.localStorage?.getItem(ROSTER_BACKUP_KEY)) globalThis.localStorage?.setItem(ROSTER_BACKUP_KEY, s);
+    if (starters < ROSTER_REPLACED_SET && !globalThis.localStorage?.getItem(ROSTER_BACKUP_KEY)) globalThis.localStorage?.setItem(ROSTER_BACKUP_KEY, s);
   } catch {
     /* storage full: the migrated library still carries every program in `recovered` */
   }

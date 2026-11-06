@@ -3,10 +3,13 @@
 // roster lives in legacy.ts (kept only to recognise untouched old examples during migration).
 import type { EditorKind } from '../program/brain/model';
 import type { DroneDesign } from '../sim/design';
-import { BULLDOG, CITADEL, GNAT, HORNET, JACKAL, JUGGERNAUT, KESTREL, LONGBOW, MAULER, PARAGON, PICKET, RAPIER, ROSTER, TALON, VIPER, WARDEN } from './roster';
+import { BULLDOG, CITADEL, GNAT, HORNET, JACKAL, JUGGERNAUT, KESTREL, LONGBOW, MAULER, PARAGON, PICKET, RAPIER, ROSTER, SOVEREIGN, TALON, VIPER, WARDEN } from './roster';
 import * as S from './starters';
 
-export type Complexity = 'beginner' | 'intermediate' | 'advanced' | 'expert';
+/** Difficulty tiers. Boss is a tier of one: Sovereign, built to dominate rather than to be balanced. */
+export type Complexity = 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'boss';
+export const COMPLEXITIES: Complexity[] = ['beginner', 'intermediate', 'advanced', 'expert', 'boss'];
+export const COMPLEXITY_LABEL: Record<Complexity, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', expert: 'Expert', boss: 'Boss' };
 
 export interface StarterInfo {
   designId: string;
@@ -25,8 +28,10 @@ export interface StarterInfo {
   learning: string;
 }
 
-/** Which example set a library has been offered. Set 3 replaced the whole roster. */
-export const STARTER_SET = 3;
+/** Which example set a library has been offered. Set 3 replaced the whole roster; set 4 added Sovereign. */
+export const STARTER_SET = 4;
+/** the set that replaced the old example roster (libraries before it retire untouched old examples) */
+export const ROSTER_REPLACED_SET = 3;
 
 const brain = (d: DroneDesign, code: string, view: EditorKind) => ({ designId: d.id, id: `brain-${d.id}`, code, view });
 
@@ -48,12 +53,16 @@ export const DEFAULT_BRAINS: { designId: string; id: string; code: string; view:
   brain(VIPER, S.VIPER_CODE, 'code'),
   brain(PARAGON, S.PARAGON_CODE, 'code'),
   brain(JUGGERNAUT, S.JUGGERNAUT_CODE, 'code'),
+  brain(SOVEREIGN, S.SOVEREIGN_CODE, 'code'),
 ];
 
 export const DEFAULT_DESIGNS: DroneDesign[] = ROSTER;
 
 /** Every set of example drones, in order. A library is offered each set once. */
-export const STARTER_SETS: { set: number; ids: string[] }[] = [{ set: 3, ids: ROSTER.map((d) => d.id) }];
+export const STARTER_SETS: { set: number; ids: string[] }[] = [
+  { set: 3, ids: ROSTER.filter((d) => d.id !== SOVEREIGN.id).map((d) => d.id) },
+  { set: 4, ids: [SOVEREIGN.id] },
+];
 
 const info = (d: DroneDesign, i: Omit<StarterInfo, 'designId'>): StarterInfo => ({ designId: d.id, ...i });
 
@@ -208,6 +217,18 @@ export const STARTER_INFO: StarterInfo[] = [
     weaknesses: 'Very slow; its sides (30 mm) and rear (12 mm) are thin and only one machine gun covers the back.',
     learning: 'Structural, thermal and power management; reacting to damage.',
   }),
+  info(SOVEREIGN, {
+    role: 'Boss — the strongest legitimate machine we could engineer',
+    complexity: 'boss',
+    problem: 'Everything: the starter roster, purpose-built battleships, missile batteries, swarms — and being outnumbered. It is not balanced and is not meant to be.',
+    engineering: 'Chosen by measuring eight candidate hulls in simulated combat against the roster and a suite of custom opponents. Tracked (faster than legs at this weight, turns on the spot); 70 mm on all three heavy sections, so no face is weak; four heavy cannons forward on two autoloaders; a dual autocannon whose 50 mm rounds strip other drones’ turrets; a directional shield; point defense and an interceptor rocket pod with a cassette, against shells and missiles; radar; two reactors. All 60 shells ride in three racks in the rear section — a shell rack cooks off when hit, and in the measured trials a forward rack was the first thing to go — and a spall liner guards the middle section, which holds the CPU and power core. 14.9 t, 113 u/s.',
+    behaviour: 'Nine cooperating systems: a self-model (sections, every weapon, power, damage intake); a memory of every contact (position history, velocity, behaviour — rushing, kiting, circling, static — and weapon evidence, from tracing each incoming round back to its shooter); a threat model (danger to us, what our working weapons can do to it); target choice with commitment; a doctrine — destroy, close, screen, recover, pursue, search — scored against the situation, held for a minimum time and abandoned when it costs structure without result (failed ranges are remembered per target); fire control by role (full heavy volleys on good solutions, turret-stripping secondaries, point defense and interceptors on their own); nose-on stance and shield toward the worst fire; wall-following navigation, clearing blocked lines of fire, looking round cover, backing out when enemies spread round it; ammunition and power management. Every decision is logged with its reason.',
+    strengths: 'Beats every starter including Juggernaut, and most purpose-built custom opponents; wins most fights against two or three drones at once.',
+    weaknesses: 'Two heavy-cannon battleships of its own class at once; its tracks (8 mm) can be shot off by machine guns; slow to bring its turrets round on a surprise contact at close range.',
+    learning: 'How far engineering and a layered, explainable brain can go — and what you would have to build to beat it.',
+  }),
 ];
 
 export const starterInfo = (designId: string): StarterInfo | undefined => STARTER_INFO.find((i) => i.designId === designId);
+/** the balanced starters (everything below the boss tier) */
+export const isBoss = (designId: string) => starterInfo(designId)?.complexity === 'boss';

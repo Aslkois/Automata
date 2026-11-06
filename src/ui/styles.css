@@ -4702,3 +4702,36 @@ select.nf {
 .brain-state .src {
   margin-left: 6px;
 }
+
+/* ------------------------------------------------------------------ starter tiers */
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font: 650 9.5px/1.4 var(--sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--iron);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.brain-bar h1 .tier-badge {
+  font-size: 10px;
+  vertical-align: 4px;
+}
+.tier-badge.tier-expert {
+  border-color: var(--umber);
+  color: var(--umber);
+}
+.tier-badge.tier-boss {
+  border-color: var(--fault);
+  background: var(--fault);
+  color: var(--ivory);
+}
+.switcher li button.on .tier-badge:not(.tier-boss) {
+  color: var(--sepia);
+  border-color: var(--line-dark-strong);
+}
