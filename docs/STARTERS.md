@@ -21,7 +21,7 @@ This page is generated from the roster’s own data by `scripts/starters-doc.ts`
 | [Viper](#viper) | advanced | wheeled | Wheeled flanker | 2.86 t | 167 u/s | 74 lines | Code |
 | [Paragon](#paragon) | expert | wheeled | Wheeled adaptive generalist | 4.67 t | 178 u/s | 234 lines | Code |
 | [Juggernaut](#juggernaut) | expert | walking | Walking siege platform | 8.46 t | 90 u/s | 123 lines | Code |
-| [Sovereign](#sovereign) | **boss** | tracked | Boss — the strongest legitimate machine we could engineer | 14.90 t | 113 u/s | 846 lines | Code |
+| [Sovereign](#sovereign) | **boss** | tracked | Boss — the strongest legitimate machine we could engineer | 14.90 t | 113 u/s | 847 lines | Code |
 
 ## Beginner
 
