@@ -746,7 +746,7 @@ function bossReport(all: Row[], say: (s?: string) => void, score: (r: JobOut, te
     say();
     say('Sovereign alone against two or three drones at once (custom opponents use the doctrine that was strongest against Sovereign in development); each pack on every arena with two starting positions.');
     say();
-    say('| Opponents | Sovereign’s score | W-D-L | Opponents put out of the fight per battle |');
+    say('| Opponents | Sovereign’s score | W-D-L | Opponents disabled or destroyed per battle (a win can also come from disarming them) |');
     say('|---|---|---|---|');
     const labels = [...new Set(packs.map((x) => x.job.label!))];
     for (const label of labels) {
