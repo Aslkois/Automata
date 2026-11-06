@@ -687,7 +687,8 @@ export const WARDEN_CODE = `// Warden — advanced missile hunter. Built to beat
 // every incoming round; two point-defense guns and interceptor rockets shoot them down by
 // priority (missiles first, then whatever lands soonest). Each incoming round also tells it
 // where the round came from: Warden traces it back to the shooter's bearing — even a shooter
-// it cannot see — and advances along that bearing with its dual autocannon ready.
+// it cannot see — and advances along that bearing with its autocannon ready. It is built to
+// beat shooters at range, not to out-gun brawlers: its one gun is a modest 26 mm autocannon.
 const AC = "F.H1";
 const POD = "F.H2";
 const PD = ["F.H3", "M.H2"];
@@ -748,7 +749,6 @@ function update() {
     drone.fire(POD, false);
   }
   if (e != null) {
-    drone.setFireMode(AC, e.size == "large" ? "sync" : "sequence");
     aimAtContact(AC, e);
     drone.fire(AC, e.distance < 880 && canFireAt(AC, e) && drone.weapon(AC).heat < 85);
     setState("engage");
@@ -1082,7 +1082,7 @@ function update() {
 `;
 
 export const JUGGERNAUT_CODE = `// Juggernaut — expert siege platform. Two 100 mm heavy cannons on a walking frame that can
-// carry them, a reactor, a directional shield, point defense forward and a quad gun astern.
+// carry them, a reactor, a compact shield, point defense forward and a machine gun astern.
 // It wins long fights by sustaining fire without breaking itself:
 //  · it stands still to fire (a standing walker is braced: steady aim, recoil absorbed);
 //  · the cannons alternate, so heat and recoil are spread and a shell is always coming;
@@ -1092,10 +1092,11 @@ export const JUGGERNAUT_CODE = `// Juggernaut — expert siege platform. Two 100
 //    and drops when power runs short;
 //  · it reassesses when damaged: losing the front section turns it to bring the rear quad
 //    gun to bear and back away; losing its legs, it fights where it stands.
+// Its weak point is its back: 12 mm of plate and one machine gun.
 const CANNONS = ["F.H1", "F.H2"];
 const PD = "F.H3";
 const SHIELD = "M.H2";
-const QUAD = "M.H3";
+const TAIL = "M.H3";
 let nextCannon = 0;
 let last = null;           // last sighting {x, y, vx, vy, t}
 let state = "advance";
@@ -1151,10 +1152,10 @@ function update() {
     aimAtContact(PD, e);
     drone.fire(PD, e != null && e.distance < 330 && canFireAt(PD, e));
   }
-  // rear quad: anything that gets behind us
-  const behind = drone.enemies().find((c) => c.distance < 650 && drone.inArc(QUAD, c.x, c.y));
-  aimAtContact(QUAD, behind);
-  drone.fire(QUAD, behind != null && canFireAt(QUAD, behind) && drone.weapon(QUAD).heat < 80);
+  // tail gun: anything that gets behind us
+  const behind = drone.enemies().find((c) => c.distance < 650 && drone.inArc(TAIL, c.x, c.y));
+  aimAtContact(TAIL, behind);
+  drone.fire(TAIL, behind != null && canFireAt(TAIL, behind) && drone.weapon(TAIL).heat < 80);
   // shield: the greater danger, raised only while power lasts
   const pw = drone.power();
   const lowPower = pw.capacity > 0 && pw.stored < pw.capacity * 0.2;
@@ -1180,7 +1181,7 @@ function update() {
   }
   cannonFire(e);
   if (!front.attached || front.destroyed) {
-    // the cannons are gone: present the rear gun and back off
+    // the cannons are gone: present the tail gun and back off
     setState("fall back", "front section lost");
     drone.drive(0.7, clamp(angleDiff(drone.heading(), e.bearing + 180) / 25, -1, 1));
     return;

@@ -265,3 +265,22 @@ describe('configure: the library', () => {
     for (const id of [d.id, dup.id, imported.id]) library.deleteDesign(id);
   });
 });
+
+describe('debugger: brain state', () => {
+  it('reads the newest logged state and recent activity from the decision history, for generated and starter brains', async () => {
+    const { brainState } = await import('../../src/ui/program/brainState');
+    const { DEFAULT_BRAINS } = await import('../../src/data/defaults');
+    for (const [d, code] of [
+      [LONGBOW, generateCode(LONGBOW, defaultConfig('precision'))],
+      [PARAGON, DEFAULT_BRAINS.find((b) => b.designId === PARAGON.id)!.code],
+    ] as const) {
+      const sim = new Simulation({ seed: 2, arena: defaultArena(), mode: 'duel', timeLimit: 0, decisionHz: 10, drones: [{ design: d, program: compiles(code), team: 0 }, { design: PICKET, program: compiles(generateCode(PICKET, defaultConfig())), team: 1 }] });
+      sim.run(12);
+      const ctrl = sim.controllers.get(sim.drones[0].id)!;
+      const s = brainState(ctrl.history, sim.time);
+      expect(s, d.name).not.toBeNull();
+      expect(s!.state.length, d.name).toBeGreaterThan(2);
+      expect(s!.loc.kind).toBe('line');
+    }
+  }, 30_000);
+});

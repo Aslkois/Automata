@@ -60,6 +60,10 @@ export function chassisMovement(c: ResolvedConfig, hw: HardwareProfile): Resolve
   if (precise && !hw.walking && (m === 'orbit' || (m === 'flank' && c.doctrine !== 'harassment'))) return 'kite';
   if (hw.walking) return m === 'pursue' ? 'advance' : m === 'patrol' ? 'patrol' : m === 'flank' && c.doctrine === 'harassment' ? 'flank' : 'hold';
   if (hw.chassis === 'tracked') return m === 'orbit' ? 'hold' : m === 'kite' ? 'kite' : m;
+  // armour is one thickness per section: circling shows the enemy the thin middle and rear, so a
+  // ground drone whose front plate is much thicker fights nose-on instead
+  const frontHeavy = hw.armor.front >= 1.5 * Math.max(hw.armor.middle, hw.armor.rear);
+  if (!hw.flying && frontHeavy && m === 'orbit') return 'kite';
   return m;
 }
 

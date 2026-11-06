@@ -26,17 +26,28 @@ src/
       model.ts      Brain record, per-view caches, drafts, edits
       catalog.ts    API/helper metadata and the Insert catalogue shared by all views
       stdlib.ts     helper functions (engageAll, aimAtContact…) appended when used
+    configure/      Configure: settings -> readable AutoScript for the drone's hardware
+      config.ts     settings, doctrine defaults, validation
+      hardware.ts   what is installed (weapons by role, sensors, shields, power, armour)
+      generate.ts   the generator (one plan shared with the explanation)
+      explain.ts    the hardware-intelligence panel's sentences
+      index.ts      sync state (none / synced / customised / hardware changed), apply, refresh
     legacy/         schema-1 block/node compilers, kept only for migration
   render/         canvas renderer, event-driven VFX, procedural audio (observe only)
   ui/             React app: rail shell, Construct, Program (Blockly / XYFlow / CodeMirror), Simulate
-    migrate.ts      versioned library migration (schema 1 -> 2), recovered programs
-  data/defaults.ts  example designs and brains
+    migrate.ts      versioned library migration (schema 1 -> 2), starter sets, retiring untouched old examples
+  data/
+    roster.ts       starter drone hardware
+    starters.ts     starter brains (hand-written, beginner to expert)
+    defaults.ts     starter registration (set 3), editor per brain, documentation metadata
+    legacy.ts       the retired examples, kept only to recognise them during migration
 ```
 
 ## Principles
 
 - **The simulation is authoritative and headless.** `Simulation.step()` advances exactly 1/60 s. Rendering, audio and UI read its state and drain its event queue. They never write to it. Battles run identically with or without a renderer (`npm run sim:headless`, tests).
-- **One brain, three views.** Each design owns exactly one brain. Its authoritative content is a structured AutoScript IR in which every statement and expression has a stable id. Blocks, Nodes and Code are projections of that IR. Each view caches the document it last showed together with the IR hash it was made from, and the cache is used only while that hash still matches. An edit that converts replaces the IR; one that doesn't is kept as that view's draft. Constructs a visual view can't express (switch, arrow functions, object literals, templates…) appear there as code modules: exact source that can be edited in place and runs unchanged. The runtime executes the printed IR, and trace line numbers map back to ids, so the debugger can open any view at the originating logic. Lossless round trips and identical simulated behaviour across views are covered by `tests/program/brain.test.ts`.
+- **One brain, four editors.** Configure generates AutoScript from settings and the brain's IR is parsed from it; Blocks, Nodes and Code are projections of the IR. A configured brain stores its settings and the semantic hash of what they generated, so the editor can tell a synced brain from one customised elsewhere (never overwritten unless asked, and then kept under Recovered first). See [CONFIGURE.md](CONFIGURE.md).
+- **The brain is one program.** Each design owns exactly one brain. Its authoritative content is a structured AutoScript IR in which every statement and expression has a stable id. Blocks, Nodes and Code are projections of that IR. Each view caches the document it last showed together with the IR hash it was made from, and the cache is used only while that hash still matches. An edit that converts replaces the IR; one that doesn't is kept as that view's draft. Constructs a visual view can't express (switch, arrow functions, object literals, templates…) appear there as code modules: exact source that can be edited in place and runs unchanged. The runtime executes the printed IR, and trace line numbers map back to ids, so the debugger can open any view at the originating logic. Lossless round trips and identical simulated behaviour across views are covered by `tests/program/brain.test.ts`.
 - **Sandboxing.** Player source is never executed as host JavaScript. The interpreter enforces a syntax allow-list, a per-tick operation budget (the integrated CPU's runaway-loop guard), a call-depth limit, array and string size limits, null-prototype objects, no prototype access, read-only built-ins and seeded `Math.random`. A failing program records an error for that tick. The drone keeps its standing commands and the simulation continues.
 - **No omniscience.** The API reads only the drone's own hardware state and its `perception`, which is computed each decision tick from functioning, powered sensors with range, arc and line of sight.
 - **Data-driven content.** Sections, chassis and components are plain data. Systems switch only on component `kind`.

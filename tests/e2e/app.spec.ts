@@ -136,8 +136,9 @@ test('simulate: transport controls, spectating, events, and the trace opens the 
   await controls.getByRole('button', { name: 'Pause' }).click();
   expect(await clock(page)).toBeGreaterThan(1.5);
   // spectate
-  await page.getByTestId('drone-list').getByRole('button', { name: /Assault Platform/ }).click();
-  await expect(page.getByTestId('inspected-name')).toContainText('Assault Platform');
+  await page.getByTestId('drone-list').getByRole('button', { name: /Rapier/ }).click();
+  await expect(page.getByTestId('inspected-name')).toContainText('Rapier');
+  await expect(page.getByTestId('inspected-brain-state')).toBeVisible();
   await expect(page.getByTestId('weapons-table')).toContainText('F.H1');
   await expect(page.getByTestId('trace-entries')).toContainText('nearestEnemy()');
   // events drawer
@@ -170,17 +171,19 @@ test('deployment is blocked by a brain that does nothing, and explains why', asy
   await page.getByLabel('Drone 1', { exact: true }).selectOption({ label: 'New drone' });
   await expect(page.getByTestId('roster-0')).toContainText('does nothing');
   await expect(page.getByRole('button', { name: 'Deploy' })).toBeDisabled();
-  await page.getByLabel('Drone 1', { exact: true }).selectOption({ label: 'Skirmisher' });
+  await page.getByLabel('Drone 1', { exact: true }).selectOption({ label: 'Rapier' });
   await expect(page.getByRole('button', { name: 'Deploy' })).toBeEnabled();
   await page.getByRole('button', { name: 'Deploy' }).click();
-  await expect(page.getByTestId('drone-list')).toContainText('Skirmisher');
+  await expect(page.getByTestId('drone-list')).toContainText('Rapier');
 });
 
 
 test('construct: hardpoint layouts relocate parts, ask before removing any, and undo restores', async ({ page }) => {
+  await page.getByTestId('drone-switcher').click();
+  await page.getByRole('option', { name: /Juggernaut/ }).click();
   await go(page, 'Construct');
   await page.getByTestId('section-front').click();
-  // Assault Platform front: two heavy cannons on a heavy Maximum section; Medium has one large mount
+  // Juggernaut front: two heavy cannons on a heavy Maximum section; Medium has one large mount
   await expect(page.getByTestId('layout-pick-front').getByTestId('layout-max')).toHaveAttribute('aria-checked', 'true');
   await page.getByTestId('layout-pick-front').getByTestId('layout-medium').click();
   const confirm = page.getByTestId('layout-confirm');
@@ -201,17 +204,17 @@ test('construct: hardpoint layouts relocate parts, ask before removing any, and 
   await expect(page.getByTestId('diagnostics')).toContainText('Rated mass on this chassis');
   await expect(page.getByTestId('diagnostics')).toContainText('Recoil and mounts');
   await page.getByTestId('diagnostics-toggle').click();
-  // a mount setting: the rocket cassette's interceptor split on an empty bay
+  // moving a part: point defense from F.H3 onto M.H3, which holds the rear quad machine gun
   await page.getByTestId('slot-F.H3').click();
   await page.getByTestId('move-part').click();
-  await expect(page.locator('.hint')).toContainText('Moving Optical Camera');
+  await expect(page.locator('.hint')).toContainText('Moving Point Defense');
   await page.getByRole('radio', { name: 'Internal bays' }).click();
   await page.getByRole('radio', { name: 'Hardpoints' }).click();
   await page.getByTestId('slot-M.H3').click();
-  // M.H3 holds the radar; the heavy Maximum F.H3 mount is medium-size, so the two swap
+  // the heavy Maximum F.H3 mount is medium-size, so the quad gun fits there and the two swap
   await expect(page.getByTestId('notice')).toContainText('Swapped');
-  await expect(page.getByTestId('slot-F.H3')).toHaveAttribute('aria-label', /Search Radar/);
-  await expect(page.getByTestId('slot-M.H3')).toHaveAttribute('aria-label', /Optical Camera/);
+  await expect(page.getByTestId('slot-F.H3')).toHaveAttribute('aria-label', /Quad/);
+  await expect(page.getByTestId('slot-M.H3')).toHaveAttribute('aria-label', /Point Defense/);
   // and a part that cannot fit back is refused with a reason: the heavy cannon onto a medium mount
   await page.getByTestId('slot-F.H1').click();
   await page.getByTestId('move-part').click();
@@ -224,10 +227,10 @@ test('simulate: a training course deploys with its targets, objective and goal',
   await page.getByTestId('scenario-button').click();
   await page.getByTestId('course').selectOption('maze');
   await expect(page.getByTestId('course-brief')).toContainText('reach the goal');
-  await page.getByLabel('Drone 1', { exact: true }).selectOption({ label: 'Pathfinder' });
+  await page.getByLabel('Drone 1', { exact: true }).selectOption({ label: 'Jackal' });
   await page.getByRole('button', { name: 'Remove drone 2' }).click();
   await page.getByRole('button', { name: 'Deploy' }).click();
-  await expect(page.getByTestId('drone-list')).toContainText('Pathfinder');
+  await expect(page.getByTestId('drone-list')).toContainText('Jackal');
   const controls = page.getByTestId('sim-controls');
   await controls.getByRole('radio', { name: '8×' }).click();
   await controls.getByRole('button', { name: 'Play' }).click();
@@ -324,6 +327,47 @@ test('mirror layout: flips the mounts across the section centreline, keeps the p
   await expect(page.getByTestId('mirror-note-rear')).toContainText('already symmetrical');
 });
 
+test('configure: generate a brain from tactics; edits elsewhere make it customised; regenerating keeps a copy', async ({ page }) => {
+  await page.getByTestId('drone-switcher').click();
+  await page.getByRole('option', { name: /Longbow/ }).click();
+  await go(page, 'Program');
+  const editor = page.getByRole('radiogroup', { name: 'Editor' });
+  await editor.getByRole('radio', { name: 'Configure' }).click();
+  // a hand-written brain is left alone until asked
+  await expect(page.getByTestId('cfg-status')).toContainText('written by hand');
+  await expect(page.getByTestId('cfg-hardware')).toContainText('Coilgun');
+  await expect(page.getByTestId('cfg-hardware')).toContainText('No missiles');
+  await page.getByTestId('cfg-generate').click();
+  await expect(page.getByTestId('cfg-status')).toContainText('generated from these settings');
+  // a setting applies at once to the brain
+  await page.getByRole('radio', { name: /^Aggressive/ }).click();
+  await editor.getByRole('radio', { name: 'Code' }).click();
+  await expect(page.getByTestId('code-editor')).toContainText('Doctrine: Aggressive');
+  // editing the program in Code customises it
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('ControlOrMeta+Home');
+  await page.keyboard.type('// my change\n');
+  await expect(page.getByTestId('compile-status')).toContainText('Brain compiles');
+  await editor.getByRole('radio', { name: 'Configure' }).click();
+  await expect(page.getByTestId('cfg-status')).toContainText('Customised');
+  // a setting is now stored without touching the program
+  await page.getByRole('radio', { name: /^Precision/ }).click();
+  await editor.getByRole('radio', { name: 'Code' }).click();
+  await expect(page.getByTestId('code-editor')).toContainText('my change');
+  await expect(page.getByTestId('code-editor')).toContainText('Doctrine: Aggressive');
+  // regenerating applies the stored settings and keeps the edited program
+  await editor.getByRole('radio', { name: 'Configure' }).click();
+  await page.getByTestId('cfg-generate').click();
+  await expect(page.getByTestId('cfg-status')).toContainText('generated from these settings');
+  await page.getByRole('button', { name: 'Recovered' }).click();
+  await expect(page.getByRole('complementary', { name: /Recovered/ })).toContainText('before Configure');
+  // survives a reload
+  await page.reload();
+  await go(page, 'Program');
+  await expect(page.getByTestId('cfg-status')).toContainText('generated from these settings');
+  await expect(page.getByRole('radio', { name: /^Precision/ })).toHaveAttribute('aria-checked', 'true');
+});
+
 test.describe('touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   test('every workspace is usable by touch', async ({ page }) => {
@@ -345,15 +389,26 @@ test.describe('touch phone', () => {
     await go(page, 'Simulate');
     await page.getByTestId('sim-controls').getByRole('button', { name: 'Play' }).tap();
     await page.waitForTimeout(600);
-    await page.getByTestId('drone-list').getByRole('button', { name: /Assault Platform/ }).tap();
+    await page.getByTestId('drone-list').getByRole('button', { name: /Rapier/ }).tap();
     await expect(page.getByTestId('inspected-name')).toBeVisible();
     // previous / next drone and the sheet sizes
     await page.getByRole('button', { name: 'Next drone' }).tap();
-    await expect(page.getByTestId('inspected-name')).toContainText('AA Destroyer');
+    await expect(page.getByTestId('inspected-name')).toContainText('Kestrel');
     await page.getByTestId('sheet-grab').tap();
     await expect(page.getByTestId('inspector')).toHaveAttribute('data-sheet', /full|peek|half/);
     await page.getByRole('button', { name: 'Close diagnostics' }).tap();
     await expect(page.getByTestId('inspector')).toHaveCount(0);
+  });
+
+  test('configure by touch', async ({ page }) => {
+    await go(page, 'Program');
+    await page.getByRole('radiogroup', { name: 'Editor' }).getByRole('radio', { name: 'Configure' }).tap();
+    await expect(page.getByTestId('configure')).toBeVisible();
+    await page.getByTestId('cfg-generate').tap();
+    await expect(page.getByTestId('cfg-status')).toContainText('generated from these settings');
+    await page.getByRole('radio', { name: /^Defensive/ }).tap();
+    await expect(page.getByRole('radio', { name: /^Defensive/ })).toHaveAttribute('aria-checked', 'true');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 
   test('slot-first install by touch, and the weapon shows its storage', async ({ page }) => {
@@ -381,6 +436,9 @@ test.describe('touch phone', () => {
   });
 
   test('a part can be moved to another slot by touch, and the drone stays visible', async ({ page }) => {
+    // Viper's middle section carries a machine gun on each side
+    await page.getByTestId('drone-switcher').tap();
+    await page.getByRole('option', { name: /Viper/ }).tap();
     await go(page, 'Construct');
     await page.getByTestId('slot-M.H1').tap();
     await page.getByTestId('move-part').tap();

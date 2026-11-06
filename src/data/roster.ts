@@ -116,12 +116,12 @@ export const TALON = design(
   sec('light', 'medium', 8, { H1: m('mg', 180) }),
 );
 
-/** Advanced · tracked missile hunter: radar, two point-defense guns, interceptor rockets, a dual autocannon. */
+/** Advanced · tracked missile hunter: radar, two point-defense guns, interceptor rockets, an autocannon. */
 export const WARDEN = design(
   'starter-warden',
   'Warden',
   'tracked',
-  sec('heavy', 'medium', 50, { H1: m('dual_autocannon'), H2: m('rocket_pod', 0, { interceptors: 3 }), H3: m('point_defense'), I1: m('ammo_medium'), I2: m('rocket_cassette', 0, { interceptors: 8 }) }),
+  sec('heavy', 'medium', 50, { H1: m('autocannon'), H2: m('rocket_pod', 0, { interceptors: 3 }), H3: m('point_defense'), I1: m('ammo_medium'), I2: m('rocket_cassette', 0, { interceptors: 8 }) }),
   sec('medium', 'medium', 28, { H1: m('radar'), H2: m('point_defense'), I1: m('ammo_small'), I2: m('battery') }),
   sec('light', 'medium', 10, { I1: m('ammo_medium') }),
 );
@@ -146,13 +146,13 @@ export const PARAGON = design(
   sec('light', 'medium', 10, { H1: m('mg', 180), I1: m('battery') }),
 );
 
-/** Expert · walking siege platform: two heavy cannons, a directional shield, point defense, a reactor. */
+/** Expert · walking siege platform: two heavy cannons, a compact shield, point defense, a reactor. */
 export const JUGGERNAUT = design(
   'starter-juggernaut',
   'Juggernaut',
   'walking',
-  sec('heavy', 'max', 70, { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('point_defense'), I1: m('cooler'), I2: m('autoloader'), I3: m('shell_rack'), I4: m('reactor') }),
-  sec('heavy', 'min', 45, { H1: m('radar'), H2: m('shield_dir'), H3: m('quad_mg', 180), I1: m('fire_suppression'), I2: m('shell_rack'), I3: m('coupling', 0, { joint: 'front' }), I4: m('ammo_small') }),
+  sec('heavy', 'max', 55, { H1: m('heavy_cannon'), H2: m('heavy_cannon'), H3: m('point_defense'), I1: m('cooler'), I2: m('autoloader'), I3: m('shell_rack'), I4: m('reactor') }),
+  sec('heavy', 'min', 30, { H1: m('radar'), H2: m('shield_compact'), H3: m('mg', 180), I1: m('fire_suppression'), I2: m('shell_rack'), I3: m('coupling', 0, { joint: 'front' }), I4: m('ammo_small') }),
   sec('light', 'medium', 12, { I1: m('cooler'), I2: m('thermal_reservoir') }),
 );
 
