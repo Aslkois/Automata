@@ -44,8 +44,8 @@ const notify = () => {
 
 export function defaultScenario(lib: Library): Scenario {
   const has = (id: string) => lib.designs.some((d) => d.id === id);
-  const a = has('example-assault') ? 'example-assault' : lib.designs[0]?.id ?? '';
-  const b = has('example-aa-destroyer') ? 'example-aa-destroyer' : lib.designs[1]?.id ?? a;
+  const a = has('starter-rapier') ? 'starter-rapier' : lib.designs[0]?.id ?? '';
+  const b = has('starter-kestrel') ? 'starter-kestrel' : (lib.designs.find((d) => d.id !== a)?.id ?? a);
   return { mode: 'duel', seed: 1, timeLimit: 180, decisionHz: 10, roster: [{ key: 1, team: 0, designId: a }, { key: 2, team: 1, designId: b }] };
 }
 

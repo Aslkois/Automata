@@ -10,11 +10,30 @@ import { graphToIR, irToGraph, type GraphDoc } from './graph';
 import { irHash, type BrainIR } from './ir';
 import { parseBrain } from './parse';
 import { printIR } from './print';
+import { parseConfig, type BrainConfig } from '../configure/config';
 import { carryHidden, reconcile } from './reconcile';
 
 export const BRAIN_SCHEMA = 2;
+/** The three projections of the IR. */
 export type ViewKind = 'blocks' | 'nodes' | 'code';
 export const VIEW_KINDS: ViewKind[] = ['blocks', 'nodes', 'code'];
+/** The editors a brain can be open in: the projections, plus Configure (which generates the IR). */
+export type EditorKind = ViewKind | 'configure';
+export const EDITOR_KINDS: EditorKind[] = ['configure', 'blocks', 'nodes', 'code'];
+
+/**
+ * A brain made with Configure keeps its settings. `hash` is the semantic hash (ids ignored) of
+ * the program they generated: while the brain's IR still has that hash, the brain *is* the
+ * configuration; once another editor changes it, the brain is customised and Configure never
+ * overwrites it without being asked.
+ */
+export interface BrainConfigMeta {
+  data: BrainConfig;
+  hash: string;
+  /** identity of the hardware it was generated for (see analyzeHardware().key) */
+  hardware: string;
+  generator: number;
+}
 
 export interface CodeDoc {
   text: string;
@@ -46,11 +65,13 @@ export interface Brain {
   designId: string;
   ir: BrainIR;
   /** the editor last used: UI state, not identity */
-  view: ViewKind;
+  view: EditorKind;
   views: { code?: ViewCache<CodeDoc>; blocks?: ViewCache<BlocksDoc>; nodes?: ViewCache<GraphDoc> };
   updatedAt: number;
   /** provenance of a migrated brain (schema-1 program) */
   origin?: { programId: string; kind: string; name: string };
+  /** the Configure settings this brain was generated from, if any */
+  config?: BrainConfigMeta;
 }
 
 export const STARTER_CODE = `// Runs on every decision tick (10 Hz).
@@ -72,7 +93,7 @@ export function irFromCode(code: string): BrainIR {
   return r.ir;
 }
 
-export function newBrain(id: string, designId: string, code = STARTER_CODE, view: ViewKind = 'blocks'): Brain {
+export function newBrain(id: string, designId: string, code = STARTER_CODE, view: EditorKind = 'blocks'): Brain {
   return { schema: BRAIN_SCHEMA, id, designId, ir: irFromCode(code), view, views: {}, updatedAt: Date.now() };
 }
 
@@ -175,5 +196,10 @@ export function validateBrain(raw: unknown): Brain {
   if (typeof b.id !== 'string' || typeof b.designId !== 'string') throw new Error('brain is missing its id or drone');
   if (!b.ir || !Array.isArray(b.ir.body)) throw new Error('brain has no program');
   if (b.schema > BRAIN_SCHEMA) throw new Error('brain schema is newer than supported');
-  return { schema: BRAIN_SCHEMA, id: b.id, designId: b.designId, ir: b.ir, view: VIEW_KINDS.includes(b.view) ? b.view : 'blocks', views: b.views ?? {}, updatedAt: b.updatedAt ?? Date.now(), ...(b.origin ? { origin: b.origin } : {}) };
+  const cfg = b.config as BrainConfigMeta | undefined;
+  const config =
+    cfg && typeof cfg === 'object' && typeof cfg.hash === 'string'
+      ? { data: parseConfig(cfg.data), hash: cfg.hash, hardware: typeof cfg.hardware === 'string' ? cfg.hardware : '', generator: typeof cfg.generator === 'number' ? cfg.generator : 1 }
+      : undefined;
+  return { schema: BRAIN_SCHEMA, id: b.id, designId: b.designId, ir: b.ir, view: EDITOR_KINDS.includes(b.view) ? b.view : 'blocks', views: b.views ?? {}, updatedAt: b.updatedAt ?? Date.now(), ...(b.origin ? { origin: b.origin } : {}), ...(config ? { config } : {}) };
 }

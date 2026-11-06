@@ -90,12 +90,12 @@ HELPERS.push(
   {
     name: 'steerClear',
     sig: 'steerClear(throttle = 1)',
-    doc: 'Drive forward and turn toward the more open side when something is within 150 u ahead; reverse out when the front bumper touches.',
+    doc: 'Drive forward and turn toward the more open side when something is within 150 u ahead; reverse out when the front bumper touches or the way is blocked within 45 u.',
     category: 'move',
     code: `function steerClear(t) {
   if (t == null) t = 1;
-  if (drone.bumper("front")) { drone.drive(-0.6, openDistance("left") > openDistance("right") ? 1 : -1); return; }
   var ahead = openDistance("front");
+  if (drone.bumper("front") || ahead < 45) { drone.drive(-0.6, openDistance("left") > openDistance("right") ? 1 : -1); return; }
   if (ahead < 150) { drone.drive(t * 0.25, openDistance("left") > openDistance("right") ? -1 : 1); return; }
   drone.drive(t, clamp((openDistance("right") - openDistance("left")) / 600, -0.3, 0.3));
 }`,

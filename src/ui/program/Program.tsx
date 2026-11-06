@@ -1,12 +1,13 @@
-// PROGRAM — the selected drone's brain, shown as Blocks, Nodes or Code. One program; the
-// mode switch only changes how it is shown and edited.
+// PROGRAM — the selected drone's brain: generated from tactics in Configure, or shown as
+// Blocks, Nodes or Code. One program; the mode switch only changes how it is made and edited.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { blockModules, type BlocksDoc } from '../../program/brain/blocks';
 import { CALLS, CATEGORY_LABEL, SNIPPETS, type Category, type DesignIds } from '../../program/brain/catalog';
 import { compileBrain } from '../../program/brain/compile';
 import type { GraphDoc } from '../../program/brain/graph';
 import { indexIR } from '../../program/brain/ir';
-import { discardDraft, newBrain, openView, restoreSetAside, STARTER_CODE, type CodeDoc, type ViewDocs, type ViewKind } from '../../program/brain/model';
+import { discardDraft, newBrain, openView, restoreSetAside, STARTER_CODE, type CodeDoc, type EditorKind, type ViewDocs, type ViewKind } from '../../program/brain/model';
+import { configStatus } from '../../program/configure';
 import { listMounts } from '../../sim/design';
 import { useShell } from '../App';
 import { Icon, Kbd, Segments, useDismiss, useStoredState } from '../common';
@@ -17,10 +18,12 @@ import { CAT } from '../theme';
 import { BlockEditor, type EditorHandle } from './BlockEditor';
 import { designIds } from './blockTypes';
 import { CodeEditor, type CodeHandle } from './CodeEditor';
+import { ConfigureEditor } from './ConfigureEditor';
 import { NodeEditor } from './NodeEditor';
 import { SymbolBar } from './SymbolBar';
 
-const VIEWS: { id: ViewKind; label: string; hint: string }[] = [
+const VIEWS: { id: EditorKind; label: string; hint: string }[] = [
+  { id: 'configure', label: 'Configure', hint: 'Choose tactics; the brain is written for this drone’s hardware' },
   { id: 'blocks', label: 'Blocks', hint: 'Snap-together blocks' },
   { id: 'nodes', label: 'Nodes', hint: 'A graph of steps and values' },
   { id: 'code', label: 'Code', hint: 'AutoScript text' },
@@ -43,7 +46,10 @@ export function Program({ active }: { active: boolean }) {
   const emittedSig = useRef<unknown>(null);
 
   const saving = useSaving();
-  const view: ViewKind = brain?.view ?? 'blocks';
+  const editor: EditorKind = brain?.view ?? 'blocks';
+  const configuring = editor === 'configure';
+  // Configure is not a projection of the program: while it is open, the program text is the projection kept current
+  const view: ViewKind = configuring ? 'code' : (editor as ViewKind);
   const opened = useMemo(() => (brain ? openView(brain, view) : null), [brain, view]);
 
   // keep regenerated documents so layout and ids stay put across visits
@@ -74,7 +80,9 @@ export function Program({ active }: { active: boolean }) {
   // navigation from the battlefield: reveal the logic behind a decision
   useEffect(() => {
     if (!focus || !brain || focus.designId !== designId) return;
-    if (focus.view && focus.view !== brain.view) library.saveBrain({ ...brain, view: focus.view });
+    // the debugger points at program statements: from Configure, open them in Code
+    const want = focus.view ?? (brain.view === 'configure' ? 'code' : undefined);
+    if (want && want !== brain.view) library.saveBrain({ ...brain, view: want });
     setHighlight({ id: focus.id, n: focus.nonce });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus]);
@@ -96,8 +104,8 @@ export function Program({ active }: { active: boolean }) {
   const errorMap = new Map(errors.filter((e) => e.ref).map((e) => [e.ref!, e.message]));
   const modules = view === 'blocks' ? blockModules(doc as BlocksDoc) : view === 'nodes' ? (doc as GraphDoc).nodes.filter((n) => n.t === 'code' || n.t === 'codev').length : 0;
 
-  const setView = (v: ViewKind) => {
-    if (v === view) return;
+  const setView = (v: EditorKind) => {
+    if (v === editor) return;
     library.saveBrain({ ...library.brainFor(designId)!, view: v });
     setHighlight((h) => (h ? { ...h, n: h.n + 1 } : h));
   };
@@ -106,10 +114,12 @@ export function Program({ active }: { active: boolean }) {
     library.editBrain(designId, k, d);
   };
   const reveal = (id: string | undefined, line?: number) => {
+    if (configuring) setView('code');
     if (id) setHighlight({ id, n: Date.now() });
     else if (line && view === 'code') codeRef.current?.revealLine(line);
   };
   const insert = (code: string, kind: 'stmt' | 'expr' | 'top') => {
+    if (configuring) return false;
     if (view === 'code') {
       codeRef.current?.insert(code);
       return true;
@@ -120,6 +130,7 @@ export function Program({ active }: { active: boolean }) {
   const hl = highlight && indexIR(brain.ir).has(highlight.id) ? highlight.id : null;
   const codeLine = view === 'code' && hl ? (doc as CodeDoc).idLine[hl] ?? null : null;
   const key = `${brain.id}:${view}:${token.current}`;
+  const cfgStatus = configStatus(brain, design);
 
   return (
     <div className={`program ${drawer ? `with-${drawer}` : ''}`} data-testid="programs">
@@ -128,7 +139,7 @@ export function Program({ active }: { active: boolean }) {
           <Segments size="sm" classes={classesOf(design)} />
           <div>
             <h1>{design.name}</h1>
-            <p className="muted">Brain</p>
+            <p className="muted">Brain{cfgStatus === 'synced' ? ' · configured' : cfgStatus === 'customized' ? ' · configured, customised' : ''}</p>
           </div>
           <button className="chip-btn hw" onClick={() => go('construct')} title="Open this drone’s hardware" aria-label="Hardware">
             <Icon name="construct" size={16} /> <span>Hardware</span>
@@ -136,8 +147,9 @@ export function Program({ active }: { active: boolean }) {
         </div>
         <div className="mode" role="radiogroup" aria-label="Editor">
           {VIEWS.map((v) => (
-            <button key={v.id} role="radio" aria-checked={view === v.id} className={view === v.id ? 'on' : ''} onClick={() => setView(v.id)} title={v.hint}>
+            <button key={v.id} role="radio" aria-checked={editor === v.id} className={editor === v.id ? 'on' : ''} onClick={() => setView(v.id)} title={v.hint}>
               {v.label}
+              {v.id === 'configure' && cfgStatus !== 'none' && <span className={`cfg-dot ${cfgStatus}`} title={cfgStatus === 'synced' ? 'Generated from settings' : cfgStatus === 'customized' ? 'Customised since generation' : 'Hardware changed since generation'} />}
             </button>
           ))}
         </div>
@@ -150,7 +162,7 @@ export function Program({ active }: { active: boolean }) {
             {problemsOpen && <Problems errors={errors} onPick={(e) => (reveal(e.ref, e.line), setProblemsOpen(false))} onClose={() => setProblemsOpen(false)} />}
           </div>
           <span className="save muted" aria-live="polite">
-            {opened.opened.isDraft ? 'Draft kept' : saving ? 'Saving…' : 'Saved'}
+            {!configuring && opened.opened.isDraft ? 'Draft kept' : saving ? 'Saving…' : 'Saved'}
           </span>
           <button className="btn primary" onClick={() => testDrone(designId)} disabled={compiled.errors.length > 0} title="Deploy this drone in Simulate">
             <Icon name="simulate" /> Test
@@ -167,7 +179,7 @@ export function Program({ active }: { active: boolean }) {
             ['more', 'list', 'Recovered'],
           ] as const
         ).map(([id, icon, label]) => (
-          <button key={id} className={`tbtool ${drawer === id ? 'on' : ''}`} aria-pressed={drawer === id} onClick={() => setDrawer(drawer === id ? null : id)} title={label}>
+          <button key={id} className={`tbtool ${drawer === id ? 'on' : ''}`} aria-pressed={drawer === id} disabled={id === 'insert' && configuring} onClick={() => setDrawer(drawer === id ? null : id)} title={id === 'insert' && configuring ? 'Insert works in Blocks, Nodes and Code' : label}>
             <Icon name={icon} size={20} />
             <span>{label}</span>
           </button>
@@ -175,7 +187,7 @@ export function Program({ active }: { active: boolean }) {
       </nav>
 
       <div className="editor-frame">
-        {opened.opened.isDraft && (
+        {!configuring && opened.opened.isDraft && (
           <div className="banner warn" role="status">
             <Icon name="warn" size={16} />
             <span>
@@ -189,7 +201,7 @@ export function Program({ active }: { active: boolean }) {
             </button>
           </div>
         )}
-        {!opened.opened.isDraft && opened.opened.setAside && (
+        {!configuring && !opened.opened.isDraft && opened.opened.setAside && (
           <div className="banner" role="status">
             <span>An unfinished {view} draft was set aside because the brain changed in another editor.</span>
             <button className="link" onClick={() => library.saveBrain(restoreSetAside(library.brainFor(designId)!, view))}>
@@ -200,15 +212,16 @@ export function Program({ active }: { active: boolean }) {
             </button>
           </div>
         )}
-        {modules > 0 && (
+        {!configuring && modules > 0 && (
           <div className="compat muted" title="Constructs this editor can't draw natively are shown as code modules: exact AutoScript that runs unchanged and can be edited in place.">
             <Icon name="program" size={14} /> {modules} code {modules === 1 ? 'module' : 'modules'}
           </div>
         )}
         <div className="editor-host">
-          {view === 'blocks' && <BlockEditor key={key} ref={blockRef} doc={doc as BlocksDoc} onChange={(d) => onEdit('blocks', d)} highlight={hl ? `${hl}` : null} errorRefs={errorRefs} visible={active} />}
-          {view === 'nodes' && <NodeEditor key={key} ref={nodeRef} doc={doc as GraphDoc} onChange={(d) => onEdit('nodes', d)} highlight={hl} errors={errorMap} ids={ids} />}
-          {view === 'code' && (
+          {configuring && <ConfigureEditor design={design} brain={brain} onOpenCode={() => setView('code')} onTest={() => testDrone(designId)} canTest={compiled.errors.length === 0} />}
+          {!configuring && view === 'blocks' && <BlockEditor key={key} ref={blockRef} doc={doc as BlocksDoc} onChange={(d) => onEdit('blocks', d)} highlight={hl ? `${hl}` : null} errorRefs={errorRefs} visible={active} />}
+          {!configuring && view === 'nodes' && <NodeEditor key={key} ref={nodeRef} doc={doc as GraphDoc} onChange={(d) => onEdit('nodes', d)} highlight={hl} errors={errorMap} ids={ids} />}
+          {!configuring && view === 'code' && (
             <>
               <CodeEditor key={key} ref={codeRef} value={(doc as CodeDoc).text} onChange={(text) => onEdit('code', { text, idLine: {}, rawLine: {} })} highlightLine={codeLine} />
               <SymbolBar onInsert={(t) => codeRef.current?.insert(t)} />
@@ -217,7 +230,7 @@ export function Program({ active }: { active: boolean }) {
         </div>
       </div>
 
-      {drawer === 'insert' && <InsertDrawer ids={ids} view={view} onInsert={insert} onClose={() => setDrawer(null)} />}
+      {drawer === 'insert' && !configuring && <InsertDrawer ids={ids} view={view} onInsert={insert} onClose={() => setDrawer(null)} />}
       {drawer === 'reference' && <ReferenceDrawer onInsert={(c) => insert(c, c.endsWith(';') ? 'stmt' : 'expr')} onClose={() => setDrawer(null)} />}
       {drawer === 'debug' && <DebugDrawer designId={designId} onReveal={(id) => reveal(id)} onClose={() => setDrawer(null)} />}
       {drawer === 'more' && <RecoveredDrawer designId={designId} onClose={() => setDrawer(null)} />}

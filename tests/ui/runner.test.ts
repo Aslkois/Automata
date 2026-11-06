@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AA_DESTROYER, AA_PROGRAM, ASSAULT_PLATFORM, ASSAULT_PROGRAM } from '../../src/data/defaults';
+import { AA_DESTROYER, AA_PROGRAM, ASSAULT_PLATFORM, ASSAULT_PROGRAM } from '../../src/data/legacy';
 import { defaultArena, Simulation, type ScenarioConfig } from '../../src/sim/world';
 import { SimRunner } from '../../src/ui/simulate/runner';
 

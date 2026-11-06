@@ -1,5 +1,5 @@
 // Runs a duel headlessly and prints a summary. Usage: npm run sim:headless -- [seed] [seconds]
-import { AA_DESTROYER, AA_PROGRAM, ASSAULT_PLATFORM, ASSAULT_PROGRAM, BRAWLER_PROGRAM, SKIRMISHER } from '../src/data/defaults';
+import { AA_DESTROYER, AA_PROGRAM, ASSAULT_PLATFORM, ASSAULT_PROGRAM, BRAWLER_PROGRAM, SKIRMISHER } from '../src/data/legacy';
 import { computeStats, validateDesign } from '../src/sim/design';
 import { defaultArena, Simulation } from '../src/sim/world';
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { damageComponent } from '../../src/sim/damage';
-import { AA_DESTROYER } from '../../src/data/defaults';
+import { AA_DESTROYER } from '../../src/data/legacy';
 import type { SimEvent } from '../../src/sim/types';
 import { code, comp, design, idle, m, makeSim, runUntilProjectilesGone, shoot } from './helpers';
 

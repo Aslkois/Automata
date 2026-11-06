@@ -455,9 +455,12 @@ export function createDroneApi(host: ApiHost): ObjVal {
       const s = w0.ammo.includes('rocket') || w0.ammo.includes('missile') ? 600 : w0.muzzleVelocity;
       const rx = tx - m.x;
       const ry = ty - m.y;
-      // Solve |r + v t| = s t
-      const A = tvx * tvx + tvy * tvy - s * s;
-      const B = 2 * (rx * tvx + ry * tvy);
+      // Rounds leave the muzzle carrying the drone's own velocity, so the lead is solved in
+      // the drone's frame: with v the target's velocity relative to ours, |r + v t| = s t.
+      const vx = tvx - d.body.vel.x;
+      const vy = tvy - d.body.vel.y;
+      const A = vx * vx + vy * vy - s * s;
+      const B = 2 * (rx * vx + ry * vy);
       const C = rx * rx + ry * ry;
       let time: number;
       if (Math.abs(A) < 1e-9) time = -C / B;
@@ -469,7 +472,8 @@ export function createDroneApi(host: ApiHost): ObjVal {
         time = Math.min(...[t1, t2].filter((x) => x > 0));
       }
       if (!Number.isFinite(time) || time <= 0) return null;
-      return makeObj({ x: tx + tvx * time, y: ty + tvy * time, t: time });
+      // the point to aim the barrel at (for a moving shooter this is not where the target will be)
+      return makeObj({ x: tx + vx * time, y: ty + vy * time, t: time });
     }),
 
     // ---------------------------------------------------------------- shields

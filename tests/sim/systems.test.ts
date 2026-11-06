@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AA_DESTROYER, AA_PROGRAM, ASSAULT_PLATFORM, ASSAULT_PROGRAM, BRAWLER_PROGRAM, SKIRMISHER } from '../../src/data/defaults';
+import { AA_DESTROYER, AA_PROGRAM, ASSAULT_PLATFORM, ASSAULT_PROGRAM, BRAWLER_PROGRAM, SKIRMISHER } from '../../src/data/legacy';
 import { parseBrain } from '../../src/program/brain/parse';
 import { blocksToIR, irToBlocks } from '../../src/program/brain/blocks';
 import { graphToIR, irToGraph } from '../../src/program/brain/graph';

@@ -1,7 +1,8 @@
 // Acceptance tests for "one brain, three editors": the IR is the program; Blocks, Nodes and
 // Code are views of it. These run headless against the same projections the editors use.
 import { describe, expect, it } from 'vitest';
-import { AA_CODE, AA_DESTROYER, ASSAULT_CODE, ASSAULT_PLATFORM, BRAWLER_CODE, LEGACY_DEFAULT_PROGRAMS, SKIRMISHER, DEFAULT_DESIGNS } from '../../src/data/defaults';
+import { STARTER_SET } from '../../src/data/defaults';
+import { AA_CODE, AA_DESTROYER, ASSAULT_CODE, ASSAULT_PLATFORM, BRAWLER_CODE, LEGACY_DEFAULT_PROGRAMS, LEGACY_DESIGNS, SKIRMISHER } from '../../src/data/legacy';
 import { blocksToIR, irToBlocks, type BJ, type BlocksDoc } from '../../src/program/brain/blocks';
 import { compileBrain } from '../../src/program/brain/compile';
 import { graphToIR, irToGraph, type GraphDoc } from '../../src/program/brain/graph';
@@ -230,7 +231,7 @@ describe('one brain, three editors', () => {
     g.nodes[0].x = 1234;
     brain = applyEdit(brain, 'nodes', g).brain;
     brain = { ...brain, view: 'nodes' };
-    const stored = JSON.parse(JSON.stringify({ version: 2, designs: [AA_DESTROYER], brains: [brain], recovered: [] }));
+    const stored = JSON.parse(JSON.stringify({ version: 2, designs: [AA_DESTROYER], brains: [brain], recovered: [], starters: STARTER_SET }));
     const re = migrateLibrary(stored)!.library.brains[0];
     expect(irHash(re.ir)).toBe(irHash(brain.ir));
     expect(re.view).toBe('nodes');
@@ -278,11 +279,14 @@ describe('one brain, three editors', () => {
     const custom2 = { schema: 1, id: 'my-prog-2', name: 'Sniper doctrine v2', kind: 'code', code: 'function update(){ drone.drive(1,0); }' };
     const sniper = { ...ASSAULT_PLATFORM, id: 'sniper', name: 'Sniper' };
     const broken = { schema: 1, id: 'broken', name: 'Half-built', kind: 'blocks', blocks: { blocks: { languageVersion: 0, blocks: [{ type: 'mystery', id: 'x' }] } } };
-    const v1 = { version: 1, designs: [...DEFAULT_DESIGNS, sniper], programs: [...LEGACY_DEFAULT_PROGRAMS, custom, custom2, broken] };
+    // the player had renamed the old examples, so the roster replacement keeps them as their own
+    const mine = LEGACY_DESIGNS.slice(0, 5).map((d) => ({ ...d, name: `${d.name} (mine)` }));
+    const v1 = { version: 1, designs: [...mine, sniper], programs: [...LEGACY_DEFAULT_PROGRAMS, custom, custom2, broken] };
     const m = migrateLibrary(JSON.parse(JSON.stringify(v1)))!;
     expect(m.migrated).toBe(true);
     const lib = m.library;
-    expect(lib.designs.map((d) => d.id)).toEqual(v1.designs.map((d) => d.id));
+    // every schema-1 design survives (the new starters are added after them)
+    expect(lib.designs.map((d) => d.id).slice(0, v1.designs.length)).toEqual(v1.designs.map((d) => d.id));
     expect(lib.brains).toHaveLength(lib.designs.length);
     for (const d of lib.designs) expect(lib.brains.filter((b) => b.designId === d.id)).toHaveLength(1);
     // clear associations retained
